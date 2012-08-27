@@ -4,7 +4,7 @@ use 5.008;
 use strict;
 use warnings;
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 # kafka server imitation (non-blocking mode)
 
@@ -561,7 +561,7 @@ Kafka::Mock - object interface to the TCP mock server for testing
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Mock> version 0.02
+This documentation refers to C<Kafka::Mock> version 0.03
 
 =head1 SYNOPSIS
 

@@ -46,7 +46,7 @@ my %config = (
 my @patterns = qw( t/*.t t/*/*.t );
 $config{test} = { TESTS => join ' ', map { glob } @patterns };
 
-print "=  => To run a full tests requires a running local server kafka (port 9092) <=  =\n";
+print "=  => To run a full tests requires a running local server kafka (port 9092) <=  =\n" unless $no_full_tests;
 my $answer = $no_full_tests || prompt( 'Do you want to run a full tests of the client?', 'no' );
 
 if ( $answer =~ m/^y/i ) 
