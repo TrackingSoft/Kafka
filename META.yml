@@ -1,0 +1,29 @@
+---
+abstract: 'Apache Kafka low-level synchronous API, which does not use Zookeeper.'
+author:
+  - 'TrackingSoft LLC <sgladkov@trackingsoft.com>'
+build_requires:
+  CPAN::Meta: 2.120921
+  Test::Deep: 0.109
+  Test::Distribution: 2
+  Test::Exception: 0.31
+  Test::Kwalitee: 1.01
+  Test::Pod: 1.45
+  Test::Pod::Coverage: 1.08
+configure_requires:
+  ExtUtils::MakeMaker: 0
+dynamic_config: 1
+generated_by: 'ExtUtils::MakeMaker version 6.62, CPAN::Meta::Converter version 2.120921'
+license: perl
+meta-spec:
+  url: http://module-build.sourceforge.net/META-spec-v1.4.html
+  version: 1.4
+name: Kafka
+no_index:
+  directory:
+    - t
+    - inc
+requires:
+  Digest::CRC: 0.18
+  Params::Util: 1.04
+version: 0.02

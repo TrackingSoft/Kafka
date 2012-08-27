@@ -1,0 +1,115 @@
+Kafka package version 0.02
+==========================
+
+The Kafka package is a set of Perl modules which provides a
+simple and consistent application programming interface (API) to the
+Apache Kafka, a high-throughput distributed messaging system.
+The main focus of the package is to provide classes
+and functions that allow you to write Apache Kafka clients
+without Apache ZooKeeper service.
+
+The Kafka package was written, tested, and found working on 
+recent Linux distributions.
+
+INSTALLATION
+
+To install this package type the following:
+
+   perl Makefile.PL
+   make
+   make test
+   make install
+
+DEPENDENCIES
+
+In order to install and use this package you will need Perl version
+5.10 or better. Some modules within this package depend on other
+packages that are distributed separately from Perl. We recommend that
+you have the following packages installed before you install
+Kafka:
+
+   Digest::CRC
+   Params::Util
+
+Digest::CRC version 0.18 has a bug which prevents it from using fast,
+XS code if installed via CPAN.
+Please install this module manually using
+'perl Makefile.PL && make test install' if installed via CPAN shell.
+
+The Kafka package has the following optional dependencies:
+
+   Test::Pod
+   Test::Pod::Coverage
+   Test::Exception
+   CPAN::Meta
+   Test::Deep
+   Test::Distribution
+   Test::Kwalitee
+
+If the optional modules are missing, some "prereq" tests are skipped.
+
+The installation of the missing dependencies can either be accomplished
+through your OS package manager or through CPAN (or downloading the source
+for all dependencies and compiling them manually).
+
+TESTING
+
+The following environment variables change the way Kafka Benchmark test behave
+("t/99_usage/03_kafka_bench.t"):
+
+   # the IO timeout in secs
+   KAFKA_BENCHMARK_TIMEOUT = 0.5
+
+   # minimum length of test messages
+   KAFKA_BENCHMARK_LEN_MIN = 200
+
+   # maximum length of the test messages
+   KAFKA_BENCHMARK_LEN_MAX = 200
+
+   # number of messages for batch testing
+   KAFKA_BENCHMARK_PACKAGE = 5000
+
+   # number of messages for a single test
+   KAFKA_BENCHMARK_SINGLE = 5
+
+SIMPLE BENCHMARK
+
+Use benchmark_consumer.pl and benchmark_producer.pl to run a simple benchmark.
+Run one or more consumer instances using benchmark_consumer.pl .
+and one or more producer instances using benchmark_producer.pl .
+
+DOCUMENTATION
+
+Every Kafka package module has a man page.
+A simple description of each module is included below in
+the SEE ALSO section.
+
+SEE ALSO
+
+The basic operation of the Kafka package modules:
+
+   Kafka             - constants and messages used by
+                       the Kafka package modules
+   Kafka::IO         - object interface to socket communications
+                       with the Apache Kafka server
+   Kafka::Protocol   - functions to process messages
+                       in the Apache Kafka's Wire Format
+   Kafka::Message    - object interface to the Kafka message properties
+   Kafka::Int64      - functions to work with 64 bit elements
+                       of the protocol on 32 bit systems
+   Kafka::Mock       - object interface to the TCP mock server for testing
+   Kafka::Producer   - object interface to the producer client
+   Kafka::Consumer   - object interface to the consumer client
+
+COPYRIGHT AND LICENCE
+
+Copyright (C) 2012 by TrackingSoft LLC.
+All rights reserved.
+
+This package is free software; you can redistribute it and/or modify it under
+the same terms as Perl itself. See perlartistic at
+http://dev.perl.org/licenses/artistic.html .
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+or FITNESS FOR A PARTICULAR PURPOSE.

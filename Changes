@@ -1,0 +1,12 @@
+Revision history for Kafka package
+
+0.02  Wed Jun  13 2012
+    CHANGES:
+    - Minor changes in documentation
+
+    BUGFIXES:
+    - Fixed Kafka::Int64 to make it working on Perl 5.12
+    - Disallow using 0 timeouts in Kafka::IO and Kafka::Mock
+
+0.01  Tue Jun  12 2012
+    - Original version
