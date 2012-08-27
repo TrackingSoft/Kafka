@@ -437,7 +437,7 @@ The following methods are defined for the C<Kafka::IO> class:
 
 =head3 C<send( $message )>
 
-Sends a message on a C<Kafka::IO> IO object socket. Reconnects on unconnected
+Sends a message on a C<Kafka::IO> object socket. Reconnects on unconnected
 sockets.
 
 The argument must be a bytes string.
@@ -447,7 +447,7 @@ the undefined value if the L</RaiseError> is not true.
 
 =head3 C<receive( $length )>
 
-Receives a message on a IO object socket. Attempts to receive the C<$length>
+Receives a message on an IO object socket. Attempts to receive the C<$length>
 bytes of data.
 
 Returns a reference to the received message. If there's an error, returns
@@ -458,7 +458,7 @@ and Perl thinks it's a number.
 
 =head3 C<close>
 
-The method to close the C<Kafka::IO> IO object and clean up.
+The method to close the C<Kafka::IO> object and clean up.
 
 =head3 C<last_errorcode>
 
@@ -505,12 +505,12 @@ L<constructor|/CONSTRUCTOR> or to other L<method|/METHODS>.
 
 =item C<Can't send>
 
-This means that the message can't be sent on a C<Kafka::IO> IO object socket.
+This means that the message can't be sent on a C<Kafka::IO> object socket.
 
 =item C<Can't recv>
 
 This means that the message can't be received on a C<Kafka::IO>
-IO object socket.
+object socket.
 
 =item C<Can't bind>
 

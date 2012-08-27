@@ -262,7 +262,7 @@ The following methods are defined for the C<Kafka::Producer> class:
 =head3 C<send( $topic, $partition, $messages )>
 
 Sends a messages (coded according to the Apache Kafka Wire Format protocol)
-on a C<Kafka::IO> IO object socket.
+on a C<Kafka::IO> object socket.
 
 Returns 1 if the message is successfully sent. If there's an error, returns
 the undefined value if the C<RaiseError> is not true.

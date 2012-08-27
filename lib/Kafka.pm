@@ -96,7 +96,7 @@ __END__
 
 =head1 NAME
 
-Kafka - constants and messages used by the Kafka package modules.
+Kafka - constants and messages used by the Kafka package modules
 
 =head1 VERSION
 
@@ -137,7 +137,7 @@ look at the L</"An Example"> section.
 =head1 ABSTRACT
 
 The Kafka package is a set of Perl modules which provides a simple and
-consistent application programming interface (API) to the Apache Kafka
+consistent application programming interface (API) to Apache Kafka,
 a high-throughput distributed messaging system.
 This is a low-level API implementation which DOES NOT interract with 
 an Apache ZooKeeper for consumer coordination and/or load balancing.
@@ -212,7 +212,7 @@ The Kafka client has the class name L<Kafka::Producer|Kafka::Producer> or
 L<Kafka::Consumer|Kafka::Consumer>.
 
 Messages are the fundamental unit of communication. They are published to
-a topic by a producer which means they are physically sent to a server acting
+a topic by a producer, which means they are physically sent to a server acting
 as a broker. Some number of consumers subscribe to a topic, and each published
 message is delivered to all the consumers.
 The messages stream is partitioned on the brokers as a set of distinct
@@ -326,9 +326,9 @@ Kafka consumer API is implemented by L<Kafka::Consumer|Kafka::Consumer> class.
 
 The request methods of the consumer object are C<offsets()> and C<fetch()>.
 
-C<offsets> method returns reference to the list of offsets of received messages.
+C<offsets> method returns a reference to the list of offsets of received messages.
 
-C<fetch> method returns reference to the list of received
+C<fetch> method returns a reference to the list of received
 L<Kafka::Message|Kafka::Message> objects.
 
     # Get a list of valid offsets up to max_number before the given time
@@ -370,7 +370,7 @@ The arguments:
 
 =item *
 
-B<topic> and B<partition> specify location of the B<messages> we want to retrieve.
+B<topic> and B<partition> specify the location of the B<messages> we want to retrieve.
 
 =item *
 
@@ -448,7 +448,7 @@ resource might be denied, or other things might have failed for some reason.
 
 =item *
 
-C<close> method: terminates connection with Kafka and cleans up.
+C<close> method: terminates connection with Kafka and clean up.
 
     my $producer = Kafka::Producer->new(
         IO          => $io,
@@ -533,7 +533,7 @@ Possible error codes returned by C<last_errorcode> method
 
 =item C<ERROR_CANNOT_RECV>
 
-4 - Can't recv
+4 - Can't receive
 
 =item C<ERROR_CANNOT_BIND>
 

@@ -6,6 +6,14 @@ use 5.010;
 
 use File::Basename;
 use ExtUtils::MakeMaker qw( prompt );
+use Getopt::Long;
+
+my $no_full_tests;
+
+GetOptions(
+    'no_full_tests!', \$no_full_tests,
+);
+$no_full_tests = 'no' if $no_full_tests;
 
 my %config = (
     NAME                        => 'Kafka',
@@ -39,7 +47,7 @@ my @patterns = qw( t/*.t t/*/*.t );
 $config{test} = { TESTS => join ' ', map { glob } @patterns };
 
 print "=  => To run a full tests requires a running local server kafka (port 9092) <=  =\n";
-my $answer = prompt( 'Do you want to run a full tests of the client?', 'no' );
+my $answer = $no_full_tests || prompt( 'Do you want to run a full tests of the client?', 'no' );
 
 if ( $answer =~ m/^y/i ) 
 {

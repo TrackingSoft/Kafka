@@ -610,7 +610,7 @@ The following functions are available for C<Kafka::Protocol> module.
 =item *
 
 B<offset>, B<max_size> or B<time>, B<max_number> are the additional information
-that might encode parameters of the messages we want to access.
+that might be encoded parameters of the messages we want to access.
 
 =back
 

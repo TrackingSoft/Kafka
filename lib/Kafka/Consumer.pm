@@ -364,7 +364,7 @@ The Kafka consumer response has an ARRAY reference type for C<offsets>, and
 C<fetch> methods.
 For the C<offsets> response array has the offset integers, in descending order.
 
-For the C<fetch> response array has the class name
+For the C<fetch> response the array has the class name
 L<Kafka::Message|Kafka::Message> elements.
 
 =head2 CONSTRUCTOR
@@ -411,7 +411,7 @@ mode to true.
 =item *
 
 The arguments below B<offset>, B<max_size> or B<time>, B<max_number> are
-the additional information that might encode parameters of the messages
+the additional information that might be encoded parameters of the messages
 we want to access.
 
 =back
@@ -542,7 +542,7 @@ L</last_error>.
 
 =item C<Can't send>
 
-This means that the request can't be sent on a C<Kafka::IO> IO object socket.
+This means that the request can't be sent on a C<Kafka::IO> object socket.
 
 =item C<Can't recv>
 

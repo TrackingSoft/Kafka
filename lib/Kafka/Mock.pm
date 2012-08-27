@@ -710,7 +710,7 @@ The following methods are defined for the C<Kafka::Mock> class:
 
 =head3 C<port>
 
-The method returns the Mock server port to use for L<Kafka::IO|Kafka::IO> IO
+The method returns the Mock server port to use for L<Kafka::IO|Kafka::IO>
 object with C<"localhost"> as his L<host|Kafka::IO/host> attribute.
 
 =head3 C<last_request>
@@ -745,7 +745,6 @@ delays in receipt of a request or response in the transmission, respectively.
 
 C<$position> specifies the byte position in the message will be
 followed by performed delay C<$delay> seconds.
-
 C<$position> must be a positive integer.
 That is, it is defined and Perl thinks it's an integer.
 For mode C<"request"> argument to C<$position> should be set not less than 6
@@ -754,8 +753,7 @@ as the request identifier should be holistic (REQUEST_LENGTH + REQUEST_TYPE).
 C<$delay> must be a positive number.
 That is, it is defined and Perl thinks it's a number.
 
-Error will cause the program to halt (C<confess>) if the argument is not
-a valid.
+Error will cause the program to halt (C<confess>) if an argument is not valid.
 
 =head3 C<clear>
 
@@ -763,7 +761,7 @@ The method to delete all previously specified delays.
 
 =head3 C<close>
 
-The method to kill the mock server process and cleans up.
+The method to kill the mock server process and clean up.
 
 =head2 Sample Data
 
@@ -872,8 +870,8 @@ thing to do).
 
 =item C<Mismatch argument>
 
-This means that you didn't give the right argument to a C<new>
-L<constructor|/CONSTRUCTOR>..
+This means that you didn't give the right argument to the C<new>
+L<constructor|/CONSTRUCTOR>.
 
 =item Any other errors
 
