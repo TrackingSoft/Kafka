@@ -1,5 +1,9 @@
 Revision history for Kafka package
 
+0.03  Mon Aug  28 2012
+    CHANGES:
+    - Makefile.PL modified for the use of command line
+
 0.02  Wed Jun  13 2012
     CHANGES:
     - Minor changes in documentation

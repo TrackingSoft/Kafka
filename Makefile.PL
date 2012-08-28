@@ -8,12 +8,15 @@ use File::Basename;
 use ExtUtils::MakeMaker qw( prompt );
 use Getopt::Long;
 
-my $no_full_tests;
+my ( $no_full_tests, $full_tests, $answer, $topic );
 
 GetOptions(
-    'no_full_tests!', \$no_full_tests,
+    'no_full_tests!'    => \$no_full_tests,
+    'full_tests!'       => \$full_tests,
+    'topic=s'           => \$topic,
 );
-$no_full_tests = 'no' if $no_full_tests;
+$answer = 'no'  if $no_full_tests;
+$answer = 'yes' if $full_tests;
 
 my %config = (
     NAME                        => 'Kafka',
@@ -46,13 +49,16 @@ my %config = (
 my @patterns = qw( t/*.t t/*/*.t );
 $config{test} = { TESTS => join ' ', map { glob } @patterns };
 
-print "=  => To run a full tests requires a running local server kafka (port 9092) <=  =\n" unless $no_full_tests;
-my $answer = $no_full_tests || prompt( 'Do you want to run a full tests of the client?', 'no' );
+print "=  => To run a full tests requires a running local server kafka (port 9092) <=  =\n" unless $answer;
+$answer ||= prompt( 'Do you want to run a full tests of the client?', 'no' );
 
 if ( $answer =~ m/^y/i ) 
 {
     print "I'm going to run a full tests.\n";
-    $answer = prompt( 'Please specify the topic for use with the kafka server:', 'test' );
+    $answer = $topic || prompt( 'Please specify the topic for use with the kafka server:', 'test' );
+
+print STDERR "$topic - $answer\n";
+
     my @files = $config{test}->{TESTS} =~ m| (t\/99_usage\/\d\d_kafka.*?\.t)|g;
     foreach my $f_name ( @files )
     {
