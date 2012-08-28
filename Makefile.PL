@@ -57,8 +57,6 @@ if ( $answer =~ m/^y/i )
     print "I'm going to run a full tests.\n";
     $answer = $topic || prompt( 'Please specify the topic for use with the kafka server:', 'test' );
 
-print STDERR "$topic - $answer\n";
-
     my @files = $config{test}->{TESTS} =~ m| (t\/99_usage\/\d\d_kafka.*?\.t)|g;
     foreach my $f_name ( @files )
     {
