@@ -1,8 +1,14 @@
 Revision history for Kafka package
 
-0.03  Mon Aug  28 2012
+0.03  Mon Aug  30 2012
     CHANGES:
     - Makefile.PL modified for the use of command line
+    - Added control code coverage 'coverage.sh'
+    - Added test 't/94_fixme.t'
+    - Added test 't/95_critic.t'
+
+    BUGFIXES:
+    - Fixed version number to 'use 5.010'
 
 0.02  Wed Jun  13 2012
     CHANGES:

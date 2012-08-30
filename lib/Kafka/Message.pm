@@ -1,6 +1,6 @@
 package Kafka::Message;
 
-use 5.008003;
+use 5.010;
 use strict;
 use warnings;
 

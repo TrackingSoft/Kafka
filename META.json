@@ -26,7 +26,9 @@
             "Test::Deep" : "0.109",
             "Test::Distribution" : "2",
             "Test::Exception" : "0.31",
+            "Test::Fixme" : "0.07",
             "Test::Kwalitee" : "1.01",
+            "Test::Perl::Critic" : "1.02",
             "Test::Pod" : "1.45",
             "Test::Pod::Coverage" : "1.08"
          }

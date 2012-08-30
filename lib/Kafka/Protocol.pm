@@ -34,7 +34,7 @@ use Kafka qw(
     BITS64
     );
 
-if ( !BITS64 ) { eval 'use Kafka::Int64; 1;' or die "Cannot load Kafka::Int64 : $@"; }
+if ( !BITS64 ) { eval 'use Kafka::Int64; 1;' or die "Cannot load Kafka::Int64 : $@"; }  ## no critic
 
 use constant {
     DEBUG                               => 0,

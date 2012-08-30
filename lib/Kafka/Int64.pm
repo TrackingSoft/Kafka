@@ -1,6 +1,6 @@
 package Kafka::Int64;
 
-use 5.009004;
+use 5.010;
 use strict;
 use warnings;
 

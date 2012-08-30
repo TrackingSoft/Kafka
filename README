@@ -23,7 +23,7 @@ To install this package type the following:
 DEPENDENCIES
 
 In order to install and use this package you will need Perl version
-5.10 or better. Some modules within this package depend on other
+5.010 or better. Some modules within this package depend on other
 packages that are distributed separately from Perl. We recommend that
 you have the following packages installed before you install
 Kafka:
@@ -38,13 +38,13 @@ Please install this module manually using
 
 The Kafka package has the following optional dependencies:
 
+   Test::Distribution
+   Test::Exception
+   Test::Fixme
+   Test::Kwalitee
+   Test::Perl::Critic
    Test::Pod
    Test::Pod::Coverage
-   Test::Exception
-   CPAN::Meta
-   Test::Deep
-   Test::Distribution
-   Test::Kwalitee
 
 If the optional modules are missing, some "prereq" tests are skipped.
 

@@ -12,8 +12,11 @@ lib/Kafka/Int64.pm                  Functions to work with 64 bit elements
 lib/Kafka/Mock.pm                   Object TCP mock server instance for testing
 benchmark_consumer.pl               A simple consumer benchmark
 benchmark_producer.pl               A simple producer benchmark
+coverage.sh                         Control code coverage
 t/00_compile.t
 t/01_bits64.t
+t/94_fixme.t
+t/95_critic.t
 t/96_kwalitee.t
 t/97_distribution.t
 t/98_pod.t

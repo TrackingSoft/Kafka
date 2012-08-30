@@ -29,7 +29,7 @@ use Kafka::Protocol qw(
     );
 use Kafka::Message;
 
-if ( !BITS64 ) { eval 'use Kafka::Int64; 1;' or die "Cannot load Kafka::Int64 : $@"; }
+if ( !BITS64 ) { eval 'use Kafka::Int64; 1;' or die "Cannot load Kafka::Int64 : $@"; }  ## no critic
 
 our $_last_error;
 our $_last_errorcode;
