@@ -1,4 +1,4 @@
-Kafka package version 0.03
+Kafka package version 0.05
 ==========================
 
 The Kafka package is a set of Perl modules which provides a
@@ -38,13 +38,8 @@ Please install this module manually using
 
 The Kafka package has the following optional dependencies:
 
-   Test::Distribution
+   Test::Deep
    Test::Exception
-   Test::Fixme
-   Test::Kwalitee
-   Test::Perl::Critic
-   Test::Pod
-   Test::Pod::Coverage
 
 If the optional modules are missing, some "prereq" tests are skipped.
 

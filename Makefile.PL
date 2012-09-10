@@ -26,15 +26,8 @@ my %config = (
         'Params::Util'          => 1.04,
         },
     BUILD_REQUIRES              => {            # more to the list $Module::CoreList::version{5.010}
-        'Test::Exception'       => 0.31,
         'Test::Deep'            => 0.109,
-        'Test::Fixme'           => 0.07,
-        'Test::Perl::Critic'    => 1.02,
-        'Test::Pod'             => 1.45,
-        'Test::Pod::Coverage'   => 1.08,
-        'Test::Kwalitee'        => 1.01,
-        'Test::Distribution'    => 2.00,
-        'CPAN::Meta'            => 2.120921,
+        'Test::Exception'       => 0.31,
         },
     ( $] >= 5.005 ?                             ## Add these new keywords supported since 5.005
         (
@@ -88,6 +81,16 @@ else
 {
     $config{test}->{TESTS} =~ s| t\/99_usage\/\d\d_kafka.*?\.t||g;
     print "Miss the interaction with the kafka server.\n";
+}
+
+if( $ENV{AUTHOR_TESTS} ) {
+    @patterns = qw( xt/author/*.t xt/author/*/*.t );
+    $config{test}->{TESTS} .= ' '.join ' ', map { glob } @patterns;
+}
+
+if( $ENV{RELEASE_TESTS} ) {
+    @patterns = qw( xt/release/*.t xt/release/*/*.t );
+    $config{test}->{TESTS} .= ' '.join ' ', map { glob } @patterns;
 }
 
 ExtUtils::MakeMaker::WriteMakefile( %config );

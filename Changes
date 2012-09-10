@@ -1,5 +1,13 @@
 Revision history for Kafka package
 
+0.05  Mon Sep  13 2012
+    CHANGES:
+    - Mock server tests moved to 'xt' directory
+
+0.04  Mon Sep  10 2012
+    CHANGES:
+    - Author and release tests moved to 'xt' directory
+
 0.03  Mon Aug  30 2012
     CHANGES:
     - Makefile.PL modified for the use of command line
