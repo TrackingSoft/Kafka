@@ -9,7 +9,8 @@ use warnings;
 use lib 'lib';
 use bytes;
 use Params::Util qw( _ARRAY0 );
-use Benchmark qw( timediff timesum timestr );
+#use Benchmark qw( timediff timesum timestr );
+use Time::HiRes     qw( gettimeofday );
 
 use Test::More;
 plan "no_plan";
@@ -126,14 +127,18 @@ sub send_messages {
     my $partition   = shift;
     my $messages    = shift;
 
-    my ( $timestamp1, $timestamp2 );
-    $timestamp1 = new Benchmark;
+#    my ( $timestamp1, $timestamp2 );
+#    $timestamp1 = new Benchmark;
+    my ( $time_before, $time_after );
+    $time_before = gettimeofday;
     my $ret = $producer->send( $topic, $partition, $messages );
-    $timestamp2 = new Benchmark;
+#    $timestamp2 = new Benchmark;
+    $time_after = gettimeofday;
     if ( $ret )
     {
         is( $ret, 1, "sent a series of messages" ) if $#{$messages};
-        return timediff( $timestamp2, $timestamp1 );
+#        return timediff( $timestamp2, $timestamp1 );
+        return $time_after - $time_before;
     }
     else
     {
@@ -150,10 +155,13 @@ sub fetch_messages {
     my $max_size    = shift;
     my $is_package  = shift;
 
-    my ( $timestamp1, $timestamp2 );
-    $timestamp1 = new Benchmark;
+#    my ( $timestamp1, $timestamp2 );
+#    $timestamp1 = new Benchmark;
+    my ( $time_before, $time_after );
+    $time_before = gettimeofday;
     my $messages = $consumer->fetch( $topic, $partition, $offset, $max_size );
-    $timestamp2 = new Benchmark;
+#    $timestamp2 = new Benchmark;
+    $time_after = gettimeofday;
     if ( $messages )
     {
         ok( defined( _ARRAY0( $messages ) ), "messages are received" ) if $is_package;
@@ -171,7 +179,8 @@ sub fetch_messages {
             }
             ++$cnt;
         }
-        return ( \@fetch, timediff( $timestamp2, $timestamp1 ) );
+#        return ( \@fetch, timediff( $timestamp2, $timestamp1 ) );
+        return ( \@fetch, $time_after - $time_before );
     }
     if ( !$messages or $consumer->last_error )
     {
@@ -209,58 +218,65 @@ sub report {
     diag "Total:";
     foreach my $k ( qw( send_package send_single send_mix fetch_package fetch_single fetch_mix fetch_inseries ) )
     {
-        diag sprintf( "%-14s ", $k ), timestr( $bench{ $k }, "noc", ".4f" );
+#        diag sprintf( "%-14s ", $k ), timestr( $bench{ $k }, "noc", ".4f" );
+        diag sprintf( "%-14s ", $k ), sprintf( "%.4f", $bench{ $k } );
     }
 
     foreach my $result ( (
         $bench{send_package}, $bench{fetch_package}
         ) )
     {
-        for ( my $i = 0; $i < @$result; ++$i )
-        {
-            ${$result}[ $i ] /= $number_of_package;
-        }
+#        for ( my $i = 0; $i < @$result; ++$i )
+#        {
+#            ${$result}[ $i ] /= $number_of_package;
+#        }
+        $result /= $number_of_package;
     }
 
     foreach my $result ( (
         $bench{send_mix}, $bench{fetch_mix}
         ) )
     {
-        for ( my $i = 0; $i < @$result; ++$i )
-        {
-            ${$result}[ $i ] /= $number_of_package_mix;
-        }
+#        for ( my $i = 0; $i < @$result; ++$i )
+#        {
+#            ${$result}[ $i ] /= $number_of_package_mix;
+#        }
+        $result /= $number_of_package_mix;
     }
 
     foreach my $result ( (
         $bench{fetch_inseries}
         ) )
     {
-        for ( my $i = 0; $i < @$result; ++$i )
-        {
-            ${$result}[ $i ] /= $number_of_package_ser;
-        }
+#        for ( my $i = 0; $i < @$result; ++$i )
+#        {
+#            ${$result}[ $i ] /= $number_of_package_ser;
+#        }
+        $result /= $number_of_package_ser;
     }
 
     foreach my $result ( ( $bench{send_single}, $bench{fetch_single} ) )
     {
-        for ( my $i = 0; $i < @$result; ++$i )
-        {
-            ${$result}[ $i ] /= $number_of_single;
-        }
+#        for ( my $i = 0; $i < @$result; ++$i )
+#        {
+#            ${$result}[ $i ] /= $number_of_single;
+#        }
+        $result /= $number_of_single;
     }
 
     diag "Seconds per message:";
     foreach my $k ( qw( send_package send_single send_mix fetch_package fetch_single fetch_mix fetch_inseries ) )
     {
-        diag sprintf( "%-14s ", $k ), timestr( $bench{ $k }, "noc", ".4f" );
+#        diag sprintf( "%-14s ", $k ), timestr( $bench{ $k }, "noc", ".4f" );
+        diag sprintf( "%-14s ", $k ), sprintf( "%.4f", $bench{ $k } );
     }
 
     diag "Messages per second:";
     foreach my $k ( qw( send_package send_single send_mix fetch_package fetch_single fetch_mix fetch_inseries ) )
     {
-        my( undef, $pu, $ps, undef, undef, undef ) = @{$bench{ $k }};
-        diag sprintf( "%-14s ", $k ), ( $pu + $ps ) ? sprintf( "%4d", int( 1 / ( $pu + $ps ) ) ) : "N/A";
+#        my( undef, $pu, $ps, undef, undef, undef ) = @{$bench{ $k }};
+#        diag sprintf( "%-14s ", $k ), ( $pu + $ps ) ? sprintf( "%4d", int( 1 / ( $pu + $ps ) ) ) : "N/A";
+        diag sprintf( "%-14s ", $k ), $bench{ $k } ? sprintf( "%4d", int( 1 / $bench{ $k } ) ) : "N/A";
     }
 }
 
@@ -274,15 +290,18 @@ $in_package = $number_of_package;
 $request_size = $in_package * 9 + $total;
 
 $fetch = [];
-$bench{send_package} = new Benchmark;
-$bench{fetch_package} = $bench{send_package} = timediff( $bench{send_package}, $bench{send_package} );
+#$bench{send_package} = new Benchmark;
+#$bench{fetch_package} = $bench{send_package} = timediff( $bench{send_package}, $bench{send_package} );
+$bench{fetch_package} = $bench{send_package} = 0;
 
 while (1)
 {
     note "PRODUCE Request transfer size $request_size bytes, please wait...";
     $first_offset = next_offset( $consumer, $topic, $partition, 1 );
-    $bench{send_package} = timesum( $bench{send_package},
-        send_messages( $producer, $topic, $partition, $messages ) );
+#    $bench{send_package} = timesum( $bench{send_package},
+#        send_messages( $producer, $topic, $partition, $messages ) );
+    $bench{send_package} = $bench{send_package}
+        + send_messages( $producer, $topic, $partition, $messages );
     note "PRODUCE Request transmitted";
 
     note "waiting for messages to get ready...";
@@ -292,13 +311,15 @@ while (1)
 
     note "trying to get FETCH Response to all messages, please wait...";
     ( $fetched, $to_bench ) = fetch_messages( $consumer, $topic, $partition, $first_offset, $max_size, 1 );
-    $bench{fetch_package} = timesum( $bench{fetch_package}, $to_bench );
+#    $bench{fetch_package} = timesum( $bench{fetch_package}, $to_bench );
+    $bench{fetch_package} += $to_bench;
     push @$fetch, @$fetched;
 
-    my( undef, $pu_send,  $ps_send,  undef, undef, undef ) = @{$bench{send_package}};
-    my( undef, $pu_fetch, $ps_fetch, undef, undef, undef ) = @{$bench{fetch_package}};
+#    my( undef, $pu_send,  $ps_send,  undef, undef, undef ) = @{$bench{send_package}};
+#    my( undef, $pu_fetch, $ps_fetch, undef, undef, undef ) = @{$bench{fetch_package}};
 
-    last if ( $pu_send + $ps_send ) and ( $pu_fetch + $ps_fetch );
+#    last if ( $pu_send + $ps_send ) and ( $pu_fetch + $ps_fetch );
+    last if $bench{send_package} and $bench{fetch_package};
 
     $number_of_package += $in_package;
     push @$messages, @copy;
@@ -311,8 +332,9 @@ cmp_deeply $fetch, $messages, "all messages are received correctly";
 @copy = (); push @copy, @$messages;
 
 $fetch = [];
-$bench{send_single} = new Benchmark;
-$bench{fetch_single} = $bench{send_single} = timediff( $bench{send_single}, $bench{send_single} );
+#$bench{send_single} = new Benchmark;
+#$bench{fetch_single} = $bench{send_single} = timediff( $bench{send_single}, $bench{send_single} );
+$bench{fetch_single} = $bench{send_single} = 0;
 
 $in_single = $number_of_single;
 while (1)
@@ -322,9 +344,10 @@ while (1)
     {
         $first_offset = next_offset( $consumer, $topic, $partition );
 
-        $bench{send_single} = timesum( $bench{send_single},
-            send_messages( $producer, $topic, $partition, [ $copy[ $idx ] ] )
-            );
+#        $bench{send_single} = timesum( $bench{send_single},
+#            send_messages( $producer, $topic, $partition, [ $copy[ $idx ] ] )
+#            );
+        $bench{send_single} += send_messages( $producer, $topic, $partition, [ $copy[ $idx ] ] );
 
         my ( $fetched, $to_bench );
 
@@ -332,13 +355,15 @@ while (1)
 
         ( $fetched, $to_bench ) = fetch_messages( $consumer, $topic, $partition, $first_offset, $max_size );
         push @$fetch, $$fetched[0];
-        $bench{fetch_single} = timesum( $bench{fetch_single}, $to_bench );
+#        $bench{fetch_single} = timesum( $bench{fetch_single}, $to_bench );
+        $bench{fetch_single} += $to_bench;
     }
 
-    my( undef, $pu_send,  $ps_send,  undef, undef, undef ) = @{$bench{send_single}};
-    my( undef, $pu_fetch, $ps_fetch, undef, undef, undef ) = @{$bench{fetch_single}};
+#    my( undef, $pu_send,  $ps_send,  undef, undef, undef ) = @{$bench{send_single}};
+#    my( undef, $pu_fetch, $ps_fetch, undef, undef, undef ) = @{$bench{fetch_single}};
 
-    last if ( $pu_send + $ps_send ) and ( $pu_fetch + $ps_fetch );
+#    last if ( $pu_send + $ps_send ) and ( $pu_fetch + $ps_fetch );
+    last if $bench{send_single} and $bench{fetch_single};
 
     $number_of_single += $in_single;
     push @$messages, @copy;
@@ -352,8 +377,9 @@ $number_of_package_mix = $in_package;
 $request_size = $in_package * 9 + $total;
 
 $fetch = [];
-$bench{send_mix} = new Benchmark;
-$bench{fetch_mix} = $bench{send_mix} = timediff( $bench{send_mix}, $bench{send_mix} );
+#$bench{send_mix} = new Benchmark;
+#$bench{fetch_mix} = $bench{send_mix} = timediff( $bench{send_mix}, $bench{send_mix} );
+$bench{fetch_mix} = $bench{send_mix} = 0;
 
 while (1)
 {
@@ -362,9 +388,10 @@ while (1)
 
     foreach my $idx ( 0 .. ( $in_package - 1 ) )
     {
-        $bench{send_mix} = timesum( $bench{send_mix},
-            send_messages( $producer, $topic, $partition, [ $copy[ $idx ] ] )
-            );
+#        $bench{send_mix} = timesum( $bench{send_mix},
+#            send_messages( $producer, $topic, $partition, [ $copy[ $idx ] ] )
+#            );
+        $bench{send_mix} += send_messages( $producer, $topic, $partition, [ $copy[ $idx ] ] );
     }
 
     note "waiting for messages to get ready...";
@@ -374,13 +401,15 @@ while (1)
 
     note "trying to get FETCH Response to all messages, please wait...";
     ( $fetched, $to_bench ) = fetch_messages( $consumer, $topic, $partition, $first_offset, $max_size, 1 );
-    $bench{fetch_mix} = timesum( $bench{fetch_mix}, $to_bench );
+#    $bench{fetch_mix} = timesum( $bench{fetch_mix}, $to_bench );
+    $bench{fetch_mix} += $to_bench;
     push @$fetch, @$fetched;
 
-    my( undef, $pu_send,  $ps_send,  undef, undef, undef ) = @{$bench{send_mix}};
-    my( undef, $pu_fetch, $ps_fetch, undef, undef, undef ) = @{$bench{fetch_mix}};
+#    my( undef, $pu_send,  $ps_send,  undef, undef, undef ) = @{$bench{send_mix}};
+#    my( undef, $pu_fetch, $ps_fetch, undef, undef, undef ) = @{$bench{fetch_mix}};
 
-    last if ( $pu_send + $ps_send ) and ( $pu_fetch + $ps_fetch );
+#    last if ( $pu_send + $ps_send ) and ( $pu_fetch + $ps_fetch );
+    last if $bench{send_mix} and $bench{fetch_mix};
 
     $number_of_package_mix += $in_package;
     push @$messages, @copy;
@@ -393,8 +422,9 @@ cmp_deeply $fetch, $messages, "all messages are received correctly";
 $number_of_package_ser = $in_package;
 
 $fetch = [];
-$bench{fetch_inseries} = new Benchmark;
-$bench{fetch_inseries} = timediff( $bench{fetch_inseries}, $bench{fetch_inseries} );
+#$bench{fetch_inseries} = new Benchmark;
+#$bench{fetch_inseries} = timediff( $bench{fetch_inseries}, $bench{fetch_inseries} );
+$bench{fetch_inseries} = 0;
 
 while (1)
 {
@@ -414,12 +444,13 @@ while (1)
         $delta += 9 + bytes::length( $$messages[ $idx ] );
 
         push @$fetch, $$fetched[0];
-        $bench{fetch_inseries} = timesum( $bench{fetch_inseries}, $to_bench );
+#        $bench{fetch_inseries} = timesum( $bench{fetch_inseries}, $to_bench );
+        $bench{fetch_inseries} += $to_bench;
     }
 
-    my( undef, $pu_fetch, $ps_fetch, undef, undef, undef ) = @{$bench{fetch_inseries}};
+#    my( undef, $pu_fetch, $ps_fetch, undef, undef, undef ) = @{$bench{fetch_inseries}};
 
-    last if ( $pu_fetch + $ps_fetch );
+    last if $bench{fetch_inseries};
 
     $number_of_package_ser += $in_package;
     push @$messages, @copy;
