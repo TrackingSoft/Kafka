@@ -8,7 +8,8 @@ use warnings;
 
 use lib 'lib';
 use bytes;
-use Benchmark qw( timediff timesum timestr );
+#use Benchmark qw( :hireswallclock timediff timesum timestr );
+use Time::HiRes     qw( gettimeofday );
 use Getopt::Long;
 
 # PRECONDITIONS ----------------------------------------------------------------
@@ -122,10 +123,13 @@ sub fetch_messages {
     my $offset      = shift;
     my $max_size    = shift;
 
-    my ( $timestamp1, $timestamp2 );
-    $timestamp1 = new Benchmark;
+#    my ( $timestamp1, $timestamp2 );
+#    $timestamp1 = new Benchmark;
+    my ( $time_before, $time_after );
+    $time_before = gettimeofday;
     my $messages = $consumer->fetch( $topic, $partition, $offset, $max_size );
-    $timestamp2 = new Benchmark;
+#    $timestamp2 = new Benchmark;
+    $time_after = gettimeofday;
     if ( $messages )
     {
         my $cnt = 0;
@@ -140,7 +144,8 @@ sub fetch_messages {
             }
             ++$cnt;
         }
-        return ( $messages, timediff( $timestamp2, $timestamp1 ) );
+#        return ( $messages, timediff( $timestamp2, $timestamp1 ) );
+        return ( $messages, $time_after - $time_before );
     }
     if ( !$messages or $consumer->last_error )
     {
@@ -159,13 +164,14 @@ my %total = (
     messages    => 0,
     seconds     => 0,
     );
-$bench{fetch_mix} = new Benchmark;
+#$bench{fetch_mix} = new Benchmark;
 
 # an infinite loop
 INFINITE: {
     $first_offset = ( $re_read or !@$fetch ) ? 0 : $fetch->[ @$fetch - 1 ]->next_offset;
     $fetch = [];
-    $bench{fetch_mix} = timediff( $bench{fetch_mix}, $bench{fetch_mix} );
+#    $bench{fetch_mix} = timediff( $bench{fetch_mix}, $bench{fetch_mix} );
+    $bench{fetch_mix} = 0;
     my $cnt = 0;
     my $all_bytes = 0;
 
@@ -187,9 +193,11 @@ INFINITE: {
             last unless @$fetched;
 
 # decoration
-            $bench{fetch_mix} = timesum( $bench{fetch_mix}, $to_bench );
-            my( undef, $pu, $ps, undef, undef, undef ) = @$to_bench;
-            $total{seconds}     += $pu + $ps;
+#            $bench{fetch_mix} = timesum( $bench{fetch_mix}, $to_bench );
+            $bench{fetch_mix} += $to_bench;
+#            my( undef, $pu, $ps, undef, undef, undef ) = @$to_bench;
+#            $total{seconds}     += $pu + $ps;
+            $total{seconds}     += $to_bench;
             $total{messages}    += scalar @$fetched;
             foreach my $m ( @$fetched )
             {
@@ -201,24 +209,28 @@ INFINITE: {
             push @$fetch, @$fetched;
             my $already = scalar @$fetch;
             my $mbs = $all_bytes / ( 1024 * 1024 );
-            @tmp_bench = [];
-            push @tmp_bench, @{$bench{fetch_mix}};
+#            @tmp_bench = [];
+#            push @tmp_bench, @{$bench{fetch_mix}};
+            my $tmp_bench = $bench{fetch_mix};
 
             $cnt += scalar @$fetched;
 
-            ( undef, $pu, $ps, undef, undef, undef ) = @tmp_bench;
-            my $secs = $pu + $ps;
+#            ( undef, $pu, $ps, undef, undef, undef ) = @tmp_bench;
+#            my $secs = $pu + $ps;
+            my $secs = $bench{fetch_mix};
 
-            for ( my $i = 0; $i < $#tmp_bench; ++$i )
-            {
-                $tmp_bench[ $i ] /= ( scalar $already );
-            }
+#            for ( my $i = 0; $i < $#tmp_bench; ++$i )
+#            {
+#                $tmp_bench[ $i ] /= ( scalar $already );
+#            }
+            $tmp_bench /= ( scalar $already );
 
-            ( undef, $pu, $ps, undef, undef, undef ) = @tmp_bench;
+#            ( undef, $pu, $ps, undef, undef, undef ) = @tmp_bench;
             print STDERR "[", scalar localtime, "] ",
                 "Received $already messages ",
                 "(".sprintf( "%.3f", $mbs )." MB), ",
-                ( $pu + $ps ) ? sprintf( "%d", int( 1 / ( $pu + $ps ) ) ) : "N/A",
+#                ( $pu + $ps ) ? sprintf( "%d", int( 1 / ( $pu + $ps ) ) ) : "N/A",
+                $tmp_bench ? sprintf( "%d", int( 1 / $tmp_bench ) ) : "N/A",
                 " messages/sec ",
                 "(".( $secs ? ( sprintf( "%.3f", $mbs / $secs ) ) : "N/A" )." MB/sec)",
                 " " x 10;
@@ -235,8 +247,9 @@ INFINITE: {
             redo;
         }
 
-        my( undef, $pu_fetch, $ps_fetch, undef, undef, undef ) = @{$bench{fetch_mix}};
-        last if ( $pu_fetch + $ps_fetch );
+#        my( undef, $pu_fetch, $ps_fetch, undef, undef, undef ) = @{$bench{fetch_mix}};
+#        last if ( $pu_fetch + $ps_fetch );
+        last if $bench{fetch_mix};
     }
 
     redo unless $no_infinite;

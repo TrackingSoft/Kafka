@@ -69,7 +69,7 @@ my $sock = IO::Socket::INET->new(
     Proto    => 'tcp'
     ) or die "Cannot open client socket: $!";
 
-foreach ( ( 0...( scalar( keys %requests ) - 1 ) ) )
+foreach ( ( 0..( scalar( keys %requests ) - 1 ) ) )
 {
     print {$sock} pack( "H*", $requests{ $_ } );
     my $res = <$sock>;

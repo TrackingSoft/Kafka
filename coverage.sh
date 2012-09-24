@@ -4,6 +4,7 @@ cover -delete
 
 perl -MDevel::Cover t/00_compile.t
 perl -MDevel::Cover t/01_bits64.t
+perl -MDevel::Cover xt/author/93_versions.t
 perl -MDevel::Cover xt/author/94_fixme.t
 perl -MDevel::Cover xt/author/95_critic.t
 perl -MDevel::Cover xt/release/96_kwalitee.t

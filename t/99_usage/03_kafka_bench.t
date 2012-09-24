@@ -9,7 +9,7 @@ use warnings;
 use lib 'lib';
 use bytes;
 use Params::Util qw( _ARRAY0 );
-#use Benchmark qw( timediff timesum timestr );
+#use Benchmark qw( :hireswallclock timediff timesum timestr );
 use Time::HiRes     qw( gettimeofday );
 
 use Test::More;

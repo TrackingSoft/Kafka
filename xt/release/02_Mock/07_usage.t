@@ -115,12 +115,12 @@ my %responses = (
 my $server;
 
 # read by <...> line should end with '0a'
-foreach ( ( 0...( scalar( keys %requests ) - 1 ) ) )
+foreach ( ( 0..( scalar( keys %requests ) - 1 ) ) )
 {
     substr( $responses{ $_ }, -2, 2 ) = '0a' if $responses{ $_ };
 }
 
-my $timeout = 0.1;
+my $timeout = 0.5;
 
 $server = Kafka::Mock->new(
     requests    => \%requests,
@@ -155,7 +155,7 @@ SKIP:
     $server->delay( "response", 16, 0.003 );
 
     my ( $res, $ret );
-    foreach ( ( 0...( scalar( keys %requests ) - 1 ) ) )
+    foreach ( ( 0..( scalar( keys %requests ) - 1 ) ) )
     {
         next unless $requests{ $_ };
         print {$sock} pack( "H*", $requests{ $_ } );

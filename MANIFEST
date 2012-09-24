@@ -2,14 +2,14 @@ Changes                             History of this package
 MANIFEST                            This file
 Makefile.PL                         Makefile generator
 README                              Get you started with this package
-lib/Kafka.pm                        Constants and messages used by this package
-lib/Kafka/Producer.pm               Object interface to the producer client
-lib/Kafka/Consumer.pm               Object interface to the consumer client
-lib/Kafka/Protocol.pm               Process messages in the Kafka's Wire Format
-lib/Kafka/Message.pm                Object interface to the Kafka message properties
-lib/Kafka/IO.pm                     Object interface to socket communications
-lib/Kafka/Int64.pm                  Functions to work with 64 bit elements
-lib/Kafka/Mock.pm                   Object TCP mock server instance for testing
+lib/Kafka.pm
+lib/Kafka/Producer.pm
+lib/Kafka/Consumer.pm
+lib/Kafka/Protocol.pm
+lib/Kafka/Message.pm
+lib/Kafka/IO.pm
+lib/Kafka/Int64.pm
+lib/Kafka/Mock.pm
 benchmark_consumer.pl               A simple consumer benchmark
 benchmark_producer.pl               A simple producer benchmark
 coverage.sh                         Control code coverage
@@ -55,6 +55,7 @@ t/99_usage/00_mock.t                    Mock server usage examples
 t/99_usage/01_kafka.t                   Kafka usage examples
 t/99_usage/02_mock_error.t              Test errors in FETCH & OFFSETS Response
 t/99_usage/03_kafka_bench.t             Kafka Benchmark test
+xt/author/93_versions.t
 xt/author/94_fixme.t
 xt/author/95_critic.t
 xt/release/96_kwalitee.t
