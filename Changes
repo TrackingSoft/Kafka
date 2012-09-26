@@ -1,6 +1,6 @@
 Revision history for Kafka package
 
-0.06  Mon Sep  ?? 2012
+0.06  Mon Sep  26 2012
     CHANGES:
     - Refinement of calculation operation time in benchmarks
     - Some improvements in tests

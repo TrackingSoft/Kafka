@@ -8,7 +8,6 @@ use warnings;
 
 use lib 'lib';
 use bytes;
-#use Benchmark qw( :hireswallclock timediff timesum timestr );
 use Time::HiRes     qw( gettimeofday );
 use Getopt::Long;
 
@@ -36,15 +35,12 @@ my (
     );
 
 my $host                = "localhost",
-#my $topic               = "test";
 my $topic               = undef;
-#my $partitions          = 3;
 my $partitions          = undef;
 my $timeout             = DEFAULT_TIMEOUT;
 
 my @chars = ( " ", "A" .. "Z", "a" .. "z", 0 .. 9, qw(! @ $ % ^ & *) );
 my $msg_len             = 200;
-#my $number_of_package   = 5_000;
 my $number_of_package   = undef;
 
 my %bench = ();
@@ -110,16 +106,12 @@ sub send_messages {
     my $partition   = shift;
     my $messages    = shift;
 
-#    my ( $timestamp1, $timestamp2 );
-#    $timestamp1 = new Benchmark;
     my ( $time_before, $time_after );
     $time_before = gettimeofday;
     my $ret = $producer->send( $topic, $partition, $messages );
-#    $timestamp2 = new Benchmark;
     $time_after = gettimeofday;
     if ( $ret )
     {
-#        return timediff( $timestamp2, $timestamp1 );
         return $time_after - $time_before;
     }
     else
@@ -154,8 +146,6 @@ $number_of_package_mix = $in_package;
 @copy = (); push @copy, @$messages;
 $request_size = $in_package * 9 + $total;
 
-#$bench{send_mix} = new Benchmark;
-#$bench{send_mix} = timediff( $bench{send_mix}, $bench{send_mix} );
 $bench{send_mix} = 0;
 
 while (1)
@@ -164,18 +154,12 @@ while (1)
     my $secs = 0;
     foreach my $idx ( 0 .. ( $in_package - 1 ) )
     {
-# useful work
-#        $bench{send_mix} = timesum( $bench{send_mix},
-#            send_messages( $producer, $topic, int( rand( $partitions ) ), [ $copy[ $idx ] ] )
-#            );
         $bench{send_mix} += send_messages( $producer, $topic, int( rand( $partitions ) ), [ $copy[ $idx ] ] );
 
 # decoration
         my $num = $idx + 1;
         unless ( $num % 1000 )
         {
-#            my( undef, $pu, $ps, undef, undef, undef ) = @{$bench{send_mix}};
-#            $secs = $pu + $ps;
             $secs = $bench{send_mix};
             my $mbs = ( $num * $msg_len ) / ( 1024 * 1024 );
 
@@ -189,8 +173,6 @@ while (1)
         }
     }
 
-#    my( undef, $pu_send,  $ps_send,  undef, undef, undef ) = @{$bench{send_mix}};
-#    last if ( $pu_send + $ps_send );
     my $_send = $bench{send_mix};
     last if $_send;
 
@@ -206,8 +188,6 @@ $producer->close;
 # Statistics
 my $msgs = scalar @$messages;
 my $mbs = 0; map { $mbs += bytes::length( $_ ) } @$messages; $mbs /= 1024 * 1024;
-#my( undef, $pu, $ps, undef, undef, undef ) = @{$bench{send_mix}};
-#my $secs = $pu + $ps;
 my $secs = $bench{send_mix};
 print STDERR "[", scalar localtime, "] Total: ",
     "Sent $msgs messages ",
