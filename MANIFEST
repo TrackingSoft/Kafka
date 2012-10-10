@@ -55,6 +55,7 @@ t/99_usage/00_mock.t                    Mock server usage examples
 t/99_usage/01_kafka.t                   Kafka usage examples
 t/99_usage/02_mock_error.t              Test errors in FETCH & OFFSETS Response
 t/99_usage/03_kafka_bench.t             Kafka Benchmark test
+xt/author/92_vars.t
 xt/author/93_versions.t
 xt/author/94_fixme.t
 xt/author/95_critic.t

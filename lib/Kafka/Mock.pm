@@ -165,7 +165,6 @@ sub _receive {
     my $start       = shift || 0;
 
     my $message = "";
-    my $ready   = 0;
     $self->{sleep} = "receive:" unless $_recv_pos;
     foreach my $part ( @{$self->_order( $length, $self->{recv_delay}, $start )} )
     {
@@ -199,8 +198,9 @@ sub _send {
     $self->{sleep} .= ( $self->{sleep} ? " " : "" )."send:";
     foreach my $part ( @{$self->_order( $str, $self->{send_delay} )} )
     {
-        my $len = bytes::length( my $message = $part->[0] );
-        if ( my $len = bytes::length( my $message = $part->[0] ) )
+        my $message = $part->[0];
+        my $len = bytes::length( $message );
+        if ( my $len = bytes::length( $message ) )
         {
             my $sent = 0;
             my $status;
