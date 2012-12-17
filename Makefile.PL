@@ -4,6 +4,11 @@ use strict;
 use warnings;
 use 5.010;
 
+if ( $^O eq 'MSWin32' ) {
+    print STDERR "OS unsupported: $^O\n";
+    exit( 255 );
+}
+
 use File::Basename;
 use ExtUtils::MakeMaker qw( prompt );
 use Getopt::Long;
@@ -21,6 +26,7 @@ $answer = 'yes' if $full_tests;
 my %config = (
     NAME                        => 'Kafka',
     VERSION_FROM                => 'lib/Kafka.pm',  # finds $VERSION
+    MIN_PERL_VERSION            => '5.010',
     PREREQ_PM                   => {            # more to the list $Module::CoreList::version{5.010}
         'Digest::CRC'           => 0.18,
         'Params::Util'          => 1.04,

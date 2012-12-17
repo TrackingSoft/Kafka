@@ -1,5 +1,9 @@
 Revision history for Kafka package
 
+0.07  Mon Dec  18 2012
+    CHANGES:
+    - Checking OS and Perl version in Makefile.PL
+
 0.06  Mon Sep  26 2012
     CHANGES:
     - Refinement of calculation operation time in benchmarks

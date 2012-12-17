@@ -18,7 +18,7 @@ our @EXPORT_OK  = qw(
     offsets_response
     );
 
-our $VERSION = '0.06';
+our $VERSION = '0.07';
 
 use bytes;
 use Carp;
@@ -491,7 +491,7 @@ Apache Kafka's Wire Format
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Consumer> version 0.06
+This documentation refers to C<Kafka::Consumer> version 0.07
 
 =head1 SYNOPSIS
 

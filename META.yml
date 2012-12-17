@@ -17,8 +17,9 @@ name: Kafka
 no_index:
   directory:
     - t
+    - xt
     - inc
 requires:
   Digest::CRC: 0.18
   Params::Util: 1.04
-version: 0.06
+version: 0.07
