@@ -43,7 +43,7 @@ $server = Kafka::Mock->new(
     timeout     => 0.1,
     );
 $port = $server->port;
-foreach my $host ( ( "nobody.nothing", "", 0, 1 ) )
+foreach my $host ( ( "some very incorrect name", "", 0, 1 ) )
 {
     $io = Kafka::IO->new( 
         host        => $host,
@@ -63,7 +63,7 @@ $server = Kafka::Mock->new(
     responses   => {},
     timeout     => 0.1,
     );
-foreach my $test_port ( ( "", "nobody.nothing", 0, -1, 999999 ) )
+foreach my $test_port ( ( "", "some very incorrect name", 0, -1, 999999 ) )
 {
     $server = Kafka::Mock->new(
         requests    => {},

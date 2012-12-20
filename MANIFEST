@@ -51,9 +51,7 @@ t/06_Consumer/03_last_errorcode.t
 t/06_Consumer/04_fetch.t
 t/06_Consumer/05_offsets.t
 t/06_Consumer/06_close.t
-t/99_usage/00_mock.t                    Mock server usage examples
 t/99_usage/01_kafka.t                   Kafka usage examples
-t/99_usage/02_mock_error.t              Test errors in FETCH & OFFSETS Response
 t/99_usage/03_kafka_bench.t             Kafka Benchmark test
 xt/author/92_vars.t
 xt/author/93_versions.t
@@ -85,5 +83,7 @@ xt/release/05_Message/98_pod.t
 xt/release/05_Message/99_pod_coverage.t
 xt/release/06_Consumer/98_pod.t
 xt/release/06_Consumer/99_pod_coverage.t
+xt/release/99_usage/00_mock.t           Mock server usage examples
+xt/release/99_usage/02_mock_error.t     Test errors in FETCH & OFFSETS Response
 META.yml                                Module meta-data (added by MakeMaker)
 META.json                               Module meta-data (added by MakeMaker)

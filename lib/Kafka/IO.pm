@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use sigtrap;
 
-our $VERSION = '0.07';
+our $VERSION = '0.08';
 
 use bytes;
 use Carp;
@@ -295,7 +295,7 @@ server without using the Apache ZooKeeper
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::IO> version 0.07
+This documentation refers to C<Kafka::IO> version 0.08
 
 =head1 SYNOPSIS
 

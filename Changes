@@ -1,15 +1,20 @@
 Revision history for Kafka package
 
-0.07  Mon Dec  18 2012
+0.08  Fri Dec  21 2012
     CHANGES:
-    - Checking OS and Perl version in Makefile.PL
+    - Tests reorganized
 
-0.06  Mon Sep  26 2012
+0.07  Thu Dec  18 2012
+    FIXES:
+    - Checking OS and Perl version in Makefile.PL
+      CPAN RT #82018: Tests hang on Windows. (reported by Alexandr Ciornii)
+
+0.06  Wed Sep  26 2012
     CHANGES:
     - Refinement of calculation operation time in benchmarks
     - Some improvements in tests
 
-0.05  Mon Sep  13 2012
+0.05  Thu Sep  13 2012
     CHANGES:
     - Mock server tests moved to 'xt' directory
 
@@ -17,7 +22,7 @@ Revision history for Kafka package
     CHANGES:
     - Author and release tests moved to 'xt' directory
 
-0.03  Mon Aug  30 2012
+0.03  Thu Aug  30 2012
     CHANGES:
     - Makefile.PL modified for the use of command line
     - Added control code coverage 'coverage.sh'
