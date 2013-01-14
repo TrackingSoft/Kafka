@@ -1,4 +1,4 @@
-Kafka package version 0.08
+Kafka package version 0.09
 ==========================
 
 The Kafka package is a set of Perl modules which provides a
@@ -69,9 +69,10 @@ The following environment variables change the way Kafka Benchmark test behave
 
 SIMPLE BENCHMARK
 
-Use benchmark_consumer.pl and benchmark_producer.pl to run a simple benchmark.
-Run one or more consumer instances using benchmark_consumer.pl .
-and one or more producer instances using benchmark_producer.pl .
+Use tools/benchmark_consumer.pl and tools/benchmark_producer.pl to run a simple
+benchmark.
+Run one or more consumer instances using tools/benchmark_consumer.pl .
+and one or more producer instances using tools/benchmark_producer.pl .
 
 DOCUMENTATION
 

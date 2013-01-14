@@ -1,5 +1,11 @@
 Revision history for Kafka package
 
+0.09  Mon Jan  14 2013
+    CHANGES:
+    - benchmark_consumer.pl and benchmark_producer.pl are moved
+      to directory tools
+    - Makefile.PL by default does not ask questions interactively
+
 0.08  Fri Dec  21 2012
     CHANGES:
     - Tests reorganized

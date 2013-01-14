@@ -10,8 +10,8 @@ lib/Kafka/Message.pm
 lib/Kafka/IO.pm
 lib/Kafka/Int64.pm
 lib/Kafka/Mock.pm
-benchmark_consumer.pl               A simple consumer benchmark
-benchmark_producer.pl               A simple producer benchmark
+tools/benchmark_consumer.pl         A simple consumer benchmark
+tools/benchmark_producer.pl         A simple producer benchmark
 coverage.sh                         Control code coverage
 t/00_compile.t
 t/01_bits64.t

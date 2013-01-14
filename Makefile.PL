@@ -22,6 +22,7 @@ GetOptions(
 );
 $answer = 'no'  if $no_full_tests;
 $answer = 'yes' if $full_tests;
+$answer //= 'no';
 
 my %config = (
     NAME                        => 'Kafka',
@@ -53,7 +54,7 @@ $config{test} = { TESTS => join ' ', map { glob } @patterns };
 print "=  => To run a full tests requires a running local server kafka (port 9092) <=  =\n" unless $answer;
 $answer ||= prompt( 'Do you want to run a full tests of the client?', 'no' );
 
-if ( $answer =~ m/^y/i ) 
+if ( $answer =~ m/^y/i )
 {
     print "I'm going to run a full tests.\n";
     $answer = $topic || prompt( 'Please specify the topic for use with the kafka server:', 'test' );
