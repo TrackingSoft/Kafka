@@ -235,7 +235,7 @@ Vlad Marchenko
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2012 by TrackingSoft LLC.
+Copyright (C) 2012-2013 by TrackingSoft LLC.
 All rights reserved.
 
 This package is free software; you can redistribute it and/or modify it under
