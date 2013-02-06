@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use sigtrap;
 
-our $VERSION = '0.09';
+our $VERSION = '0.10';
 
 use bytes;
 use Carp;
@@ -290,12 +290,12 @@ __END__
 
 =head1 NAME
 
-Kafka::IO - object interface to socket communications with the Apache Kafka
+Kafka::IO - object interface to socket communications with the Apache Kafka 0.7
 server without using the Apache ZooKeeper
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::IO> version 0.09
+This documentation refers to C<Kafka::IO> version 0.10
 
 =head1 SYNOPSIS
 
@@ -303,9 +303,9 @@ Setting up:
 
     use Kafka qw( KAFKA_SERVER_PORT DEFAULT_TIMEOUT );
     use Kafka::IO;
-    
+
     my $io;
-    
+
     eval { $io = Kafka::IO->new(
         host        => "localhost",
         port        => KAFKA_SERVER_PORT,
@@ -315,7 +315,7 @@ Setting up:
     print "expecting to die: (",
         Kafka::IO::last_errorcode, ") ",
         Kafka::IO::last_error, "\n" if $@;
-    
+
     unless ( $io = Kafka::IO->new(
         host        => "localhost",
         port        => KAFKA_SERVER_PORT,
@@ -332,28 +332,28 @@ Setting up:
 Producer:
 
     use Kafka::Producer;
-    
+
     my $producer = Kafka::Producer->new(
         IO          => $io,
         RaiseError  => 0                # Optional, default = 0
         );
-    
+
     # ... the application body
-    
+
     # Closes the producer and cleans up
     $producer->close;
 
 Or Consumer:
 
     use Kafka::Consumer;
-    
+
     my $consumer = Kafka::Consumer->new(
         IO          => $io,
         RaiseError  => 0                # Optional, default = 0
         );
-    
+
     # ... the application body
-    
+
     # Closes the consumer and cleans up
     $consumer->close;
 
@@ -369,8 +369,8 @@ Provides an object oriented model of communication.
 
 =item *
 
-To provide the class that allows you to write the Apache Kafka clients without
-using the Apache ZooKeeper service.
+To provide the class that allows you to write the Apache Kafka 0.7 clients
+without using the Apache ZooKeeper service.
 
 =back
 
@@ -542,7 +542,7 @@ L<Kafka::Protocol|Kafka::Protocol> - functions to process messages in the
 Apache Kafka's wire format
 
 L<Kafka::Int64|Kafka::Int64> - functions to work with 64 bit elements of the
-protocol on 32 bit systems 
+protocol on 32 bit systems
 
 L<Kafka::Mock|Kafka::Mock> - object interface to the TCP mock server for testing
 

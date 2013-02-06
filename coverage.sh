@@ -78,9 +78,10 @@ perl -MDevel::Cover t/06_Consumer/06_close.t
 perl -MDevel::Cover xt/release/06_Consumer/98_pod.t
 perl -MDevel::Cover xt/release/06_Consumer/99_pod_coverage.t
 
-perl -MDevel::Cover t/99_usage/00_mock.t
 perl -MDevel::Cover t/99_usage/01_kafka.t
-perl -MDevel::Cover t/99_usage/02_mock_error.t
 perl -MDevel::Cover t/99_usage/03_kafka_bench.t
+
+perl -MDevel::Cover xt/99_usage/00_mock.t
+perl -MDevel::Cover xt/99_usage/02_mock_error.t
 
 cover

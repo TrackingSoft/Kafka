@@ -36,7 +36,7 @@ our @EXPORT_OK  = qw(
 #    ERRORCODE_UNKNOWN
 #    ERRORCODE_WRONG_PARTITION_CODE
 
-our $VERSION = '0.09';
+our $VERSION = '0.10';
 
 use Config;
 
@@ -100,7 +100,7 @@ Kafka - constants and messages used by the Kafka package modules
 
 =head1 VERSION
 
-This documentation refers to C<Kafka> package version 0.09
+This documentation refers to C<Kafka> package version 0.10
 
 =head1 SYNOPSIS
 
@@ -137,7 +137,7 @@ look at the L</"An Example"> section.
 =head1 ABSTRACT
 
 The Kafka package is a set of Perl modules which provides a simple and
-consistent application programming interface (API) to Apache Kafka,
+consistent application programming interface (API) to Apache Kafka 0.7,
 a high-throughput distributed messaging system.
 This is a low-level API implementation which DOES NOT interract with 
 an Apache ZooKeeper for consumer coordination and/or load balancing.
@@ -190,7 +190,7 @@ on 32 bit systems.
 
 =head1 APACHE KAFKA'S STYLE COMMUNICATION
 
-The Kafka package is based on Kafka's Wire Format specification document at
+The Kafka package is based on Kafka's 0.7 Wire Format specification document at
 L<http://cwiki.apache.org/confluence/display/KAFKA/Wire+Format/>
 
 =over 3

@@ -1,9 +1,9 @@
-Kafka package version 0.09
+Kafka package version 0.10
 ==========================
 
 The Kafka package is a set of Perl modules which provides a
 simple and consistent application programming interface (API) to the
-Apache Kafka, a high-throughput distributed messaging system.
+Apache Kafka 0.7, a high-throughput distributed messaging system.
 The main focus of the package is to provide classes
 and functions that allow you to write Apache Kafka clients
 without Apache ZooKeeper service.
@@ -99,7 +99,7 @@ The basic operation of the Kafka package modules:
 
 COPYRIGHT AND LICENCE
 
-Copyright (C) 2012 by TrackingSoft LLC.
+Copyright (C) 2012-2013 by TrackingSoft LLC.
 All rights reserved.
 
 This package is free software; you can redistribute it and/or modify it under

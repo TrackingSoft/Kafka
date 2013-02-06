@@ -263,6 +263,18 @@ $request_size = $in_package * 9 + $total;
 $fetch = [];
 $bench{fetch_package} = $bench{send_package} = 0;
 
+# to wait for forcing a flush of previous data to disk
+$first_offset = next_offset( $consumer, $topic, $partition, 1 );
+{
+    sleep 1;
+    if ( $first_offset != next_offset( $consumer, $topic, $partition, 1 ) )
+    {
+        diag 'to wait for forcing a flush of previous data to disk';
+        $first_offset = next_offset( $consumer, $topic, $partition, 1 );
+        redo;
+    }
+}
+
 while (1)
 {
     note "PRODUCE Request transfer size $request_size bytes, please wait...";

@@ -18,7 +18,7 @@ our @EXPORT_OK  = qw(
     offsets_response
     );
 
-our $VERSION = '0.09';
+our $VERSION = '0.10';
 
 use bytes;
 use Carp;
@@ -487,11 +487,11 @@ __END__
 =head1 NAME
 
 Kafka::Protocol - functions to process messages in the
-Apache Kafka's Wire Format
+Apache Kafka's 0.7 Wire Format
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Consumer> version 0.09
+This documentation refers to C<Kafka::Consumer> version 0.10
 
 =head1 SYNOPSIS
 

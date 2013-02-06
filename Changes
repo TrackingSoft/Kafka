@@ -1,5 +1,9 @@
 Revision history for Kafka package
 
+0.10  Thu Feb  07 2013
+    CHANGES:
+    - 03_kafka_bench.t does not depend on previous tests
+
 0.09  Mon Jan  14 2013
     CHANGES:
     - benchmark_consumer.pl and benchmark_producer.pl are moved
