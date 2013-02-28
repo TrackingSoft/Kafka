@@ -29,8 +29,8 @@ my %config = (
     VERSION_FROM                => 'lib/Kafka.pm',  # finds $VERSION
     MIN_PERL_VERSION            => '5.010',
     PREREQ_PM                   => {            # more to the list $Module::CoreList::version{5.010}
-        'Digest::CRC'           => 0.18,
         'Params::Util'          => 1.04,
+        'String::CRC32'         => 1.4,
         },
     BUILD_REQUIRES              => {            # more to the list $Module::CoreList::version{5.010}
         'Test::Deep'            => 0.109,

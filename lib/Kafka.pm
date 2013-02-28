@@ -36,7 +36,7 @@ our @EXPORT_OK  = qw(
 #    ERRORCODE_UNKNOWN
 #    ERRORCODE_WRONG_PARTITION_CODE
 
-our $VERSION = '0.10';
+our $VERSION = '0.11';
 
 use Config;
 
@@ -100,7 +100,7 @@ Kafka - constants and messages used by the Kafka package modules
 
 =head1 VERSION
 
-This documentation refers to C<Kafka> package version 0.10
+This documentation refers to C<Kafka> package version 0.11
 
 =head1 SYNOPSIS
 
@@ -114,16 +114,16 @@ An example of C<Kafka> usage:
         DEFAULT_MAX_OFFSETS
         DEFAULT_MAX_SIZE
         );
-    
+
     # common information
     print "This is Kafka package $Kafka::VERSION\n";
     print "You have a ", BITS64 ? "64" : "32", " bit system\n";
-    
+
     use Kafka::IO;
-    
+
     # connect to local server with the defaults
     my $io = Kafka::IO->new( host => "localhost" );
-    
+
     # decoding of the error code
     unless ( $io )
     {
@@ -139,7 +139,7 @@ look at the L</"An Example"> section.
 The Kafka package is a set of Perl modules which provides a simple and
 consistent application programming interface (API) to Apache Kafka 0.7,
 a high-throughput distributed messaging system.
-This is a low-level API implementation which DOES NOT interract with 
+This is a low-level API implementation which DOES NOT interract with
 an Apache ZooKeeper for consumer coordination and/or load balancing.
 
 =head1 DESCRIPTION
@@ -205,7 +205,7 @@ followed by a messages containing entity meta-information and content.
 
 =back
 
-Communication with Kafka always assumes to follow these steps: First the IO 
+Communication with Kafka always assumes to follow these steps: First the IO
 and client objects are created and configured.
 
 The Kafka client has the class name L<Kafka::Producer|Kafka::Producer> or
@@ -248,7 +248,7 @@ L<Kafka::Producer|Kafka::Producer> and L<Kafka::Consumer|Kafka::Consumer>.
 Kafka IO API is implemented by L<Kafka::IO|Kafka::IO> class.
 
     use Kafka::IO;
-    
+
     # connect to local server with the defaults
     my $io = Kafka::IO->new( host => "localhost" );
 
@@ -274,17 +274,17 @@ the IO object disconnects and creates an internal exception.
 Kafka producer API is implemented by L<Kafka::Producer|Kafka::Producer> class.
 
     use Kafka::Producer;
-    
+
     #-- Producer
     my $producer = Kafka::Producer->new( IO => $io );
-    
+
     # Sending a single message
     $producer->send(
         "test",             # topic
         0,                  # partition
         "Single message"    # message
         );
-    
+
     # Sending a series of messages
     $producer->send(
         "test",             # topic
@@ -321,7 +321,7 @@ an array of the data strings).
 Kafka consumer API is implemented by L<Kafka::Consumer|Kafka::Consumer> class.
 
     use Kafka::Consumer;
-    
+
     $consumer = Kafka::Consumer->new( IO => $io );
 
 The request methods of the consumer object are C<offsets()> and C<fetch()>.
@@ -344,7 +344,7 @@ L<Kafka::Message|Kafka::Message> objects.
             print "Received offset: $offset\n";
         }
     }
-    
+
     # Consuming messages
     if ( my $messages = $consumer->fetch(
         "test",             # topic
@@ -411,7 +411,7 @@ C<payload> A simple message received from the Apache Kafka server.
 =item *
 
 C<valid> A message entry is valid if the CRC32 of the message payload matches
-to the CRC stored with the message. 
+to the CRC stored with the message.
 
 =item *
 
@@ -431,7 +431,7 @@ server.
 
 =head2 Common
 
-Both Kafka::Producer and Kafka::Consumer objects described above also have 
+Both Kafka::Producer and Kafka::Consumer objects described above also have
 the following common methods:
 
 =over 3
@@ -442,8 +442,8 @@ C<RaiseError> is a method which causes Kafka to die if an error is detected.
 
 =item *
 
-C<last_errorcode> and C<last_error> diagnostic methods. Use them to get detailed 
-error message if server or the resource might not be available, access to the 
+C<last_errorcode> and C<last_error> diagnostic methods. Use them to get detailed
+error message if server or the resource might not be available, access to the
 resource might be denied, or other things might have failed for some reason.
 
 =item *
@@ -454,14 +454,14 @@ C<close> method: terminates connection with Kafka and clean up.
         IO          => $io,
         RaiseError  => 1
         );
-    
+
     unless ( $producer->send( "test", 0, "Single message" )
     {
         print
             "error code       : ", $producer->last_errorcode,   "\n",
             "error description: ", $producer->last_error,       "\n";
     }
-    
+
     $producer->close;
 
 =back
@@ -600,20 +600,20 @@ Apache Kafka Wire Format protocol responses.
     use Kafka::IO;
     use Kafka::Producer;
     use Kafka::Consumer;
-    
+
     #-- IO
     my $io = Kafka::IO->new( host => "localhost" );
-    
+
     #-- Producer
     my $producer = Kafka::Producer->new( IO => $io );
-    
+
     # Sending a single message
     $producer->send(
         "test",             # topic
         0,                  # partition
         "Single message"    # message
         );
-    
+
     # Sending a series of messages
     $producer->send(
         "test",             # topic
@@ -624,12 +624,12 @@ Apache Kafka Wire Format protocol responses.
             "The third message",
         ]
         );
-    
+
     $producer->close;
-    
+
     #-- Consumer
     my $consumer = Kafka::Consumer->new( IO => $io );
-    
+
     # Get a list of valid offsets up max_number before the given time
     my $offsets;
     if ( $offsets = $consumer->offsets(
@@ -650,7 +650,7 @@ Apache Kafka Wire Format protocol responses.
             "(", $consumer->last_errorcode, ") ",
             $consumer->last_error, "\n";
     }
-    
+
     # Consuming messages
     if ( my $messages = $consumer->fetch(
         "test",             # topic
@@ -673,7 +673,7 @@ Apache Kafka Wire Format protocol responses.
             }
         }
     }
-    
+
     $consumer->close;
 
 C<$io>, C<$producer>, and C<$consumer> are created once when the
@@ -687,8 +687,8 @@ packages that are distributed separately from Perl. We recommend that
 you have the following packages installed before you install
 Kafka:
 
-    Digest::CRC
     Params::Util
+    String::CRC32
 
 Kafka package has the following optional dependencies:
 
@@ -743,7 +743,7 @@ L<Kafka::Protocol|Kafka::Protocol> - functions to process messages in the
 Apache Kafka's wire format
 
 L<Kafka::Int64|Kafka::Int64> - functions to work with 64 bit elements of the
-protocol on 32 bit systems 
+protocol on 32 bit systems
 
 L<Kafka::Mock|Kafka::Mock> - object interface to the TCP mock server for testing
 

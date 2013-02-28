@@ -1,5 +1,9 @@
 Revision history for Kafka package
 
+0.11  Thu Feb  28 2013
+    CHANGES:
+    - Use String::CRC32 instead of Digest::CRC
+
 0.10  Thu Feb  07 2013
     CHANGES:
     - 03_kafka_bench.t does not depend on previous tests

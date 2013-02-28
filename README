@@ -1,4 +1,4 @@
-Kafka package version 0.10
+Kafka package version 0.11
 ==========================
 
 The Kafka package is a set of Perl modules which provides a
@@ -8,7 +8,7 @@ The main focus of the package is to provide classes
 and functions that allow you to write Apache Kafka clients
 without Apache ZooKeeper service.
 
-The Kafka package was written, tested, and found working on 
+The Kafka package was written, tested, and found working on
 recent Linux distributions.
 
 INSTALLATION
@@ -28,13 +28,8 @@ packages that are distributed separately from Perl. We recommend that
 you have the following packages installed before you install
 Kafka:
 
-   Digest::CRC
    Params::Util
-
-Digest::CRC version 0.18 has a bug which prevents it from using fast,
-XS code if installed via CPAN.
-Please install this module manually using
-'perl Makefile.PL && make test install' if installed via CPAN shell.
+   String::CRC32
 
 The Kafka package has the following optional dependencies:
 

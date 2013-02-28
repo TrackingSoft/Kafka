@@ -18,11 +18,11 @@ our @EXPORT_OK  = qw(
     offsets_response
     );
 
-our $VERSION = '0.10';
+our $VERSION = '0.11';
 
 use bytes;
 use Carp;
-use Digest::CRC     qw( crc32 );
+use String::CRC32;
 use Params::Util    qw( _STRING _NONNEGINT _POSINT _NUMBER _ARRAY0 _SCALAR );
 
 use Kafka qw(
@@ -491,7 +491,7 @@ Apache Kafka's 0.7 Wire Format
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Consumer> version 0.10
+This documentation refers to C<Kafka::Consumer> version 0.11
 
 =head1 SYNOPSIS
 
@@ -511,7 +511,7 @@ Setting up:
         fetch_response
         offsets_response
         );
-    
+
     print "REQUEST_TYPE(s):\n";
     print
         REQUESTTYPE_PRODUCE,        " ",
@@ -519,7 +519,7 @@ Setting up:
         REQUESTTYPE_MULTIFETCH      " ",
         REQUESTTYPE_MULTIPRODUCE    " ",
         REQUESTTYPE_OFFSETS         "\n";
-    
+
     #-- declaration of variables to test
     my $topic       = "test";
     my $partition   = 0;
@@ -542,11 +542,11 @@ Requests:
         produce_request( $topic, $partition, $single_message );
     $str = unpack( "H*",
         produce_request( $topic, $partition, $series_of_messages );
-    
+
     #-- Offsets request:
     $str = unpack( "H*",
         offsets_request( $topic, $partition, $time, $max_number );
-    
+
     #-- Fetch request:
     $str = unpack( "H*",
         fetch_request( $topic, $partition, $offset, $max_size );
@@ -556,7 +556,7 @@ the L<Kafka::Mock|Kafka::Mock> module for a C<%responses> example):
 
     #-- Offsets response
     $arr_ref = offsets_response( \$responses{4} );
-    
+
     #-- Fetch response
     $hsh_ref = fetch_response( \$responses{1} );
 
@@ -847,7 +847,7 @@ L<Kafka::Protocol|Kafka::Protocol> - functions to process messages in the
 Apache Kafka's wire format
 
 L<Kafka::Int64|Kafka::Int64> - functions to work with 64 bit elements of the
-protocol on 32 bit systems 
+protocol on 32 bit systems
 
 L<Kafka::Mock|Kafka::Mock> - object interface to the TCP mock server for testing
 

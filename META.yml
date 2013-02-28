@@ -22,4 +22,5 @@ no_index:
 requires:
   Digest::CRC: 0.18
   Params::Util: 1.04
-version: 0.10
+  String::CRC32: 1.4
+version: 0.11

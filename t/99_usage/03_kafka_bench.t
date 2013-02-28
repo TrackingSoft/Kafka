@@ -265,13 +265,17 @@ $bench{fetch_package} = $bench{send_package} = 0;
 
 # to wait for forcing a flush of previous data to disk
 $first_offset = next_offset( $consumer, $topic, $partition, 1 );
+while (1)
 {
     sleep 1;
     if ( $first_offset != next_offset( $consumer, $topic, $partition, 1 ) )
     {
         diag 'to wait for forcing a flush of previous data to disk';
         $first_offset = next_offset( $consumer, $topic, $partition, 1 );
-        redo;
+    }
+    else
+    {
+        last;
     }
 }
 

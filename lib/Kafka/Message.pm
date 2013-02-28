@@ -4,7 +4,7 @@ use 5.010;
 use strict;
 use warnings;
 
-our $VERSION = '0.10';
+our $VERSION = '0.11';
 
 use Carp;
 use Params::Util qw( _HASH );
@@ -67,7 +67,7 @@ Kafka::Message - object interface to the Kafka message properties
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Message> version 0.10
+This documentation refers to C<Kafka::Message> version 0.11
 
 =head1 SYNOPSIS
 
