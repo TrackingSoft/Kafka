@@ -4,7 +4,7 @@ use 5.010;
 use strict;
 use warnings;
 
-our $VERSION = '0.11';
+our $VERSION = '0.12';
 
 # kafka server imitation (non-blocking mode)
 
@@ -427,7 +427,7 @@ sub _error {
 sub _empty_port {
     my $self        = shift;
 
-    my $port = 50000 + int( rand() * 1000 );
+    my $port = 32637;                           # 32637-32766 Unassigned
 
     while ( $port++ < 60000 )
     {
@@ -561,7 +561,7 @@ Kafka::Mock - object interface to the TCP mock server for testing
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Mock> version 0.11
+This documentation refers to C<Kafka::Mock> version 0.12
 
 =head1 SYNOPSIS
 
@@ -569,22 +569,22 @@ To use the Mock server, the application might be started and finished as below:
 
     use Kafka qw( DEFAULT_TIMEOUT );
     use Kafka::Mock;
-    
+
     # Mock server
     my $mock = Kafka::Mock->new(
         requests    => \%requests,
         responses   => \%responses,
         timeout     => 0.1  # Optional, secs float
         );
-    
+
     #-- IO
     my $io = Kafka::IO->new(
         host        => "localhost",
         port        => $mock->port
         );
-    
+
     # ... the application body
-    
+
     # to kill the mock server process
     $mock->close;
 
@@ -819,7 +819,7 @@ The method to kill the mock server process and clean up.
           .'fffffffffffffffe'                     # TIME -2: earliest
           .'00000064',                            # MAX NUM OFFSTS 100
       );
-  
+
   my %responses = (
       0   => '',                                  # PRODUCE Response
       1   =>                                      # FETCH Response
@@ -900,7 +900,7 @@ L<Kafka::Protocol|Kafka::Protocol> - functions to process messages in the
 Apache Kafka's wire format
 
 L<Kafka::Int64|Kafka::Int64> - functions to work with 64 bit elements of the
-protocol on 32 bit systems 
+protocol on 32 bit systems
 
 L<Kafka::Mock|Kafka::Mock> - object interface to the TCP mock server for testing
 

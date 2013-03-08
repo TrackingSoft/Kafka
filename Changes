@@ -1,5 +1,9 @@
 Revision history for Kafka package
 
+0.12  Fri Mar  08 2013
+    CHANGES:
+    - Change the port used in the Kafka::Mock
+
 0.11  Thu Feb  28 2013
     CHANGES:
     - Use String::CRC32 instead of Digest::CRC

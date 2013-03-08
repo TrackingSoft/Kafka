@@ -8,7 +8,7 @@ use warnings;
 # limited to 32 bits and slow bigint must be used instead. Use subs from this module
 # in such case.
 
-our $VERSION = '0.11';
+our $VERSION = '0.12';
 
 use bytes;
 use bigint; # this allows integers of practially any size at the cost of significant performance drop
@@ -63,7 +63,7 @@ the Apache Kafka Wire Format protocol on 32 bit systems
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Int64> version 0.11
+This documentation refers to C<Kafka::Int64> version 0.12
 
 =head1 SYNOPSIS
 

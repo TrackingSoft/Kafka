@@ -6,7 +6,7 @@ use warnings;
 
 # Basic functionalities to include a simple Consumer
 
-our $VERSION = '0.11';
+our $VERSION = '0.12';
 
 use Carp;
 use Params::Util qw( _INSTANCE _STRING _NONNEGINT _POSINT _NUMBER );
@@ -251,7 +251,7 @@ Kafka::Consumer - object interface to the consumer client
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Consumer> version 0.11
+This documentation refers to C<Kafka::Consumer> version 0.12
 
 =head1 SYNOPSIS
 
