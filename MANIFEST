@@ -3,87 +3,30 @@ MANIFEST                            This file
 Makefile.PL                         Makefile generator
 README                              Get you started with this package
 lib/Kafka.pm
-lib/Kafka/Producer.pm
+lib/Kafka/Connection.pm
 lib/Kafka/Consumer.pm
-lib/Kafka/Protocol.pm
-lib/Kafka/Message.pm
 lib/Kafka/IO.pm
 lib/Kafka/Int64.pm
-lib/Kafka/Mock.pm
-tools/benchmark_consumer.pl         A simple consumer benchmark
-tools/benchmark_producer.pl         A simple producer benchmark
+lib/Kafka/Message.pm
+lib/Kafka/Producer.pm
+lib/Kafka/Protocol.pm
 coverage.sh                         Control code coverage
-t/00_compile.t
+t/lib/Kafka/Cluster.pm
+t/lib/Kafka/MockIO.pm
+t/lib/Kafka/MockProtocol.pm
+t/00_api.t
 t/01_bits64.t
-t/00_Int64/00_compile.t
-t/00_Int64/01_intsum.t
-t/00_Int64/02_packq.t
-t/00_Int64/03_unpackq.t
-t/01_IO/00_compile.t
-t/01_IO/01_new.t
-t/01_IO/02_RaiseError.t
-t/01_IO/03_close.t
-t/01_IO/04_last_error.t
-t/01_IO/05_last_errorcode.t
-t/01_IO/06_send.t
-t/01_IO/07_receive.t
-t/03_Protocol/00_compile.t
-t/03_Protocol/01_last_error.t
-t/03_Protocol/02_last_errorcode.t
-t/03_Protocol/03_produce_request.t
-t/03_Protocol/04_fetch_request.t
-t/03_Protocol/05_offsets_request.t
-t/03_Protocol/06_fetch_response.t
-t/03_Protocol/07_offsets_response.t
-t/04_Producer/00_compile.t
-t/04_Producer/01_new.t
-t/04_Producer/02_last_error.t
-t/04_Producer/03_last_errorcode.t
-t/04_Producer/04_send.t
-t/04_Producer/05_close.t
-t/05_Message/00_compile.t
-t/05_Message/01_new.t
-t/05_Message/02_methods.t
-t/06_Consumer/00_compile.t
-t/06_Consumer/01_new.t
-t/06_Consumer/02_last_error.t
-t/06_Consumer/03_last_errorcode.t
-t/06_Consumer/04_fetch.t
-t/06_Consumer/05_offsets.t
-t/06_Consumer/06_close.t
-t/99_usage/01_kafka.t                   Kafka usage examples
-t/99_usage/03_kafka_bench.t             Kafka Benchmark test
-xt/author/92_vars.t
-xt/author/93_versions.t
-xt/author/94_fixme.t
-xt/author/95_critic.t
-xt/release/96_kwalitee.t
-xt/release/97_distribution.t
-xt/release/98_pod.t
-xt/release/99_pod_coverage.t
-xt/release/00_Int64/98_pod.t
-xt/release/00_Int64/99_pod_coverage.t
-xt/release/01_IO/98_pod.t
-xt/release/01_IO/99_pod_coverage.t
-xt/release/02_Mock/00_compile.t
-xt/release/02_Mock/01_new.t
-xt/release/02_Mock/02_port.t
-xt/release/02_Mock/03_delay.t
-xt/release/02_Mock/04_clear.t
-xt/release/02_Mock/05_close.t
-xt/release/02_Mock/06_last_request.t
-xt/release/02_Mock/07_usage.t
-xt/release/02_Mock/98_pod.t
-xt/release/02_Mock/99_pod_coverage.t
-xt/release/03_Protocol/98_pod.t
-xt/release/03_Protocol/99_pod_coverage.t
-xt/release/04_Producer/98_pod.t
-xt/release/04_Producer/99_pod_coverage.t
-xt/release/05_Message/98_pod.t
-xt/release/05_Message/99_pod_coverage.t
-xt/release/06_Consumer/98_pod.t
-xt/release/06_Consumer/99_pod_coverage.t
-xt/release/99_usage/00_mock.t           Mock server usage examples
-xt/release/99_usage/02_mock_error.t     Test errors in FETCH & OFFSETS Response
+t/10_decode_encode.t
+t/20_cluster.t
+t/21_cluster_start.t
+t/30_connection.t
+t/40_producer.t
+t/50_consumer.t
+t/70_kafka_usage.t
+t/71_kafka_bench.t
+t/89_cluster_stop.t
+t/90_mockio.t
+t/91_mock_usage.t
+t/92_mock_bench.t
 META.yml                                Module meta-data (added by MakeMaker)
 META.json                               Module meta-data (added by MakeMaker)

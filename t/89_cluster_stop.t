@@ -27,21 +27,29 @@ plan 'no_plan';
 
 #-- load the modules -----------------------------------------------------------
 
-use Kafka qw (
-    $BITS64
-);
+use Const::Fast;
+use File::HomeDir;
+use File::Spec;
+
+use Kafka::Cluster;
 
 #-- setting up facilities ------------------------------------------------------
 
 #-- declarations ---------------------------------------------------------------
 
+# WARNING: must match the settings of your system
+const my $KAFKA_BASE_DIR    => $ENV{KAFKA_BASE_DIR} || File::Spec->catdir( File::HomeDir->my_home, 'kafka' );
+
 #-- Global data ----------------------------------------------------------------
 
 # INSTRUCTIONS -----------------------------------------------------------------
 
-eval { my $ret = unpack( 'Q', ( 255 ) x 8 )."\n" };
+my $cluster = Kafka::Cluster->new(
+    kafka_dir       => $KAFKA_BASE_DIR,
+    does_not_start  => 1,
+);
+isa_ok( $cluster, 'Kafka::Cluster' );
 
-if      ( $@ )  { ok( !$BITS64, 'Your system not supports 64-bit integer values' ); }
-else            { ok(  $BITS64, 'Your system supports 64-bit integer values' ); }
+$cluster->close;
 
 # POSTCONDITIONS ---------------------------------------------------------------

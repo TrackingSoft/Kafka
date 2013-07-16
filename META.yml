@@ -3,8 +3,15 @@ abstract: 'Apache Kafka low-level synchronous API, which does not use Zookeeper.
 author:
   - 'TrackingSoft LLC <sgladkov@trackingsoft.com>'
 build_requires:
+  Capture::Tiny: 0.22
+  Config::IniFiles: 2.82
+  File::Find::Rule: 0.33
+  File::HomeDir: 1.00
+  Proc::Daemon: 0.14
+  Sub::Install: 0.926
   Test::Deep: 0.109
   Test::Exception: 0.31
+  Test::TCP: 2.00
 configure_requires:
   ExtUtils::MakeMaker: 0
 dynamic_config: 1
@@ -20,7 +27,9 @@ no_index:
     - xt
     - inc
 requires:
-  Digest::CRC: 0.18
-  Params::Util: 1.04
+  Const::Fast: 0.014
+  List::MoreUtils: 0.33
+  Params::Util: 1.07
+  Scalar::Util::Numeric: 0.22
   String::CRC32: 1.4
 version: 0.12

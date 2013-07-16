@@ -28,11 +28,16 @@ packages that are distributed separately from Perl. We recommend that
 you have the following packages installed before you install
 Kafka:
 
+   Const::Fast
+   Data::HexDump::Range
    Params::Util
    String::CRC32
 
 The Kafka package has the following optional dependencies:
 
+   File::Find::Rule
+   File::HomeDir
+   Mock::Quick
    Test::Deep
    Test::Exception
 
@@ -95,7 +100,6 @@ The basic operation of the Kafka package modules:
 COPYRIGHT AND LICENCE
 
 Copyright (C) 2012-2013 by TrackingSoft LLC.
-All rights reserved.
 
 This package is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself. See perlartistic at

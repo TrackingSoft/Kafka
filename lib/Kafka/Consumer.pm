@@ -1,245 +1,232 @@
 package Kafka::Consumer;
 
+# Basic functionalities to include a simple Consumer
+
+#-- Pragmas --------------------------------------------------------------------
+
 use 5.010;
 use strict;
 use warnings;
 
-# Basic functionalities to include a simple Consumer
+# PRECONDITIONS ----------------------------------------------------------------
 
-our $VERSION = '0.12';
+our $VERSION = '0.8001';
+
+#-- load the modules -----------------------------------------------------------
 
 use Carp;
-use Params::Util qw( _INSTANCE _STRING _NONNEGINT _POSINT _NUMBER );
+use Params::Util qw(
+    _INSTANCE
+    _NONNEGINT
+    _NUMBER
+    _POSINT
+    _STRING
+);
+use Scalar::Util::Numeric qw(
+    isbig
+    isint
+);
 
 use Kafka qw(
-    ERROR_MISMATCH_ARGUMENT
-    ERROR_CANNOT_SEND
-    ERROR_CANNOT_RECV
-    ERROR_NOTHING_RECEIVE
-    ERROR_IN_ERRORCODE
-    BITS64
-    );
-use Kafka::Protocol qw(
-    REQUESTTYPE_FETCH
-    REQUESTTYPE_OFFSETS
-    fetch_request
-    fetch_response
-    offsets_request
-    offsets_response
-    );
+    $BITS64
+    $DEFAULT_MAX_BYTES
+    $DEFAULT_MAX_NUMBER_OF_OFFSETS
+    $DEFAULT_MAX_WAIT_TIME
+    %ERROR
+    $ERROR_COMPRESSED_PAYLOAD
+    $ERROR_MISMATCH_ARGUMENT
+    $ERROR_NO_ERROR
+    $ERROR_PARTITION_DOES_NOT_MATCH
+    $ERROR_TOPIC_DOES_NOT_MATCH
+    $MIN_BYTES_RESPOND_IMMEDIATELY
+    $RECEIVE_EARLIEST_OFFSETS
+);
+use Kafka::Internals qw(
+    $APIKEY_FETCH
+    $APIKEY_OFFSET
+    $MIN_MAXBYTES
+    _get_CorrelationId
+    last_error
+    last_errorcode
+    RaiseError
+    _fulfill_request
+    _error
+    _connection_error
+    _set_error
+);
+use Kafka::Connection;
 use Kafka::Message;
 
-if ( !BITS64 ) { eval 'use Kafka::Int64; 1;' or die "Cannot load Kafka::Int64 : $@"; }  ## no critic
+if ( !$BITS64 ) { eval 'use Kafka::Int64; 1;' or die "Cannot load Kafka::Int64 : $@"; } ## no critic
 
-our $_last_error;
-our $_last_errorcode;
+#-- declarations ---------------------------------------------------------------
+
+our $_package_error;
+
+#-- constructor ----------------------------------------------------------------
 
 sub new {
-    my $class   = shift;
-    my $self = {
-        IO              => undef,
-        RaiseError      => 0,
-        };
+    my ( $class, @args ) = @_;
 
-    my @args = @_;
+    my $self = bless {
+        Connection          => undef,
+        RaiseError          => 0,
+        CorrelationId       => undef,
+        ClientId            => 'consumer',
+        MaxWaitTime         => $DEFAULT_MAX_WAIT_TIME,
+        MinBytes            => $MIN_BYTES_RESPOND_IMMEDIATELY,
+        MaxBytes            => $DEFAULT_MAX_BYTES,
+        MaxNumberOfOffsets  => $DEFAULT_MAX_NUMBER_OF_OFFSETS,
+    }, $class;
+
     while ( @args )
     {
         my $k = shift @args;
         $self->{ $k } = shift @args if exists $self->{ $k };
     }
 
-    bless( $self, $class );
+    $self->_error( $ERROR_NO_ERROR );
+    $self->{CorrelationId} //= _get_CorrelationId;
 
-    $@ = "";
-    unless ( defined( _NONNEGINT( $self->{RaiseError} ) ) )
-    {
-        $self->{RaiseError} = 0;
-        return $self->_error( ERROR_MISMATCH_ARGUMENT );
+    if    ( !defined _NONNEGINT( $self->RaiseError ) )                                  { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'RaiseError' ); }
+    elsif ( !_INSTANCE( $self->{Connection}, 'Kafka::Connection' ) )                    { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'Connection' ); }
+    elsif ( !isint( $self->{CorrelationId} ) )                                          { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'CorrelationId' ); }
+    elsif ( !( $self->{ClientId} eq q{} || _STRING( $self->{ClientId} ) ) )             { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'ClientId' ); }
+    elsif ( !isint( $self->{MaxWaitTime} ) )                                            { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'MaxWaitTime' ); }
+    elsif ( !isint( $self->{MinBytes} ) )                                               { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'MinBytes' ); }
+    elsif ( !( _POSINT( $self->{MaxBytes} ) && $self->{MaxBytes} >= $MIN_MAXBYTES ) )   { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'MaxBytes' ); }
+    elsif ( !isint( $self->{MaxNumberOfOffsets} ) )                                     { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'MaxNumberOfOffsets' ); }
+    else {
+        # nothing to do
     }
-    $self->{last_error} = $self->{last_errorcode} = $_last_error = $_last_errorcode = undef;
-    _INSTANCE( $self->{IO}, 'Kafka::IO' ) or return $self->_error( ERROR_MISMATCH_ARGUMENT );
-
-    $_last_error        = $_last_errorcode          = undef;
-    $self->{last_error} = $self->{last_errorcode}   = undef;
 
     return $self;
 }
 
-sub last_error {
-    my $self = shift;
+#-- public attributes ----------------------------------------------------------
 
-    return $self->{last_error} if defined $self;
-    return $_last_error;
-}
-
-sub last_errorcode {
-    my $self = shift;
-
-    return $self->{last_errorcode} if defined $self;
-    return $_last_errorcode;
-}
-
-sub _error {
-    my $self        = shift;
-    my $error_code  = shift;
-    my $description = shift;
-
-    $self->{last_errorcode} = $_last_errorcode  = $error_code;
-    $self->{last_error}     = $_last_error      = $description || $Kafka::ERROR[ $error_code ];
-    confess $self->{last_error} if $self->{RaiseError} and $self->{last_errorcode} == ERROR_MISMATCH_ARGUMENT;
-    die $self->{last_error} if $self->{RaiseError} or ( $self->{IO} and ( ref( $self->{IO} eq "Kafka::IO" ) and $self->{IO}->RaiseError ) );
-    return;
-}
-
-sub _receive {
-    my $self            = shift;
-    my $request_type    = shift;
-
-    my $response = {};
-    my $message = $self->{IO}->receive( 4 );
-    return $self->_error( $self->{IO}->last_errorcode, $self->{IO}->last_error )
-        unless ( $message and defined $$message );
-    my $tail = $self->{IO}->receive( unpack( "N", $$message ) );
-    return $self->_error( $self->{IO}->last_errorcode, $self->{IO}->last_error )
-        unless ( $tail and defined $$tail );
-    $$message .= $$tail;
-
-    my $decoded;
-    if ( $request_type == REQUESTTYPE_FETCH )
-    {
-        $decoded = fetch_response( $message );
-# WARNING: remember the error code of the last received packet
-        unless ( $response->{error_code} = $decoded->{header}->{error_code} )
-        {
-            $response->{messages} = [] unless defined $response->{messages};
-            push @{$response->{messages}}, @{$decoded->{messages}};
-        }
-    }
-    elsif ( $request_type == REQUESTTYPE_OFFSETS )
-    {
-        $decoded = offsets_response( $message );
-# WARNING: remember the error code of the last received packet
-        unless ( $response->{error_code} = $decoded->{header}->{error_code} )
-        {
-            $response->{offsets} = [] unless defined $response->{offsets};
-            push @{$response->{offsets}}, @{$decoded->{offsets}};
-# WARNING: remember the error code of the last received packet
-            $response->{error} = $decoded->{error};
-        }
-    }
-    return $response;
-}
+#-- public methods -------------------------------------------------------------
 
 sub fetch {
-    my $self        = shift;
-    my $topic       = _STRING( shift ) or return $self->_error( ERROR_MISMATCH_ARGUMENT );
-    my $partition   = shift;
-    my $offset      = shift;
-    my $max_size    = _POSINT( shift ) or return $self->_error( ERROR_MISMATCH_ARGUMENT );
+    my ( $self, $topic, $partition, $offset, $max_size ) = @_;
 
-    return $self->_error( ERROR_MISMATCH_ARGUMENT ) unless defined( _NONNEGINT( $partition ) );
-    ( ref( $offset ) eq "Math::BigInt" and $offset >= 0 ) or defined( _NONNEGINT( $offset ) ) or return $self->_error( ERROR_MISMATCH_ARGUMENT );
+    if    ( !( $topic eq q{} || _STRING( $topic ) ) )                                       { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$topic' ); }
+    elsif ( !isint( $partition ) )                                                          { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$partition' ); }
+    elsif ( !( ( isbig( $offset ) && $offset >= 0 ) || defined( _NONNEGINT( $offset ) ) ) ) { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$offset' ); }
+    elsif ( !( _POSINT( $max_size ) && $max_size >= $MIN_MAXBYTES ) )                       { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$max_size' ); }
 
-    $_last_error        = $_last_errorcode          = undef;
-    $self->{last_error} = $self->{last_errorcode}   = undef;
-
-    my $sent;
-    eval { $sent = $self->{IO}->send( fetch_request( $topic, $partition, $offset, $max_size ) ) };
-    return $self->_error( $self->{IO}->last_errorcode, $self->{IO}->last_error )
-        unless ( defined $sent );
-
-    my $decoded = {};
-    eval { $decoded = $self->_receive( REQUESTTYPE_FETCH ) };
-    return $self->_error( $self->{last_errorcode}, $self->{last_error} )
-        if ( $self->{last_error} );
-
-    if ( defined $decoded->{messages} )
-    {
-        my $response = [];
-        my $next_offset = $offset;
-        foreach my $message ( @{$decoded->{messages}} )
-        {
-            # To find the offset of the next message,
-            # take the offset of this message (that you made in the request),
-            # and add LENGTH + 4 bytes (length of this message + 4 byte header to represent the length of this message).
-            if ( BITS64 )
+    my $request = {
+        ApiKey                              => $APIKEY_FETCH,
+        CorrelationId                       => $self->{CorrelationId},
+        ClientId                            => $self->{ClientId},
+        MaxWaitTime                         => $self->{MaxWaitTime},
+        MinBytes                            => $self->{MinBytes},
+        topics                              => [
             {
-                $message->{offset} = $next_offset;
-                $next_offset += $message->{length} + 4;
+                TopicName                   => $topic,
+                partitions                  => [
+                    {
+                        Partition           => $partition,
+                        FetchOffset         => $offset,
+                        MaxBytes            => $max_size // $self->{MaxBytes},
+                    },
+                ],
+            },
+        ],
+    };
+
+    $self->_error( $ERROR_NO_ERROR );
+
+    my $response = $self->_fulfill_request( $request )
+        or return;
+
+    my $messages = [];
+    foreach my $received_topic ( @{ $response->{topics} } ) {
+        $received_topic->{TopicName} eq $topic
+            or return $self->_error( $ERROR_TOPIC_DOES_NOT_MATCH, "'$topic' ne '".$received_topic->{TopicName}."'" );
+        foreach my $received_partition ( @{ $received_topic->{partitions} } ) {
+            $received_partition->{Partition} == $partition
+                or return $self->_error( $ERROR_PARTITION_DOES_NOT_MATCH, "$partition != ".$received_partition->{Partition} );
+            my $HighwaterMarkOffset = $received_partition->{HighwaterMarkOffset};
+            foreach my $Message ( @{ $received_partition->{MessageSet} } ) {
+                my ( $offset, $next_offset, $message_error );
+                if ( $BITS64 ) {
+                    $offset = $Message->{Offset};
+                    $next_offset += $offset + 1;
+                }
+                else {
+                    $offset = Kafka::Int64::intsum( $offset, 0 );
+                    $next_offset = Kafka::Int64::intsum( $offset, 1 );
+                }
+                $message_error = $Message->{MagicByte} ? $ERROR{ $ERROR_COMPRESSED_PAYLOAD } : q{};
+
+                push( @$messages, Kafka::Message->new( {
+                        Attributes          => $Message->{Attributes},
+                        MagicByte           => $Message->{MagicByte},
+                        key                 => $Message->{Key},
+                        payload             => $Message->{Value},
+                        offset              => $offset,
+                        next_offset         => $next_offset,
+                        error               => $message_error,
+                        valid               => !$message_error,
+                        HighwaterMarkOffset => $HighwaterMarkOffset,
+                    } )
+                );
             }
-            else
-            {
-                $message->{offset} = Kafka::Int64::intsum( $next_offset, 0 );
-                $next_offset = Kafka::Int64::intsum( $next_offset, $message->{length} + 4 );
-            }
-            $message->{next_offset} = $next_offset;
-            push @$response, Kafka::Message->new( $message )
         }
-        return $response;
     }
-    elsif ( $decoded->{error_code} )
-    {
-        return $self->_error( ERROR_IN_ERRORCODE, $Kafka::ERROR[ERROR_IN_ERRORCODE].": ".( $Kafka::ERROR_CODE{ $decoded->{error_code} } || $Kafka::ERROR_CODE{ -1 } ) );
-    }
-    else
-    {
-        return $self->_error( ERROR_NOTHING_RECEIVE );
-    }
+
+    return $messages;
 }
 
 sub offsets {
-    my $self        = shift;
-    my $topic       = _STRING( shift ) or return $self->_error( ERROR_MISMATCH_ARGUMENT );
-    my $partition   = shift;
-    my $time        = shift;
-    my $max_number  = _POSINT( shift ) or return $self->_error( ERROR_MISMATCH_ARGUMENT );
+    my ( $self, $topic, $partition, $time, $max_number ) = @_;
 
-    return $self->_error( ERROR_MISMATCH_ARGUMENT ) unless defined( _NONNEGINT( $partition ) );
-    ( ref( $time ) eq "Math::BigInt" ) or defined( _NUMBER( $time ) ) or return $self->_error( ERROR_MISMATCH_ARGUMENT );
-    $time = int( $time );
-    return $self->_error( ERROR_MISMATCH_ARGUMENT ) if $time < -2;
+    if    ( !( $topic eq q{} || _STRING( $topic ) ) )                                           { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$topic' ); }
+    elsif ( !isint( $partition ) )                                                              { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$partition' ); }
+    elsif ( !( ( isbig( $time ) || isint( $time ) ) && $time >= $RECEIVE_EARLIEST_OFFSETS ) )   { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$time' ); }
+    elsif ( !_POSINT( $max_number ) )                                                           { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$max_number' ); }
 
-    $_last_error        = $_last_errorcode          = undef;
-    $self->{last_error} = $self->{last_errorcode}   = undef;
+    my $request = {
+        ApiKey                              => $APIKEY_OFFSET,
+        CorrelationId                       => $self->{CorrelationId},
+        ClientId                            => $self->{ClientId},
+        topics                              => [
+            {
+                TopicName                   => $topic,
+                partitions                  => [
+                    {
+                        Partition           => $partition,
+                        Time                => $time,
+                        MaxNumberOfOffsets  => $max_number // $self->{MaxNumberOfOffsets},
+                    },
+                ],
+            },
+        ],
+    };
 
-    my $sent;
-    eval { $sent = $self->{IO}->send( offsets_request( $topic, $partition, $time, $max_number ) ) };
-    return $self->_error( $self->{IO}->last_errorcode, $self->{IO}->last_error )
-        unless ( defined $sent );
+    $self->_error( $ERROR_NO_ERROR );
 
-    my $decoded = {};
-    eval { $decoded = $self->_receive( REQUESTTYPE_OFFSETS ) };
-    return $self->_error( $self->{last_errorcode}, $self->{last_error} )
-        if ( $self->{last_error} );
+    my $response = $self->_fulfill_request( $request )
+        or return;
 
-    if ( defined $decoded->{offsets} )
-    {
-        my $response = [];
-        push @$response, @{$decoded->{offsets}};
-        return $response;
+    my $offsets = [];
+    foreach my $received_topic ( @{ $response->{topics} } ) {
+        foreach my $partition_offsets ( @{ $received_topic->{PartitionOffsets} } ) {
+            push @$offsets, @{ $partition_offsets->{Offset} };
+        }
     }
-    elsif ( $decoded->{error_code} )
-    {
-        return $self->_error( ERROR_IN_ERRORCODE, $Kafka::ERROR[ERROR_IN_ERRORCODE].": ".( $Kafka::ERROR_CODE{ $decoded->{error_code} } || $Kafka::ERROR_CODE{ -1 } ) );
-    }
-    else
-    {
-        return $self->_error( ERROR_NOTHING_RECEIVE );
-    }
+
+    return $offsets;
 }
 
-sub close {
-    my $self = shift;
+#-- private attributes ---------------------------------------------------------
 
-    $self->{IO}->close if ref( $self->{IO} ) eq "Kafka::IO";
-    delete $self->{$_} foreach keys %$self;
-}
+#-- private methods ------------------------------------------------------------
 
-sub DESTROY {
-    my $self = shift;
+#-- Closes and cleans up -------------------------------------------------------
 
-    $self->close;
-}
+# do not close the $self->{Connection} connections as they can be used by other instances of the class Kafka::Connection
 
 1;
 
@@ -260,9 +247,9 @@ Setting up:
     #-- IO
     use Kafka qw( KAFKA_SERVER_PORT DEFAULT_TIMEOUT );
     use Kafka::IO;
-    
+
     my $io;
-    
+
     $io = Kafka::IO->new(
         host        => "localhost",
         port        => KAFKA_SERVER_PORT,
@@ -275,12 +262,12 @@ Consumer:
 
     #-- Consumer
     use Kafka::Consumer;
-    
+
     my $consumer = Kafka::Consumer->new(
         IO          => $io,
         RaiseError  => 0    # Optional, default = 0
         );
-    
+
     # Get a list of valid offsets up max_number before the given time
     my $offsets = $consumer->offsets(
         "test",             # topic
@@ -301,7 +288,7 @@ Consumer:
             "(", $consumer->last_errorcode, ") ",
             $consumer->last_error, "\n";
     }
-    
+
     # Consuming messages
     my $messages = $consumer->fetch(
         "test",             # topic
@@ -325,7 +312,7 @@ Consumer:
             }
         }
     }
-    
+
     # Closes the consumer and cleans up
     $consumer->close;
 
@@ -525,7 +512,7 @@ more descriptive L</last_error>.
 
 =over 3
 
-=item C<Mismatch argument>
+=item C<Invalid argument>
 
 This means that you didn't give the right argument to a C<new>
 L<constructor|/CONSTRUCTOR> or to other L<method|/METHODS>.
@@ -579,7 +566,7 @@ L<Kafka::Protocol|Kafka::Protocol> - functions to process messages in the
 Apache Kafka's wire format
 
 L<Kafka::Int64|Kafka::Int64> - functions to work with 64 bit elements of the
-protocol on 32 bit systems 
+protocol on 32 bit systems
 
 L<Kafka::Mock|Kafka::Mock> - object interface to the TCP mock server for testing
 
@@ -607,7 +594,6 @@ Vlad Marchenko
 =head1 COPYRIGHT AND LICENSE
 
 Copyright (C) 2012-2013 by TrackingSoft LLC.
-All rights reserved.
 
 This package is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself. See I<perlartistic> at

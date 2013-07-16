@@ -29,12 +29,21 @@ my %config = (
     VERSION_FROM                => 'lib/Kafka.pm',  # finds $VERSION
     MIN_PERL_VERSION            => '5.010',
     PREREQ_PM                   => {            # more to the list $Module::CoreList::version{5.010}
-        'Params::Util'          => 1.04,
+        'Const::Fast'           => '0.014',
+        'List::MoreUtils'       => 0.33,
+        'Params::Util'          => 1.07,
+        'Scalar::Util::Numeric' => 0.22,
         'String::CRC32'         => 1.4,
         },
     BUILD_REQUIRES              => {            # more to the list $Module::CoreList::version{5.010}
+        'Capture::Tiny'         => 0.22,
+        'Config::IniFiles'      => 2.82,
+        'File::HomeDir'         => 1.00,
+        'Proc::Daemon'          => 0.14,
+        'Sub::Install'          => 0.926,
         'Test::Deep'            => 0.109,
         'Test::Exception'       => 0.31,
+        'Test::TCP'             => 2.00,
         },
     ( $] >= 5.005 ?                             ## Add these new keywords supported since 5.005
         (

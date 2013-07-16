@@ -1,103 +1,206 @@
 package Kafka::IO;
 
+#-- Pragmas --------------------------------------------------------------------
+
 use 5.010;
 use strict;
 use warnings;
+
 use sigtrap;
 
-our $VERSION = '0.12';
+# PRECONDITIONS ----------------------------------------------------------------
 
-use bytes;
+our $VERSION = '0.8001';
+
+#-- load the modules -----------------------------------------------------------
+
 use Carp;
-use Params::Util qw( _STRING _POSINT _NONNEGINT _NUMBER _ARRAY0 );
 use Errno;
 use Fcntl;
+use Params::Util qw(
+    _ARRAY0
+    _NONNEGINT
+    _NUMBER
+    _POSINT
+    _STRING
+);
+use Scalar::Util qw(
+    dualvar
+);
 use Socket;
-use Time::HiRes qw( alarm );
+use Time::HiRes qw(
+    alarm
+);
 
 use Kafka qw(
-    KAFKA_SERVER_PORT
-    DEFAULT_TIMEOUT
-    MAX_SOCKET_REQUEST_BYTES
-    ERROR_MISMATCH_ARGUMENT
-    ERROR_CANNOT_SEND
-    ERROR_CANNOT_RECV
-    ERROR_CANNOT_BIND
-    );
+    %ERROR
+    $ERROR_CANNOT_BIND
+    $ERROR_CANNOT_RECV
+    $ERROR_CANNOT_SEND
+    $ERROR_MISMATCH_ARGUMENT
+    $ERROR_NO_ERROR
+    $ERROR_NOT_BINARY_STRING
+    $KAFKA_SERVER_PORT
+    $REQUEST_TIMEOUT
+);
+use Kafka::Internals qw(
+    $MAX_SOCKET_REQUEST_BYTES
+);
 
-our $_last_error;
-our $_last_errorcode;
+#-- declarations ---------------------------------------------------------------
+
+our $DEBUG = 0;
+our $_hdr;
+
+#-- constructor ----------------------------------------------------------------
 
 sub new {
-    my $class = shift;
+    my ( $class, @args ) = @_;
 
     my $self = bless {
-        host        => "",
-        port        => KAFKA_SERVER_PORT,
-        timeout     => DEFAULT_TIMEOUT,
-        RaiseError  => 0,
-        }, $class;
+        host        => q{},
+        port        => $KAFKA_SERVER_PORT,
+        timeout     => $REQUEST_TIMEOUT,
+    }, $class;
 
-    $@ = "";
-    $self->{last_error} = $self->{last_errorcode} = $_last_error = $_last_errorcode = undef;
-
-    my @args = @_;
-    while ( @args )
-    {
+    while ( @args ) {
         my $k = shift @args;
         $self->{ $k } = shift @args if exists $self->{ $k };
     }
 
-    unless ( defined( _NONNEGINT( $self->{RaiseError} ) ) )
-    {
-        $self->{RaiseError} = 0;
-        return $self->_error( ERROR_MISMATCH_ARGUMENT );
+    $self->{not_accepted} = 0;
+    $self->{socket} = undef;
+    $self->_error( $ERROR_NO_ERROR );
+
+    if    ( !_STRING( $self->{host} ) )                                 { $self->_error( $ERROR_MISMATCH_ARGUMENT, __PACKAGE__.'->new - host' ); }
+    elsif ( !_POSINT( $self->{port} ) )                                 { $self->_error( $ERROR_MISMATCH_ARGUMENT, __PACKAGE__.'->new - port' ); }
+    elsif ( !( _NUMBER( $self->{timeout} ) && $self->{timeout} > 0 ) )  { $self->_error( $ERROR_MISMATCH_ARGUMENT, __PACKAGE__.'->new - timeout' ); }
+    else  {
+        local $@;
+        eval { $self->_connect() };
+        $self->_error( $ERROR_CANNOT_BIND, __PACKAGE__."->new - $@" ) if $@;
     }
 
-    (
-        _STRING( $self->{host} ) and
-        _POSINT( $self->{port} ) and
-        ( _NUMBER( $self->{timeout} ) and $self->{timeout} > 0 )
-    ) or return $self->_error( ERROR_MISMATCH_ARGUMENT );
-
-    $self->{not_accepted} = 0;
-    eval { $self->_connect() };
-    return $self->_error( ERROR_CANNOT_BIND, $@ ) if ( $@ );
     return $self;
 }
 
-sub last_error {
-    my $self = shift;
+#-- public attributes ----------------------------------------------------------
 
-    return $self->{last_error} if defined $self;
-    return $_last_error;
+sub last_error {
+    my ( $self ) = @_;
+
+    return $self->{error}.q{};
 }
 
 sub last_errorcode {
-    my $self = shift;
+    my ( $self ) = @_;
 
-    return $self->{last_errorcode} if defined $self;
-    return $_last_errorcode;
+    return $self->{error} + 0;
 }
+
+#-- public methods -------------------------------------------------------------
+
+# REMARK: Original Kafka client transmits by several packages
+sub send {
+    my ( $self, $message ) = @_;
+
+    my $description = __PACKAGE__.'->send';
+    _STRING( $message )
+        or $self->_error( $ERROR_MISMATCH_ARGUMENT, $description );
+    !utf8::is_utf8( $message )
+        or return _error( $ERROR_NOT_BINARY_STRING, $description );
+    ( my $len = length( $message .= q{} ) ) <= $MAX_SOCKET_REQUEST_BYTES
+        or $self->_error( $ERROR_MISMATCH_ARGUMENT, $description );
+
+    $self->_debug_msg( 'Request to', 'green', $message ) if $DEBUG;
+
+    # accept not accepted earlier
+    while ( select( my $mask = $self->{_select}, undef, undef, 0 ) ) {
+        my $received = $self->receive( $self->{not_accepted} || 1 );
+        return unless ( $received && defined( $$received ) );
+        $self->{not_accepted} = 0;
+    }
+    $self->{not_accepted} = 0;
+
+    my ( $sent, $from_send, $mask );
+    {
+        last unless ( select( undef, $mask = $self->{_select}, undef, $self->{timeout} ) );
+        $sent += ( $from_send = send( $self->{socket}, $message, 0 ) ) || 0;
+        redo if $sent < $len;
+    }
+
+    ( defined( $sent ) && $sent == $len )
+        or return $self->_error( $ERROR_CANNOT_SEND, __PACKAGE__."->send - $!" );
+
+    return $sent;
+}
+
+sub receive {
+    my ( $self, $length ) = @_;
+
+    _POSINT( $length )
+        or return $self->_error( $ERROR_MISMATCH_ARGUMENT, __PACKAGE__.'->receive' );
+
+    my ( $from_recv, $message, $buf, $mask );
+    $message = q{};
+    {
+        last unless ( select( $mask = $self->{_select}, undef, undef, $self->{timeout} ) );
+        $from_recv = recv( $self->{socket}, $buf = q{}, $length, 0 );
+        last if !defined( $from_recv ) || $buf eq q{};
+        $message .= $buf;
+        redo if length( $message ) < $length;
+    }
+    $self->{not_accepted} = $length - length( $message );
+    $self->{not_accepted} *= $self->{not_accepted} >= 0;
+
+    ( defined( $from_recv ) && !$self->{not_accepted} )
+        or return $self->_error( $ERROR_CANNOT_RECV, __PACKAGE__."->receive - $!" );
+
+    $self->_debug_msg( 'Response from', 'yellow', $message ) if $DEBUG;
+    return \$message;
+}
+
+sub close {
+    my ( $self ) = @_;
+
+    if ( $self->{socket} ) {
+        $self->_disconnect();
+        $self->{socket} = undef;
+    }
+}
+
+sub is_alive {
+    my ( $self ) = @_;
+
+    return unless $self->{socket};
+
+    if ( defined( my $packed = getsockopt( $self->{socket}, SOL_SOCKET, SO_ERROR ) ) ) {
+        return !unpack( 'L', $packed );
+    }
+
+    return;
+}
+
+#-- private attributes ---------------------------------------------------------
+
+#-- private methods ------------------------------------------------------------
 
 # You need to have access to your Kafka instance and be able to connect through TCP
 # uses http://devpit.org/wiki/Connect%28%29_with_timeout_%28in_Perl%29
 sub _connect {
-    my $self = shift;
+    my ( $self ) = @_;
 
-    $@ = "";
+    $self->_error( $ERROR_NO_ERROR );
     $self->{socket} = undef;
-    $_last_error        = $_last_errorcode          = undef;
-    $self->{last_error} = $self->{last_errorcode}   = undef;
 
     my $name    = $self->{host};
     my $port    = $self->{port};
     my $timeout = $self->{timeout};
 
     my $ip;
-    if( $name =~ qr~[a-zA-Z]~s )
-    {
+    if( $name =~ qr~[a-zA-Z]~s ) {
         # DNS lookup.
+        local $@;
         eval {
             local $SIG{ALRM} = sub { die "alarm clock restarted"};
             alarm $self->{timeout};
@@ -109,8 +212,7 @@ sub _connect {
         die( "gethostbyname ${name}: $?\n" ) unless defined $ip;
         $ip = inet_ntoa( $ip );
     }
-    else
-    {
+    else {
         $ip = $name;
     }
 
@@ -124,31 +226,24 @@ sub _connect {
     $_ = fcntl( $connection, F_GETFL, 0 ) or die "fcntl: $!\n";
     fcntl( $connection, F_SETFL, $_ | FD_CLOEXEC ) or die "fnctl: $!\n";
 
-#    if( $timeout )
-#    {
-        # Set O_NONBLOCK so we can time out connect().
-        $_ = fcntl( $connection, F_GETFL, 0 ) or die "fcntl F_GETFL: $!\n"; # 0 for error, 0e0 for 0.
-        fcntl( $connection, F_SETFL, $_ | O_NONBLOCK ) or die "fcntl F_SETFL O_NONBLOCK: $!\n"; # 0 for error, 0e0 for 0.
-#    }
+    $_ = fcntl( $connection, F_GETFL, 0 ) or die "fcntl F_GETFL: $!\n"; # 0 for error, 0e0 for 0.
+    fcntl( $connection, F_SETFL, $_ | O_NONBLOCK ) or die "fcntl F_SETFL O_NONBLOCK: $!\n"; # 0 for error, 0e0 for 0.
 
     # Connect returns immediately because of O_NONBLOCK.
-    connect( $connection, pack_sockaddr_in( $port, inet_aton( $ip ) ) ) or $!{EINPROGRESS} or die( "connect ${ip}:${port} (${name}): $!\n" );
+    connect( $connection, pack_sockaddr_in( $port, inet_aton( $ip ) ) ) || $!{EINPROGRESS} or die( "connect ${ip}:${port} (${name}): $!\n" );
 
     $self->{socket}     = $connection;
     $self->{_select}    = undef;
-
-#    return $connection unless $timeout;
 
     # Reset O_NONBLOCK.
     $_ = fcntl( $connection, F_GETFL, 0 ) or die "fcntl F_GETFL: $!\n";  # 0 for error, 0e0 for 0.
     fcntl( $connection, F_SETFL, $_ & ~ O_NONBLOCK ) or die "fcntl F_SETFL not O_NONBLOCK: $!\n";  # 0 for error, 0e0 for 0.
 
     # Use select() to poll for completion or error. When connect succeeds we can write.
-    my $vec = "";
+    my $vec = q{};
     vec( $vec, fileno( $connection ), 1 ) = 1;
     select( undef, $vec, undef, $timeout );
-    unless( vec( $vec, fileno( $connection ), 1 ) )
-    {
+    unless( vec( $vec, fileno( $connection ), 1 ) ) {
         # If no response yet, impose our own timeout.
         $! = Errno::ETIMEDOUT();
         die("connect ${ip}:${port} (${name}): $!\n");
@@ -172,114 +267,73 @@ sub _connect {
     setsockopt( $connection, SOL_SOCKET, SO_SNDTIMEO, pack( "L!L!", $timeout, 0 ) ) or die "setsockopt SOL_SOCKET, SO_SNDTIMEO: $!\n";
     setsockopt( $connection, SOL_SOCKET, SO_RCVTIMEO, pack( "L!L!", $timeout, 0 ) ) or die "setsockopt SOL_SOCKET, SO_RCVTIMEO: $!\n";
 
-    vec( $self->{_select} = "", fileno( $self->{socket} ), 1 ) = 1;
+    vec( $self->{_select} = q{}, fileno( $self->{socket} ), 1 ) = 1;
 
     return $connection;
 }
 
 sub _disconnect {
-    my $self = shift;
+    my ( $self ) = @_;
 
     # Close socket
-    if ( $self->{socket} )
-    {
+    if ( $self->{socket} ) {
         $self->{_select} = undef;
-        close( $self->{socket} );
+        CORE::close( $self->{socket} );
         $self->{socket} = undef;
     }
 }
 
-#sub _reconnect {
-#    my $self = shift;
-#
-#    $self->_disconnect() if $self->{socket};
-#    $self->_connect();
-#}
-
-sub close {
-    my $self = shift;
-
-    $self->_disconnect() if $self and $self->{socket};
-
-    delete $self->{$_} foreach keys %$self;
-    return;
-}
-
 sub _error {
-    my $self        = shift;
-    my $error_code  = shift;
-    my $description = shift;
+    my ( $self, $error_code, $description ) = @_;
 
-    $self->{last_errorcode} = $_last_errorcode  = $error_code;
-    $self->{last_error}     = $_last_error      = $Kafka::ERROR[$self->{last_errorcode}].( $description ? ": ".$description : "" );
-    confess $self->{last_error} if $self->{RaiseError} and $self->{last_errorcode} == ERROR_MISMATCH_ARGUMENT;
-    die $self->{last_error} if $self->{RaiseError};
+    $self->{error} = dualvar $error_code, $ERROR{ $error_code }.( $description ? ': '.$description : q{} );
+
     return;
 }
 
-sub send {
-    my $self        = shift;
+sub _debug_msg {
+    my ( $self, $header, $colour, $message ) = @_;
 
-    $@ = "";
-    my $message     = _STRING( shift ) or return $self->_error( ERROR_MISMATCH_ARGUMENT );
-    $message .= "";
-    $self->_error( ERROR_MISMATCH_ARGUMENT ) if bytes::length( $message ) > MAX_SOCKET_REQUEST_BYTES;
-
-#    eval { $self->_reconnect() } if ( !$self->{socket} or !getpeername( $self->{socket} ) );
-#    return $self->_error( ERROR_CANNOT_BIND, $@ ) if ( $@ );
-
-    # accept not accepted earlier
-    while ( select( my $mask = $self->{_select}, undef, undef, 0 ) )
-    {
-        my $received = $self->receive( $self->{not_accepted} || 1 );
-        return unless ( $received and defined( $$received ) );
-        $self->{not_accepted} = 0;
+    if ( $DEBUG && !$_hdr ) {
+        require Data::HexDump::Range;
+        $_hdr = Data::HexDump::Range->new(
+            FORMAT                          => 'ANSI',  # 'ANSI'|'ASCII'|'HTML'
+            COLOR                           => 'bw',    # 'bw' | 'cycle'
+            OFFSET_FORMAT                   => 'hex',   # 'hex' | 'dec'
+            DATA_WIDTH                      => 16,      # 16 | 20 | ...
+            DISPLAY_RANGE_NAME              => 0,
+#            MAXIMUM_RANGE_NAME_SIZE         => 16,
+            DISPLAY_COLUMN_NAMES            => 1,
+            DISPLAY_RULER                   => 1,
+            DISPLAY_OFFSET                  => 1,
+#            DISPLAY_CUMULATIVE_OFFSET       => 1,
+            DISPLAY_ZERO_SIZE_RANGE_WARNING => 0,
+            DISPLAY_ZERO_SIZE_RANGE         => 1,
+            DISPLAY_RANGE_NAME              => 0,
+#            DISPLAY_RANGE_SIZE              => 1,
+            DISPLAY_ASCII_DUMP              => 1,
+            DISPLAY_HEX_DUMP                => 1,
+#            DISPLAY_DEC_DUMP                => 1,
+#            COLOR_NAMES                     => {},
+            ORIENTATION                     => 'horizontal',
+        );
     }
-    $self->{not_accepted} = 0;
 
-    my ( $sent, $from_send, $mask, $len );
-    $len = bytes::length( $message );
-    {
-        last unless ( select( undef, $mask = $self->{_select}, undef, $self->{timeout} ) );
-        $sent += ( $from_send = send( $self->{socket}, $message, 0 ) ) || 0;
-        redo if $sent < $len;
-    }
-    return $sent if ( defined( $sent ) and $sent == bytes::length( $message ) );
-    return $self->_error( ERROR_CANNOT_SEND, "".$! );
+    say STDERR
+        "# $header $self->{host}:$self->{port}\n",
+        '# Hex Stream: ', unpack( 'H*', $message ), "\n",
+        $_hdr->dump(
+            [
+                [ 'data', length( $message ), $colour ],
+            ],
+            $message
+        );
 }
 
-sub receive {
-    my $self    = shift;
-
-    $@ = "";
-    my $length  = _POSINT( shift ) or return $self->_error( ERROR_MISMATCH_ARGUMENT );
-
-#    eval { $self->_reconnect() } if ( !$self->{socket} or !getpeername( $self->{socket} ) );
-#    return $self->_error( ERROR_CANNOT_BIND, $@ ) if ( $@ );
-
-    my ( $from_recv, $message, $buf, $mask );
-    $message = "";
-    {
-        last unless ( select( $mask = $self->{_select}, undef, undef, $self->{timeout} ) );
-        $from_recv = recv( $self->{socket}, $buf = "", $length, 0 );
-        last if !defined( $from_recv ) or $buf eq "";
-        $message .= $buf;
-        redo if bytes::length( $message ) < $length;
-    }
-    $self->{not_accepted} = $length - bytes::length( $message );
-    $self->{not_accepted} *= $self->{not_accepted} >= 0;
-    return \$message if ( defined( $from_recv ) and !$self->{not_accepted} );
-    return $self->_error( ERROR_CANNOT_RECV, "".$! );
-}
-
-sub RaiseError {
-    my $self = shift;
-
-    return $self->{RaiseError};
-}
+#-- Closes and cleans up -------------------------------------------------------
 
 sub DESTROY {
-    my $self = shift;
+    my ( $self ) = @_;
 
     $self->close();
 }
@@ -498,7 +552,7 @@ more descriptive L</last_error>.
 
 =over 3
 
-=item C<Mismatch argument>
+=item C<Invalid argument>
 
 This means that you didn't give the right argument to a C<new>
 L<constructor|/CONSTRUCTOR> or to other L<method|/METHODS>.
@@ -570,7 +624,6 @@ Vlad Marchenko
 =head1 COPYRIGHT AND LICENSE
 
 Copyright (C) 2012-2013 by TrackingSoft LLC.
-All rights reserved.
 
 This package is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself. See I<perlartistic> at

@@ -1,94 +1,179 @@
 package Kafka;
 
+# Kafka allows you to produce and consume messages using the Apache Kafka distributed publish/subscribe messaging service.
+
+#TODO: Profiling
+
+#-- Pragmas --------------------------------------------------------------------
+
 use 5.010;
 use strict;
 use warnings;
 
-# Kafka allows you to produce and consume messages using the Apache Kafka distributed publish/subscribe messaging service.
+# PRECONDITIONS ----------------------------------------------------------------
 
-use Exporter qw( import );
+use Exporter qw(
+    import
+);
 
-our @EXPORT_OK  = qw(
-    KAFKA_SERVER_PORT
-    DEFAULT_TIMEOUT
-    TIMESTAMP_LATEST
-    TIMESTAMP_EARLIEST
-    DEFAULT_MAX_SIZE
-    DEFAULT_MAX_OFFSETS
-    MAX_SOCKET_REQUEST_BYTES
-    ERROR_MISMATCH_ARGUMENT
-    ERROR_WRONG_CONNECT
-    ERROR_CANNOT_SEND
-    ERROR_CANNOT_RECV
-    ERROR_CANNOT_BIND
-    ERROR_CHECKSUM_ERROR
-    ERROR_COMPRESSED_PAYLOAD
-    ERROR_NUMBER_OF_OFFSETS
-    ERROR_NOTHING_RECEIVE
-    ERROR_IN_ERRORCODE
-    ERROR_INVALID_MESSAGE_CODE
-    BITS64
-    );
+our @EXPORT_OK = qw(
+    $BITS64
+    $BLOCK_UNTIL_IS_COMMITED
+    $DEFAULT_MAX_BYTES
+    $DEFAULT_MAX_NUMBER_OF_OFFSETS
+    $DEFAULT_MAX_WAIT_TIME
+    %ERROR
+    $ERROR_BROKER_NOT_AVAILABLE
+    $ERROR_CANNOT_BIND
+    $ERROR_CANNOT_GET_METADATA
+    $ERROR_CANNOT_RECV
+    $ERROR_CANNOT_SEND
+    $ERROR_COMPRESSED_PAYLOAD
+    $ERROR_DESCRIPTION_LEADER_NOT_FOUND
+    $ERROR_INVALID_MESSAGE
+    $ERROR_INVALID_MESSAGE_SIZE
+    $ERROR_LEADER_NOT_AVAILABLE
+    $ERROR_MESSAGE_SIZE_TOO_LARGE
+    $ERROR_MISMATCH_ARGUMENT
+    $ERROR_MISMATCH_CORRELATIONID
+    $ERROR_NO_ERROR
+    $ERROR_NO_KNOWN_BROKERS
+    $ERROR_NOT_BINARY_STRING
+    $ERROR_NOT_LEADER_FOR_PARTITION
+    $ERROR_OFFSET_METADATA_TOO_LARGE_CODE
+    $ERROR_OFFSET_OUT_OF_RANGE
+    $ERROR_PARTITION_DOES_NOT_MATCH
+    $ERROR_REPLICA_NOT_AVAILABLE
+    $ERROR_REQUEST_OR_RESPONSE
+    $ERROR_REQUEST_TIMED_OUT
+    $ERROR_STALE_CONTROLLER_EPOCH_CODE
+    $ERROR_TOPIC_DOES_NOT_MATCH
+    $ERROR_UNKNOWN
+    $ERROR_UNKNOWN_APIKEY
+    $ERROR_UNKNOWN_TOPIC_OR_PARTITION
+    $KAFKA_SERVER_PORT
+    $MIN_BYTES_RESPOND_HAS_DATA
+    $MIN_BYTES_RESPOND_IMMEDIATELY
+    $NOT_SEND_ANY_RESPONSE
+    $RECEIVE_EARLIEST_OFFSETS
+    $RECEIVE_LATEST_OFFSET
+    $REQUEST_TIMEOUT
+    $RETRY_BACKOFF
+    $SEND_MAX_RETRIES
+    $WAIT_WRITTEN_TO_LOCAL_LOG
+);
 
-# Not used yet
-#    ERRORCODE_INVALID_RETCH_SIZE_CODE
-#    ERRORCODE_OFFSET_OUT_OF_RANGE
-#    ERRORCODE_UNKNOWN
-#    ERRORCODE_WRONG_PARTITION_CODE
+our $VERSION = '0.8001';
 
-our $VERSION = '0.12';
+#-- load the modules -----------------------------------------------------------
 
 use Config;
+use Const::Fast;
 
-use constant {
-    KAFKA_SERVER_PORT                   => 9092,
+#-- declarations ---------------------------------------------------------------
 
-    DEFAULT_TIMEOUT                     => 0.5,         # The timeout in secs, for gethostbyname, connect, blocking receive and send calls (could be any integer or floating-point type)
+const our $KAFKA_SERVER_PORT                    => 9092;
 
-    TIMESTAMP_LATEST                    => -1,
-    TIMESTAMP_EARLIEST                  => -2,
+const our $REQUEST_TIMEOUT                      => 1.5;                 # The timeout in secs, for gethostbyname, connect, blocking receive and send calls (could be any integer or floating-point type)
+                                                                        # The ack timeout of the producer requests.
+                                                                        # Value must be non-negative and non-zero
 
-    DEFAULT_MAX_SIZE                    => 1024 * 1024, # Maximum size of MESSAGE(s) to receive 1MB
-    DEFAULT_MAX_OFFSETS                 => 100,         # the maximum number of offsets to retrieve
+# Important configuration properties
+const our $DEFAULT_MAX_BYTES                    => 1_000_000;           # The maximum bytes to include in the message set for the partition
+const our $SEND_MAX_RETRIES                     => 3;                   # The leader may be unavailable transiently,
+                                                                        # which can fail the sending of a message.
+                                                                        # This property specifies the number of retries when such failures occur.
+const our $RETRY_BACKOFF                        => 100;                 # (ms) Before each retry, the producer refreshes the metadata of relevant topics.
+                                                                        # Since leader election takes a bit of time,
+                                                                        # this property specifies the amount of time
+                                                                        # that the producer waits before refreshing the metadata.
 
-    MAX_SOCKET_REQUEST_BYTES            => 104857600,   # The maximum size of a request that the socket server will accept (protection against OOM)
+# Used to ask for all messages before a certain time (ms). There are two special values.
+const our $RECEIVE_LATEST_OFFSET                => -1;  # to receive the latest offset (this will only ever return one offset).
+const our $RECEIVE_EARLIEST_OFFSETS             => -2;  # to receive the earliest available offsets.
 
-    ERROR_INVALID_MESSAGE_CODE          => 0,
-    ERROR_MISMATCH_ARGUMENT             => 1,
-    ERROR_WRONG_CONNECT                 => 2,
-    ERROR_CANNOT_SEND                   => 3,
-    ERROR_CANNOT_RECV                   => 4,
-    ERROR_CANNOT_BIND                   => 5,
-    ERROR_CHECKSUM_ERROR                => 6,
-    ERROR_COMPRESSED_PAYLOAD            => 7,
-    ERROR_NUMBER_OF_OFFSETS             => 8,
-    ERROR_NOTHING_RECEIVE               => 9,
-    ERROR_IN_ERRORCODE                  => 10,
+# The minimum number of bytes of messages that must be available to give a response.
+const our $MIN_BYTES_RESPOND_IMMEDIATELY        => 0;   # the server will always respond immediately.
+const our $MIN_BYTES_RESPOND_HAS_DATA           => 1;   # the server will respond as soon as at least one partition has at least 1 byte of data or the specified timeout occurs.
 
-    BITS64                              => ( defined( $Config{use64bitint} ) and $Config{use64bitint} eq "define" ) || $Config{longsize} >= 8,
-};
+# Indicates how many acknowledgements the servers should receive before responding to the request.
+const our $NOT_SEND_ANY_RESPONSE                => 0;   # the server does not send any response.
+const our $WAIT_WRITTEN_TO_LOCAL_LOG            => 1;   # the server will wait the data is written to the local log before sending a response.
+const our $BLOCK_UNTIL_IS_COMMITED              => -1;  # the server will block until the message is committed by all in sync replicas before sending a response.
 
-our @ERROR = (
-    'Invalid message',
-    'Mismatch argument',
-    'You must configure a host to connect to!',
-    "Can't send",
-    "Can't recv",
-    "Can't bind",
-    'Checksum error',
-    'Compressed payload',
-    "Amount received offsets does not match 'NUMBER of OFFSETS'",
-    'Nothing to receive',
-    "Response contains an error in 'ERROR_CODE'",
-    );
+# The maximum amount of time (ms) to block waiting if insufficient data is available at the time the request is issued
+const our $DEFAULT_MAX_WAIT_TIME                => 100;
 
-our %ERROR_CODE = (
-    -1  => 'Unknown error',
-    1   => 'Offset out of range',
-    2   => 'Invalid message code',
-    3   => 'Wrong partition code',
-    4   => 'Invalid retch size code',
-    );
+const our $DEFAULT_MAX_NUMBER_OF_OFFSETS        => 100; # Kafka is return up to 'MaxNumberOfOffsets' of offsets
+
+#-- Errors fixed by Kafka package
+const our $ERROR_MISMATCH_ARGUMENT              => -1000;
+const our $ERROR_CANNOT_SEND                    => -1001;
+const our $ERROR_CANNOT_RECV                    => -1002;
+const our $ERROR_CANNOT_BIND                    => -1003;
+const our $ERROR_COMPRESSED_PAYLOAD             => -1004;
+const our $ERROR_UNKNOWN_APIKEY                 => -1005;
+const our $ERROR_CANNOT_GET_METADATA            => -1006;
+const our $ERROR_DESCRIPTION_LEADER_NOT_FOUND   => -1007;
+const our $ERROR_MISMATCH_CORRELATIONID         => -1008;
+const our $ERROR_NO_KNOWN_BROKERS               => -1009;
+const our $ERROR_REQUEST_OR_RESPONSE            => -1010;
+const our $ERROR_TOPIC_DOES_NOT_MATCH           => -1011;
+const our $ERROR_PARTITION_DOES_NOT_MATCH       => -1012;
+const our $ERROR_NOT_BINARY_STRING              => -1013;
+
+#-- The Protocol Error Codes
+const our $ERROR_NO_ERROR                       => 0;
+const our $ERROR_UNKNOWN                        => -1;
+const our $ERROR_OFFSET_OUT_OF_RANGE            => 1;
+const our $ERROR_INVALID_MESSAGE                => 2;
+const our $ERROR_UNKNOWN_TOPIC_OR_PARTITION     => 3;
+const our $ERROR_INVALID_MESSAGE_SIZE           => 4;
+const our $ERROR_LEADER_NOT_AVAILABLE           => 5;
+const our $ERROR_NOT_LEADER_FOR_PARTITION       => 6;
+const our $ERROR_REQUEST_TIMED_OUT              => 7;
+const our $ERROR_BROKER_NOT_AVAILABLE           => 8;
+const our $ERROR_REPLICA_NOT_AVAILABLE          => 9;
+const our $ERROR_MESSAGE_SIZE_TOO_LARGE         => 10;
+const our $ERROR_STALE_CONTROLLER_EPOCH_CODE    => 11;
+const our $ERROR_OFFSET_METADATA_TOO_LARGE_CODE => 12;
+
+our %ERROR = (
+    # Errors fixed by Kafka package
+    $ERROR_MISMATCH_ARGUMENT                => 'Invalid argument',
+    $ERROR_CANNOT_SEND                      => "Can't send",
+    $ERROR_CANNOT_RECV                      => "Can't recv",
+    $ERROR_CANNOT_BIND                      => "Can't bind",
+    $ERROR_COMPRESSED_PAYLOAD               => 'Compressed payload',
+    $ERROR_UNKNOWN_APIKEY                   => 'Unknown ApiKey',
+    $ERROR_CANNOT_GET_METADATA              => "Can't get metadata",
+    $ERROR_DESCRIPTION_LEADER_NOT_FOUND     => 'Description leader not found',
+    $ERROR_MISMATCH_CORRELATIONID           => 'Mismatch CorrelationId',
+    $ERROR_NO_KNOWN_BROKERS                 => 'There are no known brokers',
+    $ERROR_REQUEST_OR_RESPONSE              => 'Bad request or response element',
+    $ERROR_TOPIC_DOES_NOT_MATCH             => 'Topic does not match the requested',
+    $ERROR_PARTITION_DOES_NOT_MATCH         => 'Partition does not match the requested',
+    $ERROR_NOT_BINARY_STRING                => 'Not binary string',
+
+    #-- The Protocol Error Messages
+    # https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-ErrorCodes
+    $ERROR_NO_ERROR                         => q{}, # 'No error--it worked!',
+    $ERROR_UNKNOWN                          => 'An unexpected server error',
+    $ERROR_OFFSET_OUT_OF_RANGE              => 'The requested offset is outside the range of offsets maintained by the server for the given topic/partition',
+    $ERROR_INVALID_MESSAGE                  => 'Message contents does not match its CRC',
+    $ERROR_UNKNOWN_TOPIC_OR_PARTITION       => 'Unknown topic or partition',
+    $ERROR_INVALID_MESSAGE_SIZE             => 'Message has invalid size',
+    $ERROR_LEADER_NOT_AVAILABLE             => 'Unable to write due to ongoing Kafka leader selection',
+    $ERROR_NOT_LEADER_FOR_PARTITION         => 'Server is not a leader for partition',
+    $ERROR_REQUEST_TIMED_OUT                => 'Request time-out',
+    $ERROR_BROKER_NOT_AVAILABLE             => 'Broker is not available',
+    $ERROR_REPLICA_NOT_AVAILABLE            => 'Replica not available',
+    $ERROR_MESSAGE_SIZE_TOO_LARGE           => 'Message is too big',
+    $ERROR_STALE_CONTROLLER_EPOCH_CODE      => 'Stale Controller Epoch Code',
+    $ERROR_OFFSET_METADATA_TOO_LARGE_CODE   => 'Specified metadata offset is too big',
+);
+
+const our $BITS64                               => ( defined( $Config{use64bitint} ) and $Config{use64bitint} eq "define" ) || $Config{longsize} >= 8;
 
 1;
 
@@ -521,7 +606,7 @@ Possible error codes returned by C<last_errorcode> method
 
 =item C<ERROR_MISMATCH_ARGUMENT>
 
-1 - Mismatch argument
+1 - Invalid argument
 
 =item C<ERROR_WRONG_CONNECT>
 
@@ -771,7 +856,6 @@ Vlad Marchenko
 =head1 COPYRIGHT AND LICENSE
 
 Copyright (C) 2012-2013 by TrackingSoft LLC.
-All rights reserved.
 
 This package is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself. See I<perlartistic> at

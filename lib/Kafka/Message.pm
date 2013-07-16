@@ -1,61 +1,81 @@
 package Kafka::Message;
 
+#-- Pragmas --------------------------------------------------------------------
+
 use 5.010;
 use strict;
 use warnings;
 
-our $VERSION = '0.12';
+# PRECONDITIONS ----------------------------------------------------------------
+
+our $VERSION = '0.8001';
+
+#-- load the modules -----------------------------------------------------------
 
 use Carp;
-use Params::Util qw( _HASH );
+use Params::Util qw(
+    _HASH
+);
 
 use Kafka qw(
-    ERROR_MISMATCH_ARGUMENT
+    %ERROR
+    $ERROR_MISMATCH_ARGUMENT
     );
 
+#-- declarations ---------------------------------------------------------------
+
+our @_standard_fields = qw(
+    Attributes
+    error
+    HighwaterMarkOffset
+    key
+    MagicByte
+    next_offset
+    payload
+    offset
+    valid
+);
+
+#-- constructor ----------------------------------------------------------------
+
 sub new {
-    my $class   = shift;
-    my $self    = _HASH( shift ) or confess $Kafka::ERROR[ERROR_MISMATCH_ARGUMENT];
+    my ( $class, $self ) = @_;
+
+    _HASH( $self )
+        or confess $ERROR{ $ERROR_MISMATCH_ARGUMENT };
 
     map {
-        confess $Kafka::ERROR[ERROR_MISMATCH_ARGUMENT]
-            unless( exists( $self->{ $_ } ) and defined( $self->{ $_ } ) )
-        } qw( payload valid error offset next_offset );
+        confess $ERROR{ $ERROR_MISMATCH_ARGUMENT }
+            unless( exists( $self->{ $_ } ) && defined( $self->{ $_ } ) )
+        } @_standard_fields;
 
     bless $self, $class;
 
     return $self;
 }
 
-sub payload {
-    my $self = shift;
+#-- public attributes ----------------------------------------------------------
 
-    return $self->{payload};
+{
+    no strict 'refs';   ## no critic
+
+    # getters
+    foreach my $method ( @_standard_fields )
+    {
+        *{ __PACKAGE__.'::'.$method } = sub {
+            my ( $self ) = @_;
+            return $self->{ $method };
+        };
+    }
 }
 
-sub valid {
-    my $self = shift;
+#-- public methods -------------------------------------------------------------
 
-    return $self->{valid};
-}
+#-- private attributes ---------------------------------------------------------
 
-sub error {
-    my $self = shift;
+#-- private methods ------------------------------------------------------------
 
-    return $self->{error};
-}
-
-sub offset {
-    my $self = shift;
-
-    return $self->{offset};
-}
-
-sub next_offset {
-    my $self = shift;
-
-    return $self->{next_offset};
-}
+#-- Closes and cleans up -------------------------------------------------------
 
 1;
 
@@ -179,7 +199,7 @@ thing to do).
 
 =over 3
 
-=item C<Mismatch argument>
+=item C<Invalid argument>
 
 This means that you didn't give the right argument to a C<new>
 L<constructor|/CONSTRUCTOR>, i.e. not a raw and unblessed HASH reference,
@@ -208,7 +228,7 @@ L<Kafka::Protocol|Kafka::Protocol> - functions to process messages in the
 Apache Kafka's wire format
 
 L<Kafka::Int64|Kafka::Int64> - functions to work with 64 bit elements of the
-protocol on 32 bit systems 
+protocol on 32 bit systems
 
 L<Kafka::Mock|Kafka::Mock> - object interface to the TCP mock server for testing
 
@@ -236,7 +256,6 @@ Vlad Marchenko
 =head1 COPYRIGHT AND LICENSE
 
 Copyright (C) 2012-2013 by TrackingSoft LLC.
-All rights reserved.
 
 This package is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself. See I<perlartistic> at

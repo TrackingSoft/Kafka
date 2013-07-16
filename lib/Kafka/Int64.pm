@@ -1,56 +1,85 @@
 package Kafka::Int64;
 
-use 5.010;
-use strict;
-use warnings;
-
 # Transparent BigInteger support on 32-bit platforms where native integer type is
 # limited to 32 bits and slow bigint must be used instead. Use subs from this module
 # in such case.
 
-our $VERSION = '0.12';
+#-- Pragmas --------------------------------------------------------------------
 
-use bytes;
+use 5.010;
+use strict;
+use warnings;
+
 use bigint; # this allows integers of practially any size at the cost of significant performance drop
+
+# PRECONDITIONS ----------------------------------------------------------------
+
+use Exporter qw(
+    import
+);
+
+our @EXPORT_OK = qw(
+    intsum
+    packq
+    unpackq
+);
+
+our $VERSION = '0.8001';
+
+#-- load the modules -----------------------------------------------------------
+
 use Carp;
-use Params::Util qw( _STRING _NUMBER );
+use Params::Util qw(
+    _STRING
+);
 
 use Kafka qw(
-    ERROR_MISMATCH_ARGUMENT
-    );
+    %ERROR
+    $ERROR_MISMATCH_ARGUMENT
+);
+use Kafka::Internals qw(
+    _is_suitable_int
+);
+
+#-- declarations ---------------------------------------------------------------
+
+#-- public functions -----------------------------------------------------------
 
 sub intsum {
-    my $frst = shift;
-    my $scnd = shift;
+    my ( $frst, $scnd ) = @_;
 
-    ( ( ref( $frst ) eq "Math::BigInt" or defined( _NUMBER( $frst ) ) ) and defined( _NUMBER( $scnd ) ) )
-        or confess $Kafka::ERROR[ERROR_MISMATCH_ARGUMENT];
+    ( _is_suitable_int( $frst ) && _is_suitable_int( $scnd ) ) or confess $ERROR{ $ERROR_MISMATCH_ARGUMENT };
 
-    my $ret = ( $frst + 0 ) + $scnd;
-    confess $Kafka::ERROR[ERROR_MISMATCH_ARGUMENT] if $ret->is_nan();
+    my $ret = $frst + $scnd + 0;    # bigint coercion
+    confess $ERROR{ $ERROR_MISMATCH_ARGUMENT } if $ret->is_nan();
 
     return $ret;
 }
 
 sub packq {
-    my $n = shift;
+    my ( $n ) = @_;
 
-    ( ref( $n ) eq "Math::BigInt" or defined( _NUMBER( $n ) ) ) or confess $Kafka::ERROR[ERROR_MISMATCH_ARGUMENT];
+    _is_suitable_int( $n ) or confess $ERROR{ $ERROR_MISMATCH_ARGUMENT };
 
-    if      ( $n == -1 )    { return pack 'C8', ( 255 ) x 8; }
-    elsif   ( $n == -2 )    { return pack 'C8', ( 255 ) x 7, 254; }
-    elsif   ( $n < 0 )      { confess $Kafka::ERROR[ERROR_MISMATCH_ARGUMENT]; }
+    if      ( $n == -1 )    { return pack q{C8}, ( 255 ) x 8; }
+    elsif   ( $n == -2 )    { return pack q{C8}, ( 255 ) x 7, 254; }
+    elsif   ( $n < 0 )      { confess $ERROR{ $ERROR_MISMATCH_ARGUMENT }; }
 
-    return pack 'H16', substr( '00000000000000000000000000000000'.substr( ( $n + 0 )->as_hex(), 2 ), -16 );
+    return pack q{H16}, substr( '00000000000000000000000000000000'.substr( ( $n + 0 )->as_hex(), 2 ), -16 );
 }
 
 sub unpackq {
-    my $s = _STRING( shift ) or confess $Kafka::ERROR[ERROR_MISMATCH_ARGUMENT];
+    my ( $s ) = @_;
 
-    confess $Kafka::ERROR[ERROR_MISMATCH_ARGUMENT] if bytes::length( $s ) != 8;
+    ( _STRING( $s ) && !utf8::is_utf8( $s ) )
+        or confess $ERROR{ $ERROR_MISMATCH_ARGUMENT };
 
-    return Math::BigInt->from_hex( "0x".unpack( "H16", $s ) );
+    confess $ERROR{ $ERROR_MISMATCH_ARGUMENT } if length( $s ) != 8;
+
+    return Math::BigInt->from_hex( '0x'.unpack( q{H16}, $s ) );
 }
+
+#-- private functions ----------------------------------------------------------
 
 1;
 
@@ -58,7 +87,7 @@ __END__
 
 =head1 NAME
 
-Kafka::Int64 - functions to work with 64 bit elements of 
+Kafka::Int64 - functions to work with 64 bit elements of
 the Apache Kafka Wire Format protocol on 32 bit systems
 
 =head1 VERSION
@@ -68,17 +97,17 @@ This documentation refers to C<Kafka::Int64> version 0.12
 =head1 SYNOPSIS
 
     use Kafka qw( BITS64 );
-    
+
     # Apache Kafka Wire Format: OFFSET, TIME
-    
+
     $encoded = BITS64 ?
         pack( "q>", $offset + 0 )
         : Kafka::Int64::packq( $offset + 0 );
-    
+
     $offset = BITS64 ?
         unpack( "q>", substr( $response, 0, 8 ) )
         : Kafka::Int64::unpackq( substr( $response, 0, 8 ) );
-    
+
     if ( BITS64 )
     {
         $message->{offset} = $next_offset;
@@ -159,7 +188,7 @@ thing to do).
 
 =over 3
 
-=item C<Mismatch argument>
+=item C<Invalid argument>
 
 This means that you didn't give the right argument to some of the
 L<functions|/FUNCTIONS>.
@@ -186,7 +215,7 @@ L<Kafka::Protocol|Kafka::Protocol> - functions to process messages in the
 Apache Kafka's wire format
 
 L<Kafka::Int64|Kafka::Int64> - functions to work with 64 bit elements of the
-protocol on 32 bit systems 
+protocol on 32 bit systems
 
 L<Kafka::Mock|Kafka::Mock> - object interface to the TCP mock server for testing
 
@@ -214,7 +243,6 @@ Vlad Marchenko
 =head1 COPYRIGHT AND LICENSE
 
 Copyright (C) 2012-2013 by TrackingSoft LLC.
-All rights reserved.
 
 This package is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself. See I<perlartistic> at
