@@ -34,11 +34,11 @@ my %config = (
         'Params::Util'          => 1.07,
         'Scalar::Util::Numeric' => 0.22,
         'String::CRC32'         => 1.4,
+        'Sys::SigAction'        => 0.15,
         },
     BUILD_REQUIRES              => {            # more to the list $Module::CoreList::version{5.010}
         'Capture::Tiny'         => 0.22,
         'Config::IniFiles'      => 2.82,
-        'File::HomeDir'         => 1.00,
         'Proc::Daemon'          => 0.14,
         'Sub::Install'          => 0.926,
         'Test::Deep'            => 0.109,

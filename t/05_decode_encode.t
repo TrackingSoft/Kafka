@@ -23,11 +23,6 @@ BEGIN {
     plan skip_all => 'because Test::NoWarnings required for testing' if $@;
 }
 
-BEGIN {
-    eval 'use Test::Exception';     ## no critic
-    plan skip_all => "because Test::Exception required for testing" if $@;
-}
-
 plan 'no_plan';
 
 #-- load the modules -----------------------------------------------------------

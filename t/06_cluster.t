@@ -16,6 +16,11 @@ use lib qw(
 
 use Test::More;
 
+BEGIN {
+    plan skip_all => 'Unknown base directory of Kafka server'
+        unless defined $ENV{KAFKA_BASE_DIR};
+}
+
 #-- verify load the module
 
 BEGIN {
@@ -29,7 +34,7 @@ plan 'no_plan';
 
 use Const::Fast;
 #use Data::Dumper;
-use File::HomeDir;
+#use File::HomeDir;
 use File::Spec;
 use Params::Util qw(
     _HASH
@@ -49,7 +54,8 @@ use Kafka::Cluster;
 #-- declarations ---------------------------------------------------------------
 
 # WARNING: must match the settings of your system
-const my $KAFKA_BASE_DIR    => $ENV{KAFKA_BASE_DIR} || File::Spec->catdir( File::HomeDir->my_home, 'kafka' );
+#const my $KAFKA_BASE_DIR    => $ENV{KAFKA_BASE_DIR} || File::Spec->catdir( File::HomeDir->my_home, 'kafka' );
+const my $KAFKA_BASE_DIR    => $ENV{KAFKA_BASE_DIR};
 
 #-- Global data ----------------------------------------------------------------
 

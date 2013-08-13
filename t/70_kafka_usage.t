@@ -16,6 +16,11 @@ use lib qw(
 
 use Test::More;
 
+BEGIN {
+    plan skip_all => 'Unknown base directory of Kafka server'
+        unless defined $ENV{KAFKA_BASE_DIR};
+}
+
 #-- verify load the module
 
 BEGIN {

@@ -1,14 +1,12 @@
 package Kafka::Connection;
 
-# Kafka allows you to produce and consume messages using the Apache Kafka distributed publish/subscribe messaging service.
-
 #-- Pragmas --------------------------------------------------------------------
 
 use 5.010;
 use strict;
 use warnings;
 
-# PRECONDITIONS ----------------------------------------------------------------
+# ENVIRONMENT ------------------------------------------------------------------
 
 our $VERSION = '0.8001';
 
@@ -61,6 +59,7 @@ use Kafka::Internals qw(
     $APIKEY_METADATA
     $APIKEY_OFFSET
     $APIKEY_PRODUCE
+    $DEFAULT_RAISE_ERROR
     _get_CorrelationId
     last_error
     last_errorcode
@@ -120,7 +119,7 @@ sub new {
         port                => $KAFKA_SERVER_PORT,
         broker_list         => [],
         timeout             => $REQUEST_TIMEOUT,
-        RaiseError          => 0,
+        RaiseError          => $DEFAULT_RAISE_ERROR,
         CorrelationId       => undef,
         SEND_MAX_RETRIES    => $SEND_MAX_RETRIES,
         RETRY_BACKOFF       => $RETRY_BACKOFF,
@@ -131,11 +130,13 @@ sub new {
         $self->{ $k } = shift @args if exists $self->{ $k };
     }
 
-    $self->_error( $ERROR_NO_ERROR );
     $self->{CorrelationId} //= _get_CorrelationId;
 
-    if    ( !defined _NONNEGINT( $self->RaiseError ) )                          { $self->_error( $ERROR_MISMATCH_ARGUMENT, __PACKAGE__.'->new - RaiseError' ); }
-    elsif ( !( $self->{host} eq q{} || _STRING( $self->{host} ) ) )             { $self->_error( $ERROR_MISMATCH_ARGUMENT, __PACKAGE__.'->new - host' ); }
+    if    ( !defined _NONNEGINT( $self->RaiseError ) ) {
+        $self->{RaiseError} = $DEFAULT_RAISE_ERROR;
+        $self->_error( $ERROR_MISMATCH_ARGUMENT, __PACKAGE__.'->new - RaiseError' );
+    }
+    elsif ( !( defined( $self->{host} ) && defined( _STRING( $self->{host} ) ) && !utf8::is_utf8( $self->{host} ) ) )   { $self->_error( $ERROR_MISMATCH_ARGUMENT, __PACKAGE__.'->new - host' ); }
     elsif ( !_POSINT( $self->{port} ) )                                         { $self->_error( $ERROR_MISMATCH_ARGUMENT, __PACKAGE__.'->new - port' ); }
     elsif ( !( _NUMBER( $self->{timeout} ) && $self->{timeout} > 0 ) )          { $self->_error( $ERROR_MISMATCH_ARGUMENT, __PACKAGE__.'->new - timeout' ); }
     elsif ( !_ARRAY0( $self->{broker_list} ) )                                  { $self->_error( $ERROR_MISMATCH_ARGUMENT, __PACKAGE__.'->new - broker_list' ); }
@@ -185,8 +186,13 @@ sub new {
             };
         }
 
-        keys( %$IO_cache )
-            or return $self->_error( $ERROR_MISMATCH_ARGUMENT, __PACKAGE__.'->new - server is not specified' );
+        if ( !keys( %$IO_cache ) ) {
+            $self->_error( $ERROR_MISMATCH_ARGUMENT, __PACKAGE__.'->new - server is not specified' );
+        }
+        else {
+            $self->_error( $ERROR_NO_ERROR )
+                if $self->last_error;
+        }
     }
 
     return $self;
@@ -205,7 +211,8 @@ sub get_known_servers {
 sub is_server_known {
     my ( $self, $server ) = @_;
 
-    $self->_error( $ERROR_NO_ERROR );
+    $self->_error( $ERROR_NO_ERROR )
+        if $self->last_error;
 
     if ( $self->_is_like_server( $server ) ) {
         return exists $self->{_IO_cache}->{ $server };
@@ -218,7 +225,8 @@ sub is_server_known {
 sub is_server_alive {
     my ( $self, $server ) = @_;
 
-    $self->_error( $ERROR_NO_ERROR );
+    $self->_error( $ERROR_NO_ERROR )
+        if $self->last_error;
 
     if ( $self->_is_like_server( $server ) ) {
         if ( $self->is_server_known( $server ) && ( my $io = $self->{_IO_cache}->{ $server }->{IO} ) ) {
@@ -226,7 +234,7 @@ sub is_server_alive {
         }
     }
     else {
-        $self->_error( $ERROR_MISMATCH_ARGUMENT, __PACKAGE__.'->is_server_alive' );
+        return $self->_error( $ERROR_MISMATCH_ARGUMENT, __PACKAGE__.'->is_server_alive' );
     }
     return;
 }
@@ -234,28 +242,34 @@ sub is_server_alive {
 sub receive_response_to_request {
     my ( $self, $request ) = @_;
 
+    my $error_description = __PACKAGE__.'->receive_response_to_request';
     _HASH( $request ) && exists( $request->{ApiKey} )   # The ApiKey must be present in the structure of the request
-        or return $self->_error( $ERROR_MISMATCH_ARGUMENT, __PACKAGE__.'->receive_response_to_request' );
+        or return $self->_error( $ERROR_MISMATCH_ARGUMENT, $error_description );
 
     my $api_key = $request->{ApiKey};
     $known_api_keys{ $api_key }
-        or return $self->_error( $ERROR_UNKNOWN_APIKEY );
+        or return $self->_error( $ERROR_UNKNOWN_APIKEY, $error_description );
 
 # WARNING: The current version of the module limited to the following:
 # No clear answer to the question, one leader for any combination of topic + partition, or at the same time, there are several different leaders?
 # Therefore supports queries with only one combination of topic + partition (first and only).
-    my ( $topic, $partition );
-    $topic = $request->{topics}->[0]->{TopicName}
-        // return $self->_error( $ERROR_UNKNOWN_TOPIC_OR_PARTITION );
-    $partition = $request->{topics}->[0]->{partitions}->[0]->{Partition}
-        // return $self->_error( $ERROR_UNKNOWN_TOPIC_OR_PARTITION );
+    my ( $topic_data, $topic_name, $partition, $partition_data );
 
-    $self->_error( $ERROR_NO_ERROR );
+    _ARRAY( $request->{topics} )
+        or return $self->_error( $ERROR_UNKNOWN_TOPIC_OR_PARTITION, $error_description );
+    ( ( $topic_data = $request->{topics}->[0] ) && _HASH( $topic_data ) )
+        or return $self->_error( $ERROR_UNKNOWN_TOPIC_OR_PARTITION, $error_description );
+    $topic_name = $topic_data->{TopicName}
+        // return $self->_error( $ERROR_UNKNOWN_TOPIC_OR_PARTITION, $error_description );
+    ( _ARRAY( $topic_data->{partitions} ) && _HASH( $topic_data->{partitions}->[0] ) )
+        or return $self->_error( $ERROR_UNKNOWN_TOPIC_OR_PARTITION, $error_description );
+    ( $partition = $topic_data->{partitions}->[0]->{Partition} )
+        // return $self->_error( $ERROR_UNKNOWN_TOPIC_OR_PARTITION, $error_description );
 
-
-    $self->_update_metadata( $topic ) unless %{ $self->{_metadata} };   # the first request
+    $self->_update_metadata( $topic_name )
+        unless %{ $self->{_metadata} }; # the first request
     %{ $self->{_metadata} } # hash metadata could be updated
-        or return $self->_error( $ERROR_CANNOT_GET_METADATA );
+        or return $self->_error( $ERROR_CANNOT_GET_METADATA, $error_description );
     my $encoded_request = $protocol{ $api_key }->{encode}->( $request )
         or return $self->_error( Kafka::Protocol::last_errorcode, Kafka::Protocol::last_error );
 
@@ -266,14 +280,14 @@ sub receive_response_to_request {
     while ( $retries-- ) {
         REQUEST:
         {
-            if ( defined( my $leader = $self->{_metadata}->{ $topic }->{ $partition }->{Leader} ) ) {   # hash metadata could be updated
+            if ( defined( my $leader = $self->{_metadata}->{ $topic_name }->{ $partition }->{Leader} ) ) {   # hash metadata could be updated
                 my $server = $self->{_leaders}->{ $leader }
                     or return $self->_error( $ERROR_DESCRIPTION_LEADER_NOT_FOUND );
 
                 # Send a request to the leader
-                last REQUEST if
-                       !$self->_connectIO( $server )
-                    || !$self->_sendIO( $server, $encoded_request );
+                last REQUEST unless
+                       $self->_connectIO( $server )
+                    && $self->_sendIO( $server, $encoded_request );
 
                 my $response;
                 if ( $api_key == $APIKEY_PRODUCE && $request->{RequiredAcks} == $NOT_SEND_ANY_RESPONSE ) {
@@ -283,7 +297,7 @@ sub receive_response_to_request {
                         CorrelationId                           => $CorrelationId,
                         topics                                  => [
                             {
-                                TopicName                       => $topic,
+                                TopicName                       => $topic_name,
                                 partitions                      => [
                                     {
                                         Partition               => $partition,
@@ -304,8 +318,8 @@ sub receive_response_to_request {
 
                 $response->{CorrelationId} == $CorrelationId
                     or return $self->_error( $ERROR_MISMATCH_CORRELATIONID );
-                my $topic_data      = $response->{topics}->[0];
-                my $partition_data  = $topic_data->{ $api_key == $APIKEY_OFFSET ? 'PartitionOffsets' : 'partitions' }->[0];
+                $topic_data     = $response->{topics}->[0];
+                $partition_data = $topic_data->{ $api_key == $APIKEY_OFFSET ? 'PartitionOffsets' : 'partitions' }->[0];
                 if ( ( my $ErrorCode = $partition_data->{ErrorCode} ) != $ERROR_NO_ERROR ) {
                     return $self->_error( $ErrorCode, "topic = '".$topic_data->{TopicName}."', partition = ".$partition_data->{Partition} );
                 }
@@ -315,17 +329,19 @@ sub receive_response_to_request {
         }
 
         sleep $self->{RETRY_BACKOFF} / 1000;
-        $self->_update_metadata( $topic );
+        $self->_update_metadata( $topic_name );
     }
 
 # NOTE: Here is possible, for example to repeat the operation
+
+    $self->_error( $ERROR_NO_ERROR )
+        if $self->last_error;
+
     return;     # IO error and !RaiseError
 }
 
 sub close_connection {
     my ( $self, $server ) = @_;
-
-    $self->_error( $ERROR_NO_ERROR );
 
     return $self->_error( $ERROR_MISMATCH_ARGUMENT, __PACKAGE__.'->close_connection' )
         unless $self->_is_like_server( $server );
@@ -337,11 +353,11 @@ sub close_connection {
     return;
 }
 
-# WARNING: the connections can be used by other instances of the class Kafka::Connection
 sub close {
     my ( $self ) = @_;
 
-    $self->_error( $ERROR_NO_ERROR );
+    $self->_error( $ERROR_NO_ERROR )
+        if $self->last_error;
 
     foreach my $server ( $self->get_known_servers ) {
         $self->_closeIO( $server );
@@ -547,7 +563,8 @@ sub _closeIO {
 sub _is_like_server {
     my ( $self, $server ) = @_;
 
-    return $server if _STRING( $server ) && $server =~ /^[^:]+:\d+$/;
+    return $server
+        if defined( $server ) && defined( _STRING( $server ) ) && !utf8::is_utf8( $server ) && $server =~ /^[^:]+:\d+$/;
 }
 
 # necessary because metadata using the 'Host' defined by hostname

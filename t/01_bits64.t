@@ -23,12 +23,19 @@ BEGIN {
     plan skip_all => 'because Test::NoWarnings required for testing' if $@;
 }
 
+BEGIN {
+    eval 'use Test::Exception';     ## no critic
+    plan skip_all => "because Test::Exception required for testing" if $@;
+}
+
 plan 'no_plan';
 
 #-- load the modules -----------------------------------------------------------
 
 use Kafka qw (
     $BITS64
+    %ERROR
+    $ERROR_MISMATCH_ARGUMENT
 );
 
 #-- setting up facilities ------------------------------------------------------
@@ -37,11 +44,124 @@ use Kafka qw (
 
 #-- Global data ----------------------------------------------------------------
 
+my $error_mismatch_argument = $ERROR{ $ERROR_MISMATCH_ARGUMENT };
+my $qr = qr/$error_mismatch_argument/;
+
 # INSTRUCTIONS -----------------------------------------------------------------
 
-eval { my $ret = unpack( 'Q', ( 255 ) x 8 )."\n" };
+eval { my $ret = unpack( 'Q', 0xff x 8 ) };
 
-if      ( $@ )  { ok( !$BITS64, 'Your system not supports 64-bit integer values' ); }
-else            { ok(  $BITS64, 'Your system supports 64-bit integer values' ); }
+if ( !$@ ) {
+    ok( $BITS64, 'Your system supports 64-bit integer values' );
+}
+else {
+    ok( !$BITS64, 'Your system not supports 64-bit integer values' );
+
+# numbers does not bigint
+    my $n0      = 0;
+    my $n4      = 4;
+    my $n45     = 4.5;
+    my $n_neg1  = -1;
+    my $n_neg2  = -2;
+    my $n_neg3  = -3;
+    my $n_neg5  = -5;
+
+    my $s       = q{};
+    my $s4      = '4';
+    my $ss      = 'abcd';
+
+    require Kafka::Int64;
+    {
+# after the announcement of the new numbers will be bigint
+        use bigint;
+
+#-- intsum
+        foreach my $pair (
+                [ 0,        $n0,        0 ],
+                [ 0,        $n4,        4 ],
+                [ 2,        $n4,        6 ],
+                [ 2,        $n0,        2 ],
+                [ 2,        $n_neg5,    -3 ],
+                [ $n0,      0,          0 ],
+                [ $n4,      0,          4 ],
+                [ $n4,      2,          6 ],
+                [ $n0,      2,          2 ],
+                [ $n_neg5,  2,          -3 ],
+                [ $n4,      $n4,        8 ],
+                [ $n0,      $n0,        0 ],
+                [ $n_neg5,  $n_neg5,    -10 ],
+            ) {
+            my $ret;
+            is( $ret = Kafka::Int64::intsum( $pair->[0], $pair->[1] ), $pair->[2],
+                $pair->[0].' ('.( ref( $pair->[0] ) eq 'Math::BigInt' ? q{} : 'non ' ).'bigint) + '.$pair->[1].' ('.( ref( $pair->[1] ) eq 'Math::BigInt' ? q{} : 'non ' ).'bigint) is bigint 0' );
+            isa_ok( $ret, 'Math::BigInt' );
+        }
+
+        foreach my $pair (
+                [ undef,    $n4 ],
+                [ 2,        undef ],
+                [ 2,        $n45 ],
+                [ 'string', $n4 ],
+                [ 2,        'string' ],
+            ) {
+            eval { Kafka::Int64::intsum( $pair->[0], $pair->[1] ) };
+            like( $@, $qr, 'expecting to die: Invalid argument' );
+        }
+
+#-- packq
+        foreach my $num (
+                $n4,
+                $n0,
+                $n_neg1,
+                $n_neg2,
+                4,
+                4.5,
+                0,
+                -1,
+                -2,
+            ) {
+            is( length( Kafka::Int64::packq( $num ) ), 8, 'binary string of length 64 bits ('.( ref( $num ) eq 'Math::BigInt' ? q{} : 'non ' )."bigint '$num)" );
+        }
+
+        foreach my $arg (
+                $n45,
+                undef,
+                $n_neg3,
+                -3,
+                'string',
+            ) {
+            eval { Kafka::Int64::packq( $arg ) };
+            like( $@, $qr, 'expecting to die: Invalid argument' );
+        }
+
+#-- unpackq
+        foreach my $pair (
+                [ chr(0)    x 8, 0 ],
+                [ chr(0xff) x 8, 18446744073709551615 ],
+                [ chr(1)    x 8, 72340172838076673 ],
+                [ chr(0x10) x 8, 1157442765409226768 ],
+            ) {
+            my $ret;
+            is( $ret = Kafka::Int64::unpackq( $pair->[0] ), $pair->[1], 'bigint '.$pair->[1] );
+            isa_ok( $ret, "Math::BigInt" );
+        }
+
+        foreach my $arg (
+                undef,
+                $n0,
+                $n4,
+                q{},
+                '4',
+                'abcd',
+                4,
+                4.5,
+                0,
+                -2,
+            ) {
+            eval { Kafka::Int64::unpackq( $arg ) };
+            like( $@, $qr, 'expecting to die: Invalid argument' );
+        }
+    }
+}
 
 # POSTCONDITIONS ---------------------------------------------------------------

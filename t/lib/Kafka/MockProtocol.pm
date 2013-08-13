@@ -6,7 +6,7 @@ use 5.010;
 use strict;
 use warnings;
 
-# PRECONDITIONS ----------------------------------------------------------------
+# ENVIRONMENT ------------------------------------------------------------------
 
 use Exporter qw(
     import
@@ -144,15 +144,13 @@ my $_ProduceRequest_topic_body_template = q{
 
 #-- public functions -----------------------------------------------------------
 
-# PRODUCE Request ----------------------------------------------------------------
+# PRODUCE Request --------------------------------------------------------------
 
 sub decode_produce_request {
     my ( $hex_stream_ref ) = @_;
 
     _is_hex_stream_correct( $hex_stream_ref )
         or return _protocol_error( $ERROR_MISMATCH_ARGUMENT );
-
-    _protocol_error( $ERROR_NO_ERROR );
 
     my @data = unpack( _decode_produce_request_template( $hex_stream_ref ), $$hex_stream_ref );
 
@@ -197,7 +195,7 @@ sub decode_produce_request {
     return $Produce_Request;
 }
 
-# PRODUCE Response ------------------------------------------------------------
+# PRODUCE Response -------------------------------------------------------------
 
 sub encode_produce_response {
     my ( $Produce_Response ) = @_;
@@ -205,21 +203,19 @@ sub encode_produce_response {
     _HASH( $Produce_Response )
         or return _protocol_error( $ERROR_MISMATCH_ARGUMENT );
 
-    _protocol_error( $ERROR_NO_ERROR );
-
     my (
         $template,
         $response_length,
         @data,
     );
 
-    isint( $Produce_Response->{CorrelationId} )                             # CorrelationId
+    ( defined( $Produce_Response->{CorrelationId} ) && isint( $Produce_Response->{CorrelationId} ) )    # CorrelationId
         ? push( @data, $Produce_Response->{CorrelationId} )
         : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'CorrelationId' );
     $template           = $_Response_header_template;
     $response_length    = $_Response_header_length;
 
-    my $topics_array = $Produce_Response->{topics} // [];
+    my $topics_array = $Produce_Response->{topics};
     _ARRAY0( $topics_array )                                                # topics array size
         ? push( @data, scalar( @$topics_array ) )
         : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'topics' );
@@ -230,7 +226,7 @@ sub encode_produce_response {
         _encode_string( $topic->{TopicName}, \$response_length, \@data, \$template, 'TopicName' )   # TopicName
             or return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'TopicName ('.last_error().')' );
 
-        my $partitions_array = $topic->{partitions} // [];
+        my $partitions_array = $topic->{partitions};
         _ARRAY0( $partitions_array )
             ? push( @data, scalar( @$partitions_array ) )
             : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'partitions' );
@@ -238,10 +234,10 @@ sub encode_produce_response {
         $response_length += 4;  # [l] partitions array size
 
         foreach my $partition ( @$partitions_array ) {
-            isint( $partition->{Partition} )                                # Partition
+            ( defined( $partition->{Partition} ) && isint( $partition->{Partition} ) )  # Partition
                 ? push( @data, $partition->{Partition} )
                 : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'Partition' );
-            isint( $partition->{ErrorCode} )                                # ErrorCode
+            ( defined( $partition->{ErrorCode} ) && isint( $partition->{ErrorCode} ) )  # ErrorCode
                 ? push( @data, $partition->{ErrorCode} )
                 : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'ErrorCode' );
             _is_suitable_int( $partition->{Offset} )
@@ -288,8 +284,6 @@ sub decode_fetch_request {
     _is_hex_stream_correct( $hex_stream_ref )
         or return _protocol_error( $ERROR_MISMATCH_ARGUMENT );
 
-    _protocol_error( $ERROR_NO_ERROR );
-
     my @data = unpack( $_decode_fetch_request_template, $$hex_stream_ref );
 
     my ( $i, $Fetch_Request ) = ( 0, {} );
@@ -331,7 +325,7 @@ sub decode_fetch_request {
     return $Fetch_Request;
 }
 
-# FETCH Response ------------------------------------------------------------
+# FETCH Response ---------------------------------------------------------------
 
 sub encode_fetch_response {
     my ( $Fetch_Response ) = @_;
@@ -339,15 +333,13 @@ sub encode_fetch_response {
     _HASH( $Fetch_Response )
         or return _protocol_error( $ERROR_MISMATCH_ARGUMENT );
 
-    _protocol_error( $ERROR_NO_ERROR );
-
     my (
         $template,
         $response_length,
         @data,
     );
 
-    isint( $Fetch_Response->{CorrelationId} )                               # CorrelationId
+    ( defined( $Fetch_Response->{CorrelationId} ) && isint( $Fetch_Response->{CorrelationId} ) )    # CorrelationId
         ? push( @data, $Fetch_Response->{CorrelationId} )
         : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'CorrelationId' );
     $template           = $_Response_header_template;
@@ -372,10 +364,10 @@ sub encode_fetch_response {
         $response_length += 4;  # [l] partitions array size
 
         foreach my $partition ( @$partitions_array ) {
-            isint( $partition->{Partition} )                                # Partition
+            ( defined( $partition->{Partition} ) && isint( $partition->{Partition} ) )  # Partition
                 ? push( @data, $partition->{Partition} )
                 : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'Partition' );
-            isint( $partition->{ErrorCode} )                                # ErrorCode
+            ( defined( $partition->{ErrorCode} ) && isint( $partition->{ErrorCode} ) )  # ErrorCode
                 ? push( @data, $partition->{ErrorCode} )
                 : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'ErrorCode' );
             _is_suitable_int( $partition->{HighwaterMarkOffset} )           # HighwaterMarkOffset
@@ -423,8 +415,6 @@ sub decode_offset_request {
     _is_hex_stream_correct( $hex_stream_ref )
         or return _protocol_error( $ERROR_MISMATCH_ARGUMENT );
 
-    _protocol_error( $ERROR_NO_ERROR );
-
     my @data = unpack( $_decode_offset_request_template, $$hex_stream_ref );
 
     my ( $i, $Offset_Request ) = ( 0, {} );
@@ -464,15 +454,13 @@ sub decode_offset_request {
     return $Offset_Request;
 }
 
-# OFFSET Response ------------------------------------------------------------
+# OFFSET Response --------------------------------------------------------------
 
 sub encode_offset_response {
     my ( $Offset_Response ) = @_;
 
     _HASH( $Offset_Response )
         or return _protocol_error( $ERROR_MISMATCH_ARGUMENT );
-
-    _protocol_error( $ERROR_NO_ERROR );
 
     my (
         $template,
@@ -481,7 +469,7 @@ sub encode_offset_response {
         $topics_array_size,
     );
 
-    isint( $Offset_Response->{CorrelationId} )                              # CorrelationId
+    ( defined( $Offset_Response->{CorrelationId} ) && isint( $Offset_Response->{CorrelationId} ) )  # CorrelationId
         ? push( @data, $Offset_Response->{CorrelationId} )
         : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'CorrelationId' );
     $template           = $_Response_header_template;
@@ -506,10 +494,10 @@ sub encode_offset_response {
         $response_length += 4;  # [l] PartitionOffsets array size
 
         foreach my $PartitionOffsets ( @$PartitionOffsets_array ) {
-            isint( $PartitionOffsets->{Partition} )                         # Partition
+            ( defined( $PartitionOffsets->{Partition} ) && isint( $PartitionOffsets->{Partition} ) )    # Partition
                 ? push( @data, $PartitionOffsets->{Partition} )
                 : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'Partition' );
-            isint( $PartitionOffsets->{ErrorCode} )                         # ErrorCode
+            ( defined( $PartitionOffsets->{ErrorCode} ) && isint( $PartitionOffsets->{ErrorCode} ) )    # ErrorCode
                 ? push( @data, $PartitionOffsets->{ErrorCode} )
                 : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'ErrorCode' );
             my $Offset_array = $PartitionOffsets->{Offset} // [];
@@ -554,8 +542,6 @@ sub decode_metadata_request {
     _is_hex_stream_correct( $hex_stream_ref )
         or return _protocol_error( $ERROR_MISMATCH_ARGUMENT );
 
-    _protocol_error( $ERROR_NO_ERROR );
-
     my @data = unpack( $_decode_metadata_request_template, $$hex_stream_ref );
 
     my ( $i, $Metadata_Request ) = ( 0, {} );
@@ -584,15 +570,13 @@ sub encode_metadata_response {
     _HASH( $Metadata_Response )
         or return _protocol_error( $ERROR_MISMATCH_ARGUMENT );
 
-    _protocol_error( $ERROR_NO_ERROR );
-
     my (
         $template,
         $response_length,
         @data,
     );
 
-    isint( $Metadata_Response->{CorrelationId} )                            # CorrelationId
+    ( defined( $Metadata_Response->{CorrelationId} ) && isint( $Metadata_Response->{CorrelationId} ) )  # CorrelationId
         ? push( @data, $Metadata_Response->{CorrelationId} )
         : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'CorrelationId' );
     $template           = $_Response_header_template;
@@ -604,17 +588,18 @@ sub encode_metadata_response {
         : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'Broker' );
 
     foreach my $Broker ( @$Broker_array ) {
-        isint( $Broker->{NodeId} )                                          # NodeId
+        ( defined( $Broker->{NodeId} ) && isint( $Broker->{NodeId} ) )      # NodeId
             ? push( @data, $Broker->{NodeId} )
             : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'NodeId' );
-        my $Host = $Broker->{Host};
+        defined( my $Host = $Broker->{Host} )
+            or return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'Host' );
         _verify_string( $Host, 'Host' )
             or return;
         my $Host_length = length $Broker->{Host};
         _STRING( $Broker->{Host} )                                          # Host
             ? push( @data, $Host_length, $Broker->{Host} )
             : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'Host' );
-        $response_length    += $Host_length;
+        $response_length += $Host_length;
         _POSINT( $Broker->{Port} )                                          # Port
             ? push( @data, $Broker->{Port} )
             : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'Port' );
@@ -631,7 +616,7 @@ sub encode_metadata_response {
     $response_length    += 4;
 
     foreach my $TopicMetadata ( @$TopicMetadata_array ) {
-        isint( $TopicMetadata->{ErrorCode} )                                # ErrorCode
+        ( defined( $TopicMetadata->{ErrorCode} ) && isint( $TopicMetadata->{ErrorCode} ) )  # ErrorCode
             ? push( @data, $TopicMetadata->{ErrorCode} )
             : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'ErrorCode' );
         $template           .= q{
@@ -650,13 +635,13 @@ sub encode_metadata_response {
         $response_length    += 4;
 
         foreach my $PartitionMetadata ( @$PartitionMetadata_array ) {
-            isint( $PartitionMetadata->{ErrorCode} )                        # ErrorCode
+            ( defined( $PartitionMetadata->{ErrorCode} ) && isint( $PartitionMetadata->{ErrorCode} ) )  # ErrorCode
                 ? push( @data, $PartitionMetadata->{ErrorCode} )
                 : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'ErrorCode' );
-            isint( $PartitionMetadata->{Partition} )                        # Partition
+            ( defined( $PartitionMetadata->{Partition} ) && isint( $PartitionMetadata->{Partition} ) )  # Partition
                 ? push( @data, $PartitionMetadata->{Partition} )
                 : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'Partition' );
-            isint( $PartitionMetadata->{Leader} )                           # Leader
+            ( defined( $PartitionMetadata->{Leader} ) && isint( $PartitionMetadata->{Leader} ) )    # Leader
                 ? push( @data, $PartitionMetadata->{Leader} )
                 : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'Leader' );
             my $Replicas_array = $PartitionMetadata->{Replicas} // [];
@@ -667,7 +652,7 @@ sub encode_metadata_response {
             $response_length    += $_MetadataResponse_PartitionMetadata_body_length;
 
             foreach my $Replica ( @$Replicas_array ) {
-                isint( $Replica )                                           # ReplicaId
+                ( defined( $Replica ) && isint( $Replica ) )                 # ReplicaId
                     ? push( @data, $Replica )
                     : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'Replicas ReplicaId' );
                 $template           .= q{l>};
@@ -682,7 +667,7 @@ sub encode_metadata_response {
             $response_length    += 4;
 
             foreach my $Isr ( @$Isr_array ) {
-                isint( $Isr )                                               # ReplicaId
+                ( defined( $Isr ) && isint( $Isr ) )                        # ReplicaId
                     ? push( @data, $Isr )
                     : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'Isr ReplicaId' );
                 $template           .= q{l>};

@@ -8,13 +8,12 @@ use warnings;
 
 use sigtrap;
 
-# PRECONDITIONS ----------------------------------------------------------------
+# ENVIRONMENT ------------------------------------------------------------------
 
 our $VERSION = '0.8001';
 
 #-- load the modules -----------------------------------------------------------
 
-use Carp;
 use Errno;
 use Fcntl;
 use Params::Util qw(
@@ -28,6 +27,9 @@ use Scalar::Util qw(
     dualvar
 );
 use Socket;
+use Sys::SigAction qw(
+    set_sig_handler
+);
 use Time::HiRes qw(
     alarm
 );
@@ -70,15 +72,20 @@ sub new {
 
     $self->{not_accepted} = 0;
     $self->{socket} = undef;
-    $self->_error( $ERROR_NO_ERROR );
 
-    if    ( !_STRING( $self->{host} ) )                                 { $self->_error( $ERROR_MISMATCH_ARGUMENT, __PACKAGE__.'->new - host' ); }
+    if    ( !( defined( $self->{host} ) && defined( _STRING( $self->{host} ) ) && !utf8::is_utf8( $self->{host} ) ) )   { $self->_error( $ERROR_MISMATCH_ARGUMENT, __PACKAGE__.'->new - host' ); }
     elsif ( !_POSINT( $self->{port} ) )                                 { $self->_error( $ERROR_MISMATCH_ARGUMENT, __PACKAGE__.'->new - port' ); }
     elsif ( !( _NUMBER( $self->{timeout} ) && $self->{timeout} > 0 ) )  { $self->_error( $ERROR_MISMATCH_ARGUMENT, __PACKAGE__.'->new - timeout' ); }
     else  {
         local $@;
         eval { $self->_connect() };
-        $self->_error( $ERROR_CANNOT_BIND, __PACKAGE__."->new - $@" ) if $@;
+        if ( $@ ) {
+            $self->_error( $ERROR_CANNOT_BIND, __PACKAGE__."->new - $@" );
+        }
+        else {
+            $self->_error( $ERROR_NO_ERROR )
+                if $self->last_error;
+        }
     }
 
     return $self;
@@ -89,13 +96,13 @@ sub new {
 sub last_error {
     my ( $self ) = @_;
 
-    return $self->{error}.q{};
+    return ( $self->{error} // q{} ).q{};
 }
 
 sub last_errorcode {
     my ( $self ) = @_;
 
-    return $self->{error} + 0;
+    return ( $self->{error} // 0 ) + 0;
 }
 
 #-- public methods -------------------------------------------------------------
@@ -105,12 +112,15 @@ sub send {
     my ( $self, $message ) = @_;
 
     my $description = __PACKAGE__.'->send';
-    _STRING( $message )
-        or $self->_error( $ERROR_MISMATCH_ARGUMENT, $description );
+    defined( _STRING( $message ) )
+        or return $self->_error( $ERROR_MISMATCH_ARGUMENT, $description );
     !utf8::is_utf8( $message )
-        or return _error( $ERROR_NOT_BINARY_STRING, $description );
+        or return $self->_error( $ERROR_NOT_BINARY_STRING, $description );
     ( my $len = length( $message .= q{} ) ) <= $MAX_SOCKET_REQUEST_BYTES
-        or $self->_error( $ERROR_MISMATCH_ARGUMENT, $description );
+        or return $self->_error( $ERROR_MISMATCH_ARGUMENT, $description );
+
+    $self->_error( $ERROR_NO_ERROR )
+        if $self->last_error;
 
     $self->_debug_msg( 'Request to', 'green', $message ) if $DEBUG;
 
@@ -140,6 +150,9 @@ sub receive {
 
     _POSINT( $length )
         or return $self->_error( $ERROR_MISMATCH_ARGUMENT, __PACKAGE__.'->receive' );
+
+    $self->_error( $ERROR_NO_ERROR )
+        if $self->last_error;
 
     my ( $from_recv, $message, $buf, $mask );
     $message = q{};
@@ -190,7 +203,6 @@ sub is_alive {
 sub _connect {
     my ( $self ) = @_;
 
-    $self->_error( $ERROR_NO_ERROR );
     $self->{socket} = undef;
 
     my $name    = $self->{host};
@@ -201,15 +213,15 @@ sub _connect {
     if( $name =~ qr~[a-zA-Z]~s ) {
         # DNS lookup.
         local $@;
+        my $h = set_sig_handler( 'ALRM', sub { die 'alarm clock restarted' } );
         eval {
-            local $SIG{ALRM} = sub { die "alarm clock restarted"};
             alarm $self->{timeout};
             $ip = gethostbyname( $name );
             alarm 0;
         };
         alarm 0;                                # race condition protection
         die $@ if $@;
-        die( "gethostbyname ${name}: $?\n" ) unless defined $ip;
+        die( "gethostbyname $name: $?\n" ) unless defined $ip;
         $ip = inet_ntoa( $ip );
     }
     else {

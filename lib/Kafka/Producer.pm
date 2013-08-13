@@ -8,7 +8,7 @@ use 5.010;
 use strict;
 use warnings;
 
-# PRECONDITIONS ----------------------------------------------------------------
+# ENVIRONMENT ------------------------------------------------------------------
 
 our $VERSION = '0.8001';
 
@@ -34,6 +34,7 @@ use Kafka qw(
 );
 use Kafka::Internals qw(
     $APIKEY_PRODUCE
+    $DEFAULT_RAISE_ERROR
     $PRODUCER_ANY_OFFSET
     _get_CorrelationId
     last_error
@@ -57,9 +58,9 @@ sub new {
 
     my $self = bless {
         Connection      => undef,
-        RaiseError      => 0,
+        RaiseError      => $DEFAULT_RAISE_ERROR,
         CorrelationId   => undef,
-        ClientId        => 'producer',
+        ClientId        => undef,
         RequiredAcks    => $WAIT_WRITTEN_TO_LOCAL_LOG,
         Timeout         => $REQUEST_TIMEOUT * 1000, # This provides a maximum time (ms) the server can await the receipt of the number of acknowledgements in RequiredAcks
     }, $class;
@@ -69,17 +70,21 @@ sub new {
         $self->{ $k } = shift @args if exists $self->{ $k };
     }
 
-    $self->_error( $ERROR_NO_ERROR );
-    $self->{CorrelationId} //= _get_CorrelationId;
+    $self->{CorrelationId}  //= _get_CorrelationId;
+    $self->{ClientId}       //= 'producer';
 
-    if    ( !defined _NONNEGINT( $self->RaiseError ) )                          { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'RaiseError' ); }
-    elsif ( !_INSTANCE( $self->{Connection}, 'Kafka::Connection' ) )            { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'Connection' ); }
-    elsif ( !isint( $self->{CorrelationId} ) )                                  { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'CorrelationId' ); }
-    elsif ( !( $self->{ClientId} eq q{} || _STRING( $self->{ClientId} ) ) )     { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'ClientId' ); }
-    elsif ( !isint( $self->{RequiredAcks} ) )                                   { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'RequiredAcks' ); }
-    elsif ( !_NONNEGINT( $self->{Timeout} ) )                                   { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'Timeout' ); }
+    if    ( !defined _NONNEGINT( $self->RaiseError ) ) {
+        $self->{RaiseError} = $DEFAULT_RAISE_ERROR;
+        $self->_error( $ERROR_MISMATCH_ARGUMENT, 'RaiseError' );
+    }
+    elsif ( !_INSTANCE( $self->{Connection}, 'Kafka::Connection' ) )                    { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'Connection' ); }
+    elsif ( !isint( $self->{CorrelationId} ) )                                          { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'CorrelationId' ); }
+    elsif ( !( $self->{ClientId} eq q{} || defined( _STRING( $self->{ClientId} ) ) && !utf8::is_utf8( $self->{ClientId} ) ) )   { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'ClientId' ); }
+    elsif ( !isint( $self->{RequiredAcks} ) )                                           { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'RequiredAcks' ); }
+    elsif ( !_NONNEGINT( $self->{Timeout} ) )                                           { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'Timeout' ); }
     else {
-        # nothing to do
+        $self->_error( $ERROR_NO_ERROR )
+            if $self->last_error;
     }
 
     return $self;
@@ -94,10 +99,11 @@ sub send {
 
     $key //= q{};
 
-    if    ( !( $topic eq q{} || _STRING( $topic ) ) )           { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$topic' ); }
-    elsif ( !isint( $partition ) )                              { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$partition' ); }
-    elsif ( !( _STRING( $messages ) || _ARRAY0( $messages ) ) ) { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$messages' ); }
-    elsif ( !( $key eq q{} || _STRING( $key ) ) )               { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$key' ); }
+# Checking the encoding of strings is performed in the functions of module Kafka::Protocol
+    if    ( !( $topic eq q{} || defined( _STRING( $topic ) ) ) )            { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$topic' ); }
+    elsif ( !isint( $partition ) )                                          { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$partition' ); }
+    elsif ( !( defined( _STRING( $messages ) ) || _ARRAY0( $messages ) ) )  { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$messages' ); }
+    elsif ( !( $key eq q{} || defined( _STRING( $key ) ) ) )                { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$key' ); }
 
     $messages = [ $messages ] unless ref( $messages );
 
@@ -129,7 +135,8 @@ sub send {
         };
     }
 
-    $self->_error( $ERROR_NO_ERROR );
+    $self->_error( $ERROR_NO_ERROR )
+        if $self->last_error;
 
     if ( my $response = $self->_fulfill_request( $request ) ) {
         return $response;

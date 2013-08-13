@@ -6,7 +6,7 @@ use 5.010;
 use strict;
 use warnings;
 
-# PRECONDITIONS ----------------------------------------------------------------
+# ENVIRONMENT ------------------------------------------------------------------
 
 use Exporter qw(
     import
@@ -17,6 +17,7 @@ our @EXPORT_OK = qw(
     $APIKEY_FETCH
     $APIKEY_OFFSET
     $APIKEY_METADATA
+    $DEFAULT_RAISE_ERROR
     $MAX_SOCKET_REQUEST_BYTES
     $MIN_MAXBYTES
     $PRODUCER_ANY_OFFSET
@@ -35,6 +36,7 @@ our $VERSION = '0.8001';
 
 #-- load the modules -----------------------------------------------------------
 
+use Carp;
 use Const::Fast;
 use Scalar::Util qw(
     dualvar
@@ -51,6 +53,8 @@ use Kafka qw(
 );
 
 #-- declarations ---------------------------------------------------------------
+
+const our $DEFAULT_RAISE_ERROR                  => 0;
 
 #-- Api Keys
 const our $APIKEY_PRODUCE                       => 0;
@@ -85,6 +89,7 @@ const my $MAX_CORRELATIONID                     => 2**31 - 1;           # Larges
 sub _is_suitable_int {
     my ( $n ) = @_;
 
+    $n // return;
     return isint( $n ) || isbig( $n );
 }
 
@@ -128,6 +133,9 @@ sub _fulfill_request {
     if ( my $response = eval { $connection->receive_response_to_request( $request ) } ) {
         return $response;
     }
+    if ( Kafka::Protocol::last_errorcode() ) {
+        return $self->_error( Kafka::Protocol::last_errorcode(), Kafka::Protocol::last_error() );
+    }
     else {
         return $self->_connection_error;
     }
@@ -138,11 +146,13 @@ sub _error {
 
     $self->_set_error( $error_code, $ERROR{ $error_code }.( $description ? ': '.$description : q{} ) );
 
+    confess( $self->last_error )
+        if $self->last_errorcode == $ERROR_MISMATCH_ARGUMENT;
+
     return unless $self->RaiseError;
 
-    if    ( $self->last_errorcode == $ERROR_MISMATCH_ARGUMENT ) { confess $self->last_error; }
-    elsif ( $self->last_errorcode == $ERROR_NO_ERROR )          { return; }
-    else                                                        { die $self->last_error; }
+    if ( $self->last_errorcode == $ERROR_NO_ERROR ) { return; }
+    else                                            { die $self->last_error; }
 }
 
 sub _connection_error {

@@ -26,7 +26,6 @@
             "Capture::Tiny" : "0.22",
             "Config::IniFiles" : "2.82",
             "File::Find::Rule" : "0.33",
-            "File::HomeDir" : "1.00",
             "Proc::Daemon" : "0.14",
             "Sub::Install" : "0.926",
             "Test::Deep" : "0.109",
@@ -45,7 +44,8 @@
             "List::MoreUtils" : "0.33",
             "Params::Util" : "1.07",
             "Scalar::Util::Numeric" : "0.22",
-            "String::CRC32" : "1.4"
+            "String::CRC32" : "1.4",
+            "Sys::SigAction" : "0.15",
          }
       }
    },

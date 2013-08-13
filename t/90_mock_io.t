@@ -100,7 +100,6 @@ $io = Kafka::IO->new(
     host        => 'localhost',
     port        => $KAFKA_SERVER_PORT,
     timeout     => $REQUEST_TIMEOUT,
-    RaiseError  => 0
     );
 isa_ok( $io, 'Kafka::IO' );
 

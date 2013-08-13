@@ -8,7 +8,7 @@ use 5.010;
 use strict;
 use warnings;
 
-# PRECONDITIONS ----------------------------------------------------------------
+# ENVIRONMENT ------------------------------------------------------------------
 
 our $VERSION = '0.8001';
 
@@ -26,7 +26,11 @@ use Params::Util qw(
     _POSINT
     _STRING
 );
+use Scalar::Util qw(
+    blessed
+);
 use Sub::Install;
+use Sys::Hostname;
 
 use Kafka qw(
     $ERROR_MISMATCH_ARGUMENT
@@ -62,10 +66,12 @@ use Kafka::MockProtocol qw(
 
 #-- declarations ---------------------------------------------------------------
 
-const my $MOCKED_PACKAGE    => 'Kafka::IO';
+const my $MOCKED_PACKAGE            => 'Kafka::IO';
 
 # Use Kafka::MockIO only with the following information:
-const our $PARTITION        => 0;
+const our $PARTITION                => 0;
+
+const our $KAFKA_MOCK_SERVER_PORT   => $KAFKA_SERVER_PORT;
 
 #-- Global data ----------------------------------------------------------------
 
@@ -84,7 +90,7 @@ my %_reinstall = (
 
 my ( $ApiKey, $encoded_response );
 
-my %received_data;                                          # (
+our %_received_data;                                        # (
                                                             #   topic   => {
                                                             #       partition   => [
                                                             #           [ Key, Value ],
@@ -168,18 +174,18 @@ my $decoded_metadata_response = {
     Broker                              => [
         {
             NodeId                      => 2,
-            Host                        => 'myhost',
-            Port                        => 9097,
+            Host                        => hostname,
+            Port                        => $KAFKA_MOCK_SERVER_PORT + 2,
         },
         {
             NodeId                      => 0,
-            Host                        => 'myhost',
-            Port                        => 9095,
+            Host                        => hostname,
+            Port                        => $KAFKA_MOCK_SERVER_PORT,
         },
         {
             NodeId                      => 1,
-            Host                        => 'myhost',
-            Port                        => 9096,
+            Host                        => hostname,
+            Port                        => $KAFKA_MOCK_SERVER_PORT + 1,
         },
     ],
     TopicMetadata                       => [
@@ -232,9 +238,13 @@ sub undefine {
 sub add_special_case {
     my ( $cases ) = @_;
 
-    _HASH( $cases ) or confess 'requires a hash request-response';
+    blessed( $cases )
+        and confess 'Do not use a class method as a method of the object';
+    _HASH( $cases )
+        or confess 'requires a hash request-response';
     foreach my $encoded_request ( keys %{ $cases } ) {
-        _STRING( $cases->{ $encoded_request } ) or confess 'hash must contain encoded responses';
+        _STRING( $cases->{ $encoded_request } )
+            or confess 'hash must contain encoded responses';
     }
 
     foreach my $encoded_request ( keys %{ $cases } ) {
@@ -244,6 +254,9 @@ sub add_special_case {
 
 sub del_special_case {
     my ( $encoded_request ) = @_;
+
+    blessed( $encoded_request )
+        and confess 'Do not use a class method as a method of the object';
 
     delete $_special_cases{ $encoded_request };
 }
@@ -270,13 +283,12 @@ sub new {
         $self->{ $k } = shift @args if exists $self->{ $k };
     }
 
-    Kafka::IO::_error( $self, $ERROR_NO_ERROR );
-
-    if    ( !_STRING( $self->{host} ) )                                 { Kafka::IO::_error( $self, $ERROR_MISMATCH_ARGUMENT, 'Kafka::IO->new - host' ); }
-    elsif ( !_POSINT( $self->{port} ) )                                 { Kafka::IO::_error( $self, $ERROR_MISMATCH_ARGUMENT, 'Kafka::IO::->new - port' ); }
-    elsif ( !( _NUMBER( $self->{timeout} ) && $self->{timeout} > 0 ) )  { Kafka::IO::_error( $self, $ERROR_MISMATCH_ARGUMENT, 'Kafka::IO::->new - timeout' ); }
+    if    ( !( defined( $self->{host} ) && defined( _STRING( $self->{host} ) ) && !utf8::is_utf8( $self->{host} ) ) )   { Kafka::IO::_error( $self, $ERROR_MISMATCH_ARGUMENT, 'Kafka::IO->new - host' ); }
+    elsif ( !_POSINT( $self->{port} ) )                                 { Kafka::IO::_error( $self, $ERROR_MISMATCH_ARGUMENT, 'Kafka::IO->new - port' ); }
+    elsif ( !( _NUMBER( $self->{timeout} ) && $self->{timeout} > 0 ) )  { Kafka::IO::_error( $self, $ERROR_MISMATCH_ARGUMENT, 'Kafka::IO->new - timeout' ); }
     else  {
-        # nothing to do
+        Kafka::IO::_error( $self, $ERROR_NO_ERROR );
+        $self->{socket} = 'fake true value';
     }
 
     return $self;
@@ -290,10 +302,15 @@ sub send {
     my ( $self, $message ) = @_;
 
     my $description = 'Kafka::IO->send';
-    $self->_verify_string( $message, $description )
-        or return;
+    defined( _STRING( $message ) )
+        or return Kafka::IO::_error( $self, $ERROR_MISMATCH_ARGUMENT, $description );
+    !utf8::is_utf8( $message )
+        or return Kafka::IO::_error( $self, $ERROR_NOT_BINARY_STRING, $description );
     ( my $len = length( $message .= q{} ) ) <= $MAX_SOCKET_REQUEST_BYTES
-        or $self->_error( $ERROR_MISMATCH_ARGUMENT, $description );
+        or return Kafka::IO::_error( $self, $ERROR_MISMATCH_ARGUMENT, $description );
+
+    $self->_error( $ERROR_NO_ERROR )
+        if $self->last_error;
 
     Kafka::IO::_debug_msg( $self, 'Request to', 'green', $message ) if $Kafka::IO::DEBUG;
 
@@ -302,10 +319,10 @@ sub send {
         return length( $message );
     }
 
-    $ApiKey = unpack( '
+    $ApiKey = unpack( q{
         x[l]                # Size
         s>                  # ApiKey
-        ', $message );
+    }, $message );
 
     # Set up the response
 
@@ -315,10 +332,10 @@ sub send {
         my ( $topic, $partition ) = $self->_decoded_topic_partition( $decoded_produce_request, $decoded_produce_response );
         $partition // return;
 
-        if ( !exists( $received_data{ $topic }->{ $partition } ) ) {
-            $received_data{ $topic }->{ $partition } = [];
+        if ( !exists( $_received_data{ $topic }->{ $partition } ) ) {
+            $_received_data{ $topic }->{ $partition } = [];
         }
-        my $data = $received_data{ $topic }->{ $partition };
+        my $data = $_received_data{ $topic }->{ $partition };
 
         $decoded_produce_response->{topics}->[0]->{partitions}->[0]->{Offset} = scalar @{ $data };
         foreach my $Message ( @{ $decoded_produce_request->{topics}->[0]->{partitions}->[0]->{MessageSet} } ) {
@@ -347,7 +364,7 @@ sub send {
 
         $partition_data = $decoded_fetch_response->{topics}->[0]->{partitions}->[0];
         my $messages = $partition_data->{MessageSet} = [];
-        my $data = $received_data{ $topic }->{ $partition };
+        my $data = $_received_data{ $topic }->{ $partition } // [];
         my $HighwaterMarkOffset = $partition_data->{HighwaterMarkOffset} = scalar @{ $data };
         my $full_message_set_size = 0;
         for ( my $i = $FetchOffset; $i < $HighwaterMarkOffset; ++$i ) {
@@ -411,8 +428,8 @@ sub send {
 
         my $offsets = $decoded_offset_response->{topics}->[0]->{PartitionOffsets}->[0]->{Offset} = [];
         if ( $Time == $RECEIVE_LATEST_OFFSET ) {
-            push( @{ $offsets }, ( exists( $received_data{ $topic }->{ $partition } )
-                ? scalar( @{ $received_data{ $topic }->{ $partition } } )
+            push( @{ $offsets }, ( exists( $_received_data{ $topic }->{ $partition } )
+                ? scalar( @{ $_received_data{ $topic }->{ $partition } } )
                 : () ),
                 0 );
         }
@@ -420,8 +437,8 @@ sub send {
             push @{ $offsets }, 0;
         }
         else {
-            if ( exists( $received_data{ $topic }->{ $partition } ) ) {
-                my $max_offset = min $MaxNumberOfOffsets, $#{ $received_data{ $topic }->{ $partition } };
+            if ( exists( $_received_data{ $topic }->{ $partition } ) ) {
+                my $max_offset = min $MaxNumberOfOffsets, $#{ $_received_data{ $topic }->{ $partition } };
 # NOTE:
 # - always return starting at offset 0
 # - not verified in practice, the order in which the kafka server returns the offsets
@@ -455,6 +472,9 @@ sub receive {
     _POSINT( $length )
         or return Kafka::IO::_error( $self, $ERROR_MISMATCH_ARGUMENT, 'Kafka::IO->receive' );
 
+    $self->_error( $ERROR_NO_ERROR )
+        if $self->last_error;
+
     my $message = substr( $encoded_response, 0, $length, q{} );
 
     Kafka::IO::_debug_msg( $self, 'Response from', 'yellow', $message )
@@ -471,9 +491,9 @@ sub close {
 }
 
 sub is_alive {
-#    my ( $self ) = @_;
+    my ( $self ) = @_;
 
-    return 1;
+    return !!$self->{socket};
 }
 
 #-- private attributes ---------------------------------------------------------
@@ -488,7 +508,7 @@ sub _decoded_topic_partition {
 
     my $partition = $topic_data->{partitions}->[0]->{Partition};
     $partition == $PARTITION
-        or Kafka::IO::_error( $self, $ERROR_MISMATCH_ARGUMENT, "Use Kafka::MockIO only with partition = $PARTITION" );
+        or return Kafka::IO::_error( $self, $ERROR_MISMATCH_ARGUMENT, "Use Kafka::MockIO only with partition = $PARTITION" );
 
     $topic_data = $decoded_response->{topics}->[0];
     $topic_data->{TopicName} = $topic;
@@ -507,10 +527,12 @@ sub _decoded_topic_partition {
 sub _verify_string {
     my ( $self, $string, $description ) = @_;
 
-    ( _STRING( $string ) or $string eq q{} )
+    return 1
+        if defined( $string ) && $string eq q{};
+    defined( _STRING( $string ) )
         or return Kafka::IO::_error( $self, $ERROR_MISMATCH_ARGUMENT, $description );
-    !utf8::is_utf8( $string )
-        or return Kafka::IO::_error( $self, $ERROR_NOT_BINARY_STRING, $description );
+    utf8::is_utf8( $string )
+        and return Kafka::IO::_error( $self, $ERROR_NOT_BINARY_STRING, $description );
 
     return 1;
 }

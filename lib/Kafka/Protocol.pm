@@ -6,7 +6,7 @@ use 5.010;
 use strict;
 use warnings;
 
-# PRECONDITIONS ----------------------------------------------------------------
+# ENVIRONMENT ------------------------------------------------------------------
 
 use Exporter qw(
     import
@@ -52,6 +52,7 @@ our $VERSION = '0.8001';
 use Carp;
 use Const::Fast;
 use Params::Util qw(
+    _ARRAY
     _ARRAY0
     _HASH
     _POSINT
@@ -231,9 +232,11 @@ else {
 
 const our $APIVERSION                   => 0;       # RTFM: Currently the supported version for all APIs is 0
 
+# MagicByte
 const our $COMPRESSION_NOT_EXIST        => 0;
 const our $COMPRESSION_EXISTS           => 1;
 
+# Attributes
 const our $COMPRESSION_CODEC_MASK       => 0b111;
 #-- Codec numbers:
 const our $COMPRESSION_NONE             => 0;
@@ -343,7 +346,7 @@ my $_Key_or_Value_template = q{
 
 #-- public functions -----------------------------------------------------------
 
-# PRODUCE Request ----------------------------------------------------------------
+# PRODUCE Request --------------------------------------------------------------
 
 sub encode_produce_request {
     my ( $Produce_Request ) = @_;
@@ -351,53 +354,58 @@ sub encode_produce_request {
     _HASH( $Produce_Request )
         or return _protocol_error( $ERROR_MISMATCH_ARGUMENT );
 
-    _protocol_error( $ERROR_NO_ERROR );
-
     my (
         $template,
         $request_length,
         @data,
     );
 
-    _encode_request_header( \@data, $APIKEY_PRODUCE, $Produce_Request, \$template, \$request_length );
+    _encode_request_header( \@data, $APIKEY_PRODUCE, $Produce_Request, \$template, \$request_length )
+        or return;
                                                                             # Size
                                                                             # ApiKey
                                                                             # ApiVersion
                                                                             # CorrelationId
                                                                             # ClientId
 
-    isint( $Produce_Request->{RequiredAcks} )                               # RequiredAcks
+    ( defined( $Produce_Request->{RequiredAcks} ) && isint( $Produce_Request->{RequiredAcks} ) )    # RequiredAcks
         ? push( @data, $Produce_Request->{RequiredAcks} )
         : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'RequiredAcks' );
-    isint( $Produce_Request->{Timeout} )                                    # Timeout
+    ( defined( $Produce_Request->{Timeout} ) && isint( $Produce_Request->{Timeout} ) )  # Timeout
         ? push( @data, $Produce_Request->{Timeout} )
         : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'Timeout' );
-    my $topics_array = $Produce_Request->{topics} // [];
-    _ARRAY0( $topics_array )                                                # topics array size
+    my $topics_array = $Produce_Request->{topics};
+    _ARRAY( $topics_array )                                                 # topics array size
         ? push( @data, scalar( @$topics_array ) )
         : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'topics' );
     $template       .= $_ProduceRequest_header_template;
     $request_length += $_ProduceRequest_header_length;
 
     foreach my $topic ( @$topics_array ) {
+        _HASH( $topic )
+            or return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'topics' );
         $template       .= qq{    s>      # 2 string length\n};             # string length
         $request_length += 2;
         _encode_string( $topic->{TopicName}, \$request_length, \@data, \$template, 'TopicName' )    # TopicName
             or return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'TopicName ('.last_error().')' );
 
-        my $partitions_array = $topic->{partitions} // [];
-        _ARRAY0( $partitions_array )
+        my $partitions_array = $topic->{partitions};
+        _ARRAY( $partitions_array )
             ? push( @data, scalar( @$partitions_array ) )
             : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'partitions' );
         $template       .= qq{        l>      # 4 partitions array size\n}; # partitions array size
         $request_length += 4;
         foreach my $partition ( @$partitions_array ) {
-            isint( $partition->{Partition} )
+            _HASH( $partition )
+                or return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'partitions' );
+            ( defined( $partition->{Partition} ) && isint( $partition->{Partition} ) )
                 ? push( @data, $partition->{Partition} )
                 : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'Partition' );
             $template .= qq{        l>      # 4 Partition\n};               # Partition
             $request_length += 4;
 
+            _ARRAY( $partition->{MessageSet} )
+                or return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'partitions' );
             _encode_MessageSet_array( $partition->{MessageSet}, \$request_length, \@data, \$template )
                 or return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'MessageSet'.( last_error() ? ' ('.last_error().')' : q{} ) );
         }
@@ -406,7 +414,7 @@ sub encode_produce_request {
     return pack( $template, $request_length, @data );
 }
 
-# PRODUCE Response ------------------------------------------------------------
+# PRODUCE Response -------------------------------------------------------------
 
 my $_decode_produce_response_template = qq{
     x[l]                    # Size (skip)
@@ -432,8 +440,6 @@ sub decode_produce_response {
 
     _is_hex_stream_correct( $hex_stream_ref )
         or return _protocol_error( $ERROR_MISMATCH_ARGUMENT );
-
-    _protocol_error( $ERROR_NO_ERROR );
 
     my @data = unpack( $_decode_produce_response_template, $$hex_stream_ref );
 
@@ -474,8 +480,6 @@ sub encode_fetch_request {
     _HASH( $Fetch_Request )
         or return _protocol_error( $ERROR_MISMATCH_ARGUMENT );
 
-    _protocol_error( $ERROR_NO_ERROR );
-
     my (
         $template,
         $request_length,
@@ -483,7 +487,8 @@ sub encode_fetch_request {
     );
 
 
-    _encode_request_header( \@data, $APIKEY_FETCH, $Fetch_Request, \$template, \$request_length );
+    _encode_request_header( \@data, $APIKEY_FETCH, $Fetch_Request, \$template, \$request_length )
+        or return;
                                                                             # Size
                                                                             # ApiKey
                                                                             # ApiVersion
@@ -491,39 +496,43 @@ sub encode_fetch_request {
                                                                             # ClientId
 
     push( @data, $CONSUMERS_REPLICAID );                                    # ReplicaId
-    isint( $Fetch_Request->{MaxWaitTime} )                                  # MaxWaitTime
+    ( defined( $Fetch_Request->{MaxWaitTime} ) && isint( $Fetch_Request->{MaxWaitTime} ) )   # MaxWaitTime
         ? push( @data, $Fetch_Request->{MaxWaitTime} )
         : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'MaxWaitTime' );
-    isint( $Fetch_Request->{MinBytes} )                                     # MinBytes
+    ( defined( $Fetch_Request->{MinBytes} ) && isint( $Fetch_Request->{MinBytes} ) ) # MinBytes
         ? push( @data, $Fetch_Request->{MinBytes} )
         : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'MinBytes' );
-    my $topics_array = $Fetch_Request->{topics} // [];
-    _ARRAY0( $topics_array )                                                # topics array size
+    my $topics_array = $Fetch_Request->{topics};
+    _ARRAY( $topics_array )                                                # topics array size
         ? push( @data, scalar( @$topics_array ) )
         : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'topics' );
     $template       .= $_FetchRequest_header_template;
     $request_length += $_FetchRequest_header_length;
 
     foreach my $topic ( @$topics_array ) {
+        _HASH( $topic )
+            or return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'topics' );
         $template       .= qq{    s>      # 2 string length\n};             # string length
         $request_length += 2;
         _encode_string( $topic->{TopicName}, \$request_length, \@data, \$template, 'TopicName' )    # TopicName
             or return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'TopicName ('.last_error().')' );
 
-        my $partitions_array = $topic->{partitions} // [];
-        _ARRAY0( $partitions_array )
+        my $partitions_array = $topic->{partitions};
+        _ARRAY( $partitions_array )
             ? push( @data, scalar( @$partitions_array ) )
             : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'partitions' );
         $template .= q{l>};                                                 # partitions array size
         $request_length += 4;
         foreach my $partition ( @$partitions_array ) {
-            isint( $partition->{Partition} )                                # Partition
+            _HASH( $partition )
+                or return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'partitions' );
+            ( defined( $partition->{Partition} ) && isint( $partition->{Partition} ) )  # Partition
                 ? push( @data, $partition->{Partition} )
                 : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'Partition' );
             _is_suitable_int( $partition->{FetchOffset} )                   # FetchOffset
                 ? push( @data, _pack64( $partition->{FetchOffset} ) )
                 : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'FetchOffset' );
-            isint( $partition->{MaxBytes} )                                 # MaxBytes
+            ( defined( $partition->{MaxBytes} ) && isint( $partition->{MaxBytes} ) )    # MaxBytes
                 ? push( @data, $partition->{MaxBytes} )
                 : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'MaxBytes' );
             $template       .= $_FetchRequest_body_template;
@@ -534,15 +543,13 @@ sub encode_fetch_request {
     return pack( $template, $request_length, @data );
 }
 
-# FETCH Response ------------------------------------------------------------
+# FETCH Response ---------------------------------------------------------------
 
 sub decode_fetch_response {
     my ( $hex_stream_ref ) = @_;
 
     _is_hex_stream_correct( $hex_stream_ref )
         or return _protocol_error( $ERROR_MISMATCH_ARGUMENT );
-
-    _protocol_error( $ERROR_NO_ERROR );
 
 # RTFM: As an optimization the server is allowed to return a partial message at the end of the message set.
 # Clients should handle this case.
@@ -592,15 +599,14 @@ sub encode_offset_request {
     _HASH( $Offset_Request )
         or return _protocol_error( $ERROR_MISMATCH_ARGUMENT );
 
-    _protocol_error( $ERROR_NO_ERROR );
-
     my (
         $template,
         $request_length,
         @data,
     );
 
-    _encode_request_header( \@data, $APIKEY_OFFSET, $Offset_Request, \$template, \$request_length );
+    _encode_request_header( \@data, $APIKEY_OFFSET, $Offset_Request, \$template, \$request_length )
+        or return;
                                                                             # Size
                                                                             # ApiKey
                                                                             # ApiVersion
@@ -608,33 +614,37 @@ sub encode_offset_request {
                                                                             # ClientId
 
     push( @data, $CONSUMERS_REPLICAID );                                    # ReplicaId
-    my $topics_array = $Offset_Request->{topics} // [];
-    _ARRAY0( $topics_array )                                                # topics array size
+    my $topics_array = $Offset_Request->{topics};
+    _ARRAY( $topics_array )                                                 # topics array size
         ? push( @data, scalar( @$topics_array ) )
         : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'topics' );
     $template       .= $_OffsetRequest_header_template;
     $request_length += $_OffsetRequest_header_length;
 
     foreach my $topic ( @$topics_array ) {
+        _HASH( $topic )
+            or return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'topics' );
         $template       .= qq{    s>      # 2 string length\n};             # string length
         $request_length += 2;
         _encode_string( $topic->{TopicName}, \$request_length, \@data, \$template, 'TopicName' )    # TopicName
             or return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'TopicName ('.last_error().')' );
 
-        my $partitions_array = $topic->{partitions} // [];
-        _ARRAY0( $partitions_array )
+        my $partitions_array = $topic->{partitions};
+        _ARRAY( $partitions_array )
             ? push( @data, scalar( @$partitions_array ) )
             : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'partitions' );
         $template .= q{l>};                                                 # partitions array size
         $request_length += 4;   # [l] partitions array size
         foreach my $partition ( @$partitions_array ) {
-            isint( $partition->{Partition} )                                # Partition
+            _HASH( $partition )
+                or return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'partitions' );
+            ( defined( $partition->{Partition} ) && isint( $partition->{Partition} ) )  # Partition
                 ? push( @data, $partition->{Partition} )
                 : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'Partition' );
             _is_suitable_int( $partition->{Time} )                          # Time
                 ? push( @data, _pack64( $partition->{Time} ) )
                 : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'Time' );
-            isint( $partition->{MaxNumberOfOffsets} )                       # MaxNumberOfOffsets
+            ( defined( $partition->{MaxNumberOfOffsets} ) && isint( $partition->{MaxNumberOfOffsets} ) )    # MaxNumberOfOffsets
                 ? push( @data, $partition->{MaxNumberOfOffsets} )
                 : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'MaxNumberOfOffsets' );
             $template       .= $_OffsetRequest_body_template;
@@ -645,7 +655,7 @@ sub encode_offset_request {
     return pack( $template, $request_length, @data );
 }
 
-# OFFSET Response ------------------------------------------------------------
+# OFFSET Response --------------------------------------------------------------
 
 my $_decode_offset_response_template = qq{
     x[l]                    # Size (skip)
@@ -676,8 +686,6 @@ sub decode_offset_response {
 
     _is_hex_stream_correct( $hex_stream_ref )
         or return _protocol_error( $ERROR_MISMATCH_ARGUMENT );
-
-    _protocol_error( $ERROR_NO_ERROR );
 
     my @data = unpack( $_decode_offset_response_template, $$hex_stream_ref );
 
@@ -723,23 +731,22 @@ sub encode_metadata_request {
     _HASH( $Metadata_Request )
         or return _protocol_error( $ERROR_MISMATCH_ARGUMENT );
 
-    _protocol_error( $ERROR_NO_ERROR );
-
     my (
         $template,
         $request_length,
         @data,
     );
 
-    _encode_request_header( \@data, $APIKEY_METADATA, $Metadata_Request, \$template, \$request_length );
+    _encode_request_header( \@data, $APIKEY_METADATA, $Metadata_Request, \$template, \$request_length )
+        or return;
                                                                             # Size
                                                                             # ApiKey
                                                                             # ApiVersion
                                                                             # CorrelationId
                                                                             # ClientId
 
-    my $topics_array = $Metadata_Request->{topics} // [];
-    _ARRAY0( $topics_array )                                                # topics array size
+    my $topics_array = $Metadata_Request->{topics};
+    _ARRAY( $topics_array )                                                 # topics array size
         ? push( @data, scalar( @$topics_array ) )
         : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'topics' );
     $template .= q{l>};
@@ -802,8 +809,6 @@ sub decode_metadata_response {
 
     _is_hex_stream_correct( $hex_stream_ref )
         or return _protocol_error( $ERROR_MISMATCH_ARGUMENT );
-
-    _protocol_error( $ERROR_NO_ERROR );
 
     my @data = unpack( $_decode_metadata_response_template, $$hex_stream_ref );
 
@@ -878,13 +883,15 @@ sub _encode_request_header {
         $api_key,                                                           # ApiKey
         $APIVERSION,                                                        # ApiVersion
     );
-    isint( $request_ref->{CorrelationId} )                                  # CorrelationId
+    ( defined( $request_ref->{CorrelationId} ) && isint( $request_ref->{CorrelationId} ) )  # CorrelationId
         ? push( @$data_array_ref, $request_ref->{CorrelationId} )
         : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'CorrelationId' );
     $$template_ref          = $_Request_header_template;
     $$request_length_ref    = $_Request_header_length;
     _encode_string( $request_ref->{ClientId}, $request_length_ref, $data_array_ref, $template_ref, 'ClientId' ) # ClientId
         or return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'ClientId ('.last_error().')' );
+
+    return 1;
 }
 
 sub _decode_fetch_response_template {
@@ -985,12 +992,14 @@ sub _decode_MessageSet_array {
 sub _encode_MessageSet_array {
     my ( $MessageSet_array_ref, $length_ref, $data_array_ref, $template_ref ) = @_;
 
-    _ARRAY0( $MessageSet_array_ref // [] )
-        or return;
+#    _ARRAY0( $MessageSet_array_ref )
+#        or return;
 
     my $MessageSetSize = 0;
     my $MessageSize;
     foreach my $MessageSet ( @$MessageSet_array_ref ) {
+        _HASH( $MessageSet )
+            or return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'MessageSet' );
         $MessageSize = _get_MessageSize( $MessageSet )
             or return;
         $MessageSetSize +=
@@ -1004,7 +1013,7 @@ sub _encode_MessageSet_array {
     $$length_ref    += 4;
 
     foreach my $MessageSet ( @$MessageSet_array_ref ) {
-        _is_suitable_int( $MessageSet->{Offset} // $PRODUCER_ANY_OFFSET )       # Offset (It may be $PRODUCER_ANY_OFFSET)
+        _is_suitable_int( $MessageSet->{Offset} )                               # Offset (It may be $PRODUCER_ANY_OFFSET)
             ? push( @$data_array_ref, _pack64( $MessageSet->{Offset} ) )
             : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'Offset' );
         $MessageSize = _get_MessageSize( $MessageSet )
@@ -1167,18 +1176,16 @@ sub _decode_MessageSet_template {
 
             $stream_offset += 4;        # bytes before Key or Value length
                                                                                 # [l] Key length
-            if ( $Key_length != $NULL_BYTES_LENGTH ) {
-                $stream_offset +=       # bytes before Key
-                      $Key_length                                               # Key
-                    ;
-                if ( $hex_stream_length >= $stream_offset + 4 ) {   # + [l] Value length
-                    $local_template .= $_Key_or_Value_template;
-                }
-                else {
+            $stream_offset += $Key_length   # bytes before Key
+                if $Key_length != $NULL_BYTES_LENGTH;                           # Key
+            if ( $hex_stream_length >= $stream_offset + 4 ) {   # + [l] Value length
+                $local_template .= $_Key_or_Value_template
+                    if $Key_length != $NULL_BYTES_LENGTH;
+            }
+            else {
 # Not the full MessageSet
-                    $local_template = q{};
-                    last MESSAGE_SET;
-                }
+                $local_template = q{};
+                last MESSAGE_SET;
             }
 
             $local_template .= q{
@@ -1192,19 +1199,16 @@ sub _decode_MessageSet_template {
             $stream_offset +=           # bytes before Value or next Message
                   4                                                             # [l] Value length
                 ;
-
-            if ( $Value_length != $NULL_BYTES_LENGTH ) {
-                $stream_offset +=       # bytes before next Message
-                      $Value_length                                             # Value
-                    ;
-                if ( $hex_stream_length >= $stream_offset ) {
-                    $local_template .= $_Key_or_Value_template;
-                }
-                else {
+            $stream_offset += $Value_length # bytes before next Message
+                if $Value_length != $NULL_BYTES_LENGTH;                         # Value
+            if ( $hex_stream_length >= $stream_offset ) {
+                $local_template .= $_Key_or_Value_template
+                    if $Value_length != $NULL_BYTES_LENGTH;
+            }
+            else {
 # Not the full MessageSet
-                    $local_template = q{};
-                    last MESSAGE_SET;
-                }
+                $local_template = q{};
+                last MESSAGE_SET;
             }
         }
 
@@ -1268,10 +1272,12 @@ sub _protocol_error {
 sub _verify_string {
     my ( $string, $description ) = @_;
 
-    ( _STRING( $string ) || $string eq q{} )
+    return 1
+        if defined( $string ) && $string eq q{};
+    defined( _STRING( $string ) )
         or return _protocol_error( $ERROR_MISMATCH_ARGUMENT, $description // () );
-    !utf8::is_utf8( $string )
-        or return _protocol_error( $ERROR_NOT_BINARY_STRING );
+    utf8::is_utf8( $string )
+        and return _protocol_error( $ERROR_NOT_BINARY_STRING );
 
     return 1;
 }

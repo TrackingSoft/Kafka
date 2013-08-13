@@ -23,28 +23,60 @@ BEGIN {
     plan skip_all => 'because Test::NoWarnings required for testing' if $@;
 }
 
+BEGIN {
+    eval 'use Test::Exception';     ## no critic
+    plan skip_all => "because Test::Exception required for testing" if $@;
+}
+
 plan 'no_plan';
 
 #-- load the modules -----------------------------------------------------------
 
-use Const::Fast;
-use File::HomeDir;
-use File::Spec;
+use Params::Util qw(
+    _HASH
+);
 
-use Kafka::Cluster;
+use Kafka::Message;
+use Kafka::TestInternals qw(
+    @not_hash
+);
 
 #-- setting up facilities ------------------------------------------------------
 
 #-- declarations ---------------------------------------------------------------
 
-# WARNING: must match the settings of your system
-const my $KAFKA_BASE_DIR    => $ENV{KAFKA_BASE_DIR} || File::Spec->catdir( File::HomeDir->my_home, 'kafka' );
+my ( $message, $msg );
 
 #-- Global data ----------------------------------------------------------------
 
+$msg = {
+    Attributes          => 0,
+    error               => 0,
+    HighwaterMarkOffset => 0,
+    key                 => q{},
+    MagicByte           => 0,
+    next_offset         => 0,
+    payload             => q{},
+    offset              => 0,
+    valid               => 1,
+};
+
 # INSTRUCTIONS -----------------------------------------------------------------
 
-my $cluster = Kafka::Cluster->new( kafka_dir => $KAFKA_BASE_DIR );
-isa_ok( $cluster, 'Kafka::Cluster' );
+#-- new
+
+foreach my $bad_arg ( @not_hash ) {
+    dies_ok { $message = Kafka::Message->new( $bad_arg ) } 'exception to die';
+}
+
+lives_ok { $message = Kafka::Message->new( $msg ) } 'expecting to live';
+isa_ok( $message, 'Kafka::Message' );
+
+#-- methods
+
+foreach my $method ( @Kafka::Message::_standard_fields )
+{
+    is $message->$method, $msg->{ $method }, "proper operation";
+}
 
 # POSTCONDITIONS ---------------------------------------------------------------

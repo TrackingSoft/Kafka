@@ -8,7 +8,7 @@ use 5.010;
 use strict;
 use warnings;
 
-# PRECONDITIONS ----------------------------------------------------------------
+# ENVIRONMENT ------------------------------------------------------------------
 
 our $VERSION = '0.8001';
 
@@ -44,6 +44,7 @@ use Kafka qw(
 use Kafka::Internals qw(
     $APIKEY_FETCH
     $APIKEY_OFFSET
+    $DEFAULT_RAISE_ERROR
     $MIN_MAXBYTES
     _get_CorrelationId
     last_error
@@ -70,9 +71,9 @@ sub new {
 
     my $self = bless {
         Connection          => undef,
-        RaiseError          => 0,
+        RaiseError          => $DEFAULT_RAISE_ERROR,
         CorrelationId       => undef,
-        ClientId            => 'consumer',
+        ClientId            => undef,
         MaxWaitTime         => $DEFAULT_MAX_WAIT_TIME,
         MinBytes            => $MIN_BYTES_RESPOND_IMMEDIATELY,
         MaxBytes            => $DEFAULT_MAX_BYTES,
@@ -85,19 +86,23 @@ sub new {
         $self->{ $k } = shift @args if exists $self->{ $k };
     }
 
-    $self->_error( $ERROR_NO_ERROR );
-    $self->{CorrelationId} //= _get_CorrelationId;
+    $self->{CorrelationId}  //= _get_CorrelationId;
+    $self->{ClientId}       //= 'consumer';
 
-    if    ( !defined _NONNEGINT( $self->RaiseError ) )                                  { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'RaiseError' ); }
+    if ( !defined _NONNEGINT( $self->RaiseError ) ) {
+        $self->{RaiseError} = $DEFAULT_RAISE_ERROR;
+        $self->_error( $ERROR_MISMATCH_ARGUMENT, 'RaiseError' );
+    }
     elsif ( !_INSTANCE( $self->{Connection}, 'Kafka::Connection' ) )                    { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'Connection' ); }
     elsif ( !isint( $self->{CorrelationId} ) )                                          { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'CorrelationId' ); }
-    elsif ( !( $self->{ClientId} eq q{} || _STRING( $self->{ClientId} ) ) )             { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'ClientId' ); }
+    elsif ( !( $self->{ClientId} eq q{} || defined( _STRING( $self->{ClientId} ) ) && !utf8::is_utf8( $self->{ClientId} ) ) )   { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'ClientId' ); }
     elsif ( !isint( $self->{MaxWaitTime} ) )                                            { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'MaxWaitTime' ); }
     elsif ( !isint( $self->{MinBytes} ) )                                               { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'MinBytes' ); }
     elsif ( !( _POSINT( $self->{MaxBytes} ) && $self->{MaxBytes} >= $MIN_MAXBYTES ) )   { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'MaxBytes' ); }
     elsif ( !isint( $self->{MaxNumberOfOffsets} ) )                                     { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'MaxNumberOfOffsets' ); }
     else {
-        # nothing to do
+        $self->_error( $ERROR_NO_ERROR )
+            if $self->last_error;
     }
 
     return $self;
@@ -110,10 +115,11 @@ sub new {
 sub fetch {
     my ( $self, $topic, $partition, $offset, $max_size ) = @_;
 
-    if    ( !( $topic eq q{} || _STRING( $topic ) ) )                                       { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$topic' ); }
+# Checking the encoding of strings is performed in the functions of module Kafka::Protocol
+    if    ( !( $topic eq q{} || defined( _STRING( $topic ) ) ) )                            { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$topic' ); }
     elsif ( !isint( $partition ) )                                                          { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$partition' ); }
-    elsif ( !( ( isbig( $offset ) && $offset >= 0 ) || defined( _NONNEGINT( $offset ) ) ) ) { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$offset' ); }
-    elsif ( !( _POSINT( $max_size ) && $max_size >= $MIN_MAXBYTES ) )                       { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$max_size' ); }
+    elsif ( !( defined( $offset ) && ( isbig( $offset ) && $offset >= 0 ) || defined( _NONNEGINT( $offset ) ) ) )   { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$offset' ); }
+    elsif ( defined( $max_size ) && !( _POSINT( $max_size ) && $max_size >= $MIN_MAXBYTES ) )   { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$max_size' ); }
 
     my $request = {
         ApiKey                              => $APIKEY_FETCH,
@@ -135,7 +141,8 @@ sub fetch {
         ],
     };
 
-    $self->_error( $ERROR_NO_ERROR );
+    $self->_error( $ERROR_NO_ERROR )
+        if $self->last_error;
 
     my $response = $self->_fulfill_request( $request )
         or return;
@@ -182,10 +189,10 @@ sub fetch {
 sub offsets {
     my ( $self, $topic, $partition, $time, $max_number ) = @_;
 
-    if    ( !( $topic eq q{} || _STRING( $topic ) ) )                                           { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$topic' ); }
+    if    ( !( $topic eq q{} || defined( _STRING( $topic ) ) ) )                                { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$topic' ); }
     elsif ( !isint( $partition ) )                                                              { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$partition' ); }
-    elsif ( !( ( isbig( $time ) || isint( $time ) ) && $time >= $RECEIVE_EARLIEST_OFFSETS ) )   { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$time' ); }
-    elsif ( !_POSINT( $max_number ) )                                                           { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$max_number' ); }
+    elsif ( !( defined( $time ) && ( isbig( $time ) || isint( $time ) ) && $time >= $RECEIVE_EARLIEST_OFFSETS ) )   { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$time' ); }
+    elsif ( defined( $max_number ) && !_POSINT( $max_number ) )                                 { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$max_number' ); }
 
     my $request = {
         ApiKey                              => $APIKEY_OFFSET,
@@ -205,8 +212,6 @@ sub offsets {
         ],
     };
 
-    $self->_error( $ERROR_NO_ERROR );
-
     my $response = $self->_fulfill_request( $request )
         or return;
 
@@ -216,6 +221,9 @@ sub offsets {
             push @$offsets, @{ $partition_offsets->{Offset} };
         }
     }
+
+    $self->_error( $ERROR_NO_ERROR )
+        if $self->last_error;
 
     return $offsets;
 }

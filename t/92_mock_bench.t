@@ -220,7 +220,7 @@ sub random_strings {
 }
 
 sub report {
-    diag 'Legend:';
+#    diag 'Legend:';
     diag "Message length: $min_len .. $max_len";
     diag "Messages      : package - $number_of_package, single - $number_of_single";
     diag "IO timeout    : $timeout";

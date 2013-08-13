@@ -2,7 +2,7 @@ package Kafka;
 
 # Kafka allows you to produce and consume messages using the Apache Kafka distributed publish/subscribe messaging service.
 
-#TODO: Profiling
+#TODO: ? Kafka::Cluster - test environment should be cleaned including t/data or it should do the test
 
 #-- Pragmas --------------------------------------------------------------------
 
@@ -10,7 +10,7 @@ use 5.010;
 use strict;
 use warnings;
 
-# PRECONDITIONS ----------------------------------------------------------------
+# ENVIRONMENT ------------------------------------------------------------------
 
 use Exporter qw(
     import
@@ -173,7 +173,7 @@ our %ERROR = (
     $ERROR_OFFSET_METADATA_TOO_LARGE_CODE   => 'Specified metadata offset is too big',
 );
 
-const our $BITS64                               => ( defined( $Config{use64bitint} ) and $Config{use64bitint} eq "define" ) || $Config{longsize} >= 8;
+const our $BITS64                           => ( defined( $Config{use64bitint} ) and $Config{use64bitint} eq "define" ) || $Config{longsize} >= 8;
 
 1;
 

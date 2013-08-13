@@ -8,7 +8,7 @@ use 5.010;
 use strict;
 use warnings;
 
-# PRECONDITIONS ----------------------------------------------------------------
+# ENVIRONMENT ------------------------------------------------------------------
 
 our $VERSION = '0.8001';
 
@@ -100,14 +100,13 @@ sub new {
         or confess "The object of class '$class' already exists";
 
     # The argument is needed because multiple versions can be installed simultaneously
-    _STRING( $args{kafka_dir} )                 # must match the settings of your system
+    defined( _STRING( $args{kafka_dir} ) )      # must match the settings of your system
         // confess( "The value of 'kafka_dir' should be a string" );
 
     my $kafka_cluster_factor = $args{cluster_factor} //= $DEFAULT_CLUSTER_FACTOR;
     _POSINT( $kafka_cluster_factor )
         // confess( "The value of 'cluster_factor' should be a positive integer" );
 
-    # $self
     my $self = {
         kafka   => {},                          # {
                                                 #   'does_not_start'        => ..., # boolean

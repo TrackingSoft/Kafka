@@ -12,7 +12,7 @@ use warnings;
 
 use bigint; # this allows integers of practially any size at the cost of significant performance drop
 
-# PRECONDITIONS ----------------------------------------------------------------
+# ENVIRONMENT ------------------------------------------------------------------
 
 use Exporter qw(
     import
@@ -48,10 +48,12 @@ use Kafka::Internals qw(
 sub intsum {
     my ( $frst, $scnd ) = @_;
 
-    ( _is_suitable_int( $frst ) && _is_suitable_int( $scnd ) ) or confess $ERROR{ $ERROR_MISMATCH_ARGUMENT };
+    ( defined( $frst ) && defined( $scnd ) && _is_suitable_int( $frst ) && _is_suitable_int( $scnd ) )
+        or confess $ERROR{ $ERROR_MISMATCH_ARGUMENT };
 
     my $ret = $frst + $scnd + 0;    # bigint coercion
-    confess $ERROR{ $ERROR_MISMATCH_ARGUMENT } if $ret->is_nan();
+    confess $ERROR{ $ERROR_MISMATCH_ARGUMENT }
+        if $ret->is_nan();
 
     return $ret;
 }
@@ -59,7 +61,8 @@ sub intsum {
 sub packq {
     my ( $n ) = @_;
 
-    _is_suitable_int( $n ) or confess $ERROR{ $ERROR_MISMATCH_ARGUMENT };
+    ( defined( $n ) && _is_suitable_int( $n ) )
+        or confess $ERROR{ $ERROR_MISMATCH_ARGUMENT };
 
     if      ( $n == -1 )    { return pack q{C8}, ( 255 ) x 8; }
     elsif   ( $n == -2 )    { return pack q{C8}, ( 255 ) x 7, 254; }
