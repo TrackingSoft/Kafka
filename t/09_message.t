@@ -65,9 +65,11 @@ $msg = {
 
 #-- new
 
-foreach my $bad_arg ( @not_hash ) {
-    dies_ok { $message = Kafka::Message->new( $bad_arg ) } 'exception to die';
-}
+# NOTE: We presume that the verification of the correctness of the arguments made by the user.
+
+#foreach my $bad_arg ( @not_hash ) {
+#    dies_ok { $message = Kafka::Message->new( $bad_arg ) } 'exception to die';
+#}
 
 lives_ok { $message = Kafka::Message->new( $msg ) } 'expecting to live';
 isa_ok( $message, 'Kafka::Message' );

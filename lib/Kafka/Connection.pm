@@ -8,7 +8,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.8001';
+our $VERSION = '0.800_1';
 
 #-- load the modules -----------------------------------------------------------
 
@@ -24,7 +24,6 @@ use Params::Util qw(
     _ARRAY
     _ARRAY0
     _HASH
-    _INSTANCE
     _NONNEGINT
     _NUMBER
     _POSINT
@@ -229,7 +228,8 @@ sub is_server_alive {
         if $self->last_error;
 
     if ( $self->_is_like_server( $server ) ) {
-        if ( $self->is_server_known( $server ) && ( my $io = $self->{_IO_cache}->{ $server }->{IO} ) ) {
+        my $io_cache = $self->{_IO_cache};
+        if ( exists $io_cache->{ $server } && ( my $io = $io_cache->{ $server }->{IO} ) ) {
             return $io->is_alive;
         }
     }
@@ -239,37 +239,26 @@ sub is_server_alive {
     return;
 }
 
+# WARNING: in order to achieve better performance,
+# this method do not perform arguments validation
 sub receive_response_to_request {
     my ( $self, $request ) = @_;
 
-    my $error_description = __PACKAGE__.'->receive_response_to_request';
-    _HASH( $request ) && exists( $request->{ApiKey} )   # The ApiKey must be present in the structure of the request
-        or return $self->_error( $ERROR_MISMATCH_ARGUMENT, $error_description );
-
     my $api_key = $request->{ApiKey};
-    $known_api_keys{ $api_key }
-        or return $self->_error( $ERROR_UNKNOWN_APIKEY, $error_description );
 
 # WARNING: The current version of the module limited to the following:
 # No clear answer to the question, one leader for any combination of topic + partition, or at the same time, there are several different leaders?
 # Therefore supports queries with only one combination of topic + partition (first and only).
     my ( $topic_data, $topic_name, $partition, $partition_data );
 
-    _ARRAY( $request->{topics} )
-        or return $self->_error( $ERROR_UNKNOWN_TOPIC_OR_PARTITION, $error_description );
-    ( ( $topic_data = $request->{topics}->[0] ) && _HASH( $topic_data ) )
-        or return $self->_error( $ERROR_UNKNOWN_TOPIC_OR_PARTITION, $error_description );
-    $topic_name = $topic_data->{TopicName}
-        // return $self->_error( $ERROR_UNKNOWN_TOPIC_OR_PARTITION, $error_description );
-    ( _ARRAY( $topic_data->{partitions} ) && _HASH( $topic_data->{partitions}->[0] ) )
-        or return $self->_error( $ERROR_UNKNOWN_TOPIC_OR_PARTITION, $error_description );
-    ( $partition = $topic_data->{partitions}->[0]->{Partition} )
-        // return $self->_error( $ERROR_UNKNOWN_TOPIC_OR_PARTITION, $error_description );
+    $topic_data = $request->{topics}->[0];
+    $topic_name = $topic_data->{TopicName};
+    ( $partition = $topic_data->{partitions}->[0]->{Partition} );
 
     $self->_update_metadata( $topic_name )
         unless %{ $self->{_metadata} }; # the first request
     %{ $self->{_metadata} } # hash metadata could be updated
-        or return $self->_error( $ERROR_CANNOT_GET_METADATA, $error_description );
+        or return $self->_error( $ERROR_CANNOT_GET_METADATA, __PACKAGE__.'->receive_response_to_request' );
     my $encoded_request = $protocol{ $api_key }->{encode}->( $request )
         or return $self->_error( Kafka::Protocol::last_errorcode, Kafka::Protocol::last_error );
 
@@ -343,9 +332,6 @@ sub receive_response_to_request {
 sub close_connection {
     my ( $self, $server ) = @_;
 
-    return $self->_error( $ERROR_MISMATCH_ARGUMENT, __PACKAGE__.'->close_connection' )
-        unless $self->_is_like_server( $server );
-
     if ( $self->is_server_known( $server ) ) {
         $self->_closeIO( $server );
         return 1;
@@ -373,8 +359,9 @@ sub _find_leader_server {
 
     my $leader_server;
     my $IO_cache = $self->{_IO_cache};
+    my $NodeId;
     foreach my $server ( keys %$IO_cache ) {
-        my $NodeId = $IO_cache->{ $server }->{NodeId};
+        $NodeId = $IO_cache->{ $server }->{NodeId};
         if ( defined( $NodeId ) && $NodeId == $node_id ) {
             $leader_server = $server;
             last;
@@ -390,8 +377,9 @@ sub _get_interviewed_servers {
 
     my ( @priority, @secondary, @rest );
     my $IO_cache = $self->{_IO_cache};
+    my $server_data;
     foreach my $server ( $self->get_known_servers ) {
-        my $server_data = $IO_cache->{ $server };
+        $server_data = $IO_cache->{ $server };
         if ( defined $server_data->{NodeId} ) {
             if ( $server_data->{IO} ) {
                 push @priority, $server;
@@ -450,8 +438,9 @@ sub _update_metadata {
     $IO_cache->{ $_ }->{NodeId} = undef for @brokers;
 
     #  In the IO cache update/add obtained server information
+    my $server;
     foreach my $received_broker ( @{ $decoded_response->{Broker} } ) {
-        my $server = $self->_build_server_name( @{ $received_broker }{ 'Host', 'Port' } );
+        $server = $self->_build_server_name( @{ $received_broker }{ 'Host', 'Port' } );
         $IO_cache->{ $server } = {                      # can add new servers
             IO      => $IO_cache->{ $server }->{IO},    # IO or undef
             NodeId  => $received_broker->{NodeId},
@@ -504,8 +493,9 @@ sub _connectIO {
     my ( $self, $server ) = @_;
 
     my $server_data = $self->{_IO_cache}->{ $server };
-    unless ( $server_data && $server_data->{IO} && $self->is_server_alive( $server ) ) {
-        my $io = $server_data->{IO} = Kafka::IO->new(
+    my $io;
+    unless ( $server_data && ( $io = $server_data->{IO} ) && $io->is_alive ) {
+        $io = $server_data->{IO} = Kafka::IO->new(
             host        => $server_data->{host},
             port        => $server_data->{port},
             timeout     => $self->{timeout},
@@ -564,14 +554,14 @@ sub _is_like_server {
     my ( $self, $server ) = @_;
 
     return $server
-        if defined( $server ) && defined( _STRING( $server ) ) && !utf8::is_utf8( $server ) && $server =~ /^[^:]+:\d+$/;
+        if defined( $server ) && defined( _STRING( $server ) ) && !utf8::is_utf8( $server ) && $server =~ /^[^:]+:\d+$/o;
 }
 
 # necessary because metadata using the 'Host' defined by hostname
 sub _localhost_to_hostname {
     my ( $self, $host ) = @_;
 
-    return $host =~ /^(localhost|127\.0\.0\.1)$/i ? hostname : $host;
+    return $host =~ /^(?:localhost|127\.0\.0\.1)$/io ? hostname : $host;
 }
 
 sub _io_error {
@@ -600,3 +590,126 @@ sub _io_error {
 1;
 
 __END__
+
+=head1 NAME
+
+Kafka::Connection - blah-blah-blah
+
+=head1 VERSION
+
+This documentation refers to C<Kafka::Connection> version 0.800_1
+
+=head1 SYNOPSIS
+
+    use 5.010;
+    use strict;
+
+    # A simple example of Kafka::Connection usage:
+    use Kafka::Connection;
+
+    # connect to local cluster with the defaults
+    my $connect = Kafka::Connection->new( host => 'localhost' );
+
+    # decoding of the error
+    say STDERR 'last error: ', $connect->last_error
+        unless $connect->last_errorcode;
+
+=head1 DESCRIPTION
+
+blah-blah-blah
+
+=head2 CONSTRUCTOR
+
+=head3 C<new>
+
+blah-blah-blah
+
+=head2 METHODS
+
+blah-blah-blah
+
+=head3 C<receive_response_to_request( blah-blah-blah )>
+
+blah-blah-blah
+
+=head3 C<get_known_servers>
+
+blah-blah-blah
+
+=head3 C<is_server_known( blah-blah-blah )>
+
+blah-blah-blah
+
+=head3 C<is_server_alive( blah-blah-blah )>
+
+blah-blah-blah
+
+=head3 C<close_connection( blah-blah-blah )>
+
+blah-blah-blah
+
+=head3 C<close>
+
+blah-blah-blah
+
+=head2 EXPORT
+
+blah-blah-blah
+
+=head2 GLOBAL VARIABLES
+
+=over
+
+=item C<@Kafka::ERROR>
+
+Contain the descriptions for possible error codes returned by
+C<last_errorcode> methods and functions of the package modules.
+
+=item C<%Kafka::ERROR_CODE>
+
+blah-blah-blah
+
+=back
+
+=head1 DEPENDENCIES
+
+blah-blah-blah
+
+=head1 BUGS AND LIMITATIONS
+
+blah-blah-blah
+
+=head1 MORE DOCUMENTATION
+
+All modules contain detailed information on the interfaces they provide.
+
+=head1 SEE ALSO
+
+blah-blah-blah
+
+=head1 AUTHOR
+
+Sergey Gladkov, E<lt>sgladkov@trackingsoft.comE<gt>
+
+=head1 CONTRIBUTORS
+
+Alexander Solovey
+
+Jeremy Jordan
+
+Vlad Marchenko
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright (C) 2012-2013 by TrackingSoft LLC.
+
+This package is free software; you can redistribute it and/or modify it under
+the same terms as Perl itself. See I<perlartistic> at
+L<http://dev.perl.org/licenses/artistic.html>.
+
+This program is
+distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE.
+
+=cut

@@ -1,5 +1,8 @@
 package Kafka::Message;
 
+# WARNING: in order to achieve better performance,
+# methods of this module do not perform arguments validation
+
 #-- Pragmas --------------------------------------------------------------------
 
 use 5.010;
@@ -8,19 +11,9 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.8001';
+our $VERSION = '0.800_1';
 
 #-- load the modules -----------------------------------------------------------
-
-use Carp;
-use Params::Util qw(
-    _HASH
-);
-
-use Kafka qw(
-    %ERROR
-    $ERROR_MISMATCH_ARGUMENT
-    );
 
 #-- declarations ---------------------------------------------------------------
 
@@ -40,14 +33,6 @@ our @_standard_fields = qw(
 
 sub new {
     my ( $class, $self ) = @_;
-
-    _HASH( $self )
-        or confess $ERROR{ $ERROR_MISMATCH_ARGUMENT };
-
-    map {
-        confess $ERROR{ $ERROR_MISMATCH_ARGUMENT }
-            unless( exists( $self->{ $_ } ) && defined( $self->{ $_ } ) )
-        } @_standard_fields;
 
     bless $self, $class;
 
@@ -87,33 +72,45 @@ Kafka::Message - object interface to the Kafka message properties
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Message> version 0.12
+This documentation refers to C<Kafka::Message> version 0.800_1
 
 =head1 SYNOPSIS
 
-The Kafka L<Consumer|Kafka::Consumer> response has an ARRAY reference type.
-For the C<fetch> response array has the class name C<Kafka::Message> elements.
+    use 5.010;
+    use strict;
+
+    use Kafka qw(
+        $DEFAULT_MAX_BYTES
+    );
+    use Kafka::Connection;
+    use Kafka::Consumer;
+
+    #-- Connection
+    my $connect = Kafka::Connection->new( host => 'localhost' );
+
+    #-- Consumer
+    my $consumer = Kafka::Consumer->new( Connection  => $connect );
+
+    # The Kafka consumer response has an ARRAY reference type.
+    # For the fetch response array has the class name Kafka::Message elements.
 
     # Consuming messages
     my $messages = $consumer->fetch(
-        "test",             # topic
+        'mytopic',          # topic
         0,                  # partition
         0,                  # offset
-        DEFAULT_MAX_SIZE    # Maximum size of MESSAGE(s) to receive
-        );
-    if ( $messages )
-    {
-        foreach my $message ( @$messages )
-        {
-            if( $message->valid )
-            {
-                print "payload    : ", $message->payload,       "\n";
-                print "offset     : ", $message->offset,        "\n";
-                print "next_offset: ", $message->next_offset,   "\n";
+        $DEFAULT_MAX_BYTES  # Maximum size of MESSAGE(s) to receive
+    );
+    if ( $messages ) {
+        foreach my $message ( @$messages ) {
+            if( $message->valid ) {
+                say 'key        : ', $message->key;
+                say 'payload    : ', $message->payload;
+                say 'offset     : ', $message->offset;
+                say 'next_offset: ', $message->next_offset;
             }
-            else
-            {
-                print "error      : ", $message->error,         "\n";
+            else {
+                say 'error      : ', $message->error;
             }
         }
     }
@@ -187,6 +184,22 @@ The offset beginning of the message in the Apache Kafka server.
 =head3 C<next_offset>
 
 The offset beginning of the next message in the Apache Kafka server.
+
+=head3 C<Attributes>
+
+blah-blah-blah
+
+=head3 C<HighwaterMarkOffset>
+
+blah-blah-blah
+
+=head3 C<MagicByte>
+
+blah-blah-blah
+
+=head3 C<key>
+
+blah-blah-blah
 
 =head1 DIAGNOSTICS
 

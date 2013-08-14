@@ -117,201 +117,219 @@ my ( @decode_functions, @encode_functions, $request, $encoded_response, $decoded
 
 # INSTRUCTIONS -----------------------------------------------------------------
 
+# NOTE: We presume that the verification of the correctness of the arguments made by the user.
+
 #-- last_errorcode, last_error
 
-foreach my $function ( @decode_functions, @encode_functions ) {
-    foreach my $bad_arg (
-            @not_hash,
-            $function =~ /^decode/ ? { foo => 'bar' } : \'scalar',
-        ) {
-        expected_error( $function, $bad_arg );
-    }
-}
+#foreach my $function ( @decode_functions, @encode_functions ) {
+#    foreach my $bad_arg (
+#            @not_hash,
+#            $function =~ /^decode/ ? { foo => 'bar' } : \'scalar',
+#        ) {
+#        expected_error( $function, $bad_arg );
+#    }
+#}
 
 #-- The encode requests structure only
 
 # CorrelationId
-foreach my $function ( @encode_functions ) {
-    foreach my $bad_CorrelationId ( @not_isint ) {
-        $request->{CorrelationId} = $bad_CorrelationId;
-        expected_error( $function, $request );
-    }
-}
+
+#foreach my $function ( @encode_functions ) {
+#    foreach my $bad_CorrelationId ( @not_isint ) {
+#        $request->{CorrelationId} = $bad_CorrelationId;
+#        expected_error( $function, $request );
+#    }
+#}
 $request->{CorrelationId} = 0;
 
 # ClientId
-foreach my $function ( grep /request$/, @encode_functions ) {
-    foreach my $bad_ClientId ( @not_string ) {
-        $request->{ClientId} = $bad_ClientId;
-        expected_error( $function, $request );
-    }
-}
+
+#foreach my $function ( grep /request$/, @encode_functions ) {
+#    foreach my $bad_ClientId ( @not_string ) {
+#        $request->{ClientId} = $bad_ClientId;
+#        expected_error( $function, $request );
+#    }
+#}
 $request->{ClientId} = q{};
 
 # RequiredAcks
-foreach my $bad_RequiredAcks ( @not_isint ) {
-    $request->{RequiredAcks} = $bad_RequiredAcks;
-    expected_error( 'encode_produce_request', $request );
-}
+
+#foreach my $bad_RequiredAcks ( @not_isint ) {
+#    $request->{RequiredAcks} = $bad_RequiredAcks;
+#    expected_error( 'encode_produce_request', $request );
+#}
 $request->{RequiredAcks} = $NOT_SEND_ANY_RESPONSE;
 
 # Timeout
-foreach my $bad_Timeout ( @not_isint ) {
-    $request->{Timeout} = $bad_Timeout;
-    expected_error( 'encode_produce_request', $request );
-}
+
+#foreach my $bad_Timeout ( @not_isint ) {
+#    $request->{Timeout} = $bad_Timeout;
+#    expected_error( 'encode_produce_request', $request );
+#}
 $request->{Timeout} = $REQUEST_TIMEOUT * 1000;  # ms
 
 # MaxWaitTime
-foreach my $bad_MaxWaitTime ( @not_isint ) {
-    $request->{MaxWaitTime} = $bad_MaxWaitTime;
-    expected_error( 'encode_fetch_request', $request );
-}
+
+#foreach my $bad_MaxWaitTime ( @not_isint ) {
+#    $request->{MaxWaitTime} = $bad_MaxWaitTime;
+#    expected_error( 'encode_fetch_request', $request );
+#}
 $request->{MaxWaitTime} = $DEFAULT_MAX_WAIT_TIME;
 
 # MinBytes
-foreach my $bad_MinBytes ( @not_isint ) {
-    $request->{MinBytes} = $bad_MinBytes;
-    expected_error( 'encode_fetch_request', $request );
-}
+
+#foreach my $bad_MinBytes ( @not_isint ) {
+#    $request->{MinBytes} = $bad_MinBytes;
+#    expected_error( 'encode_fetch_request', $request );
+#}
 $request->{MinBytes} = $MIN_BYTES_RESPOND_IMMEDIATELY;
 
 # topics
-foreach my $function ( grep /request$/, @encode_functions ) {
-    foreach my $bad_topics (
-            @not_array,
-            $function =~ /metadata/ ? () : [ 'scalar' ],
-            [ \'scalar' ],
-            [ [] ],
-        ) {
-        $request->{topics} = $bad_topics;
-        expected_error( $function, $request );
-    }
-}
 
-foreach my $function (
-        'encode_metadata_request'
-    ) {
-    foreach my $bad_topic ( @not_empty_string ) {
-        $request->{topics} = [ $bad_topic ];
-        expected_error( $function, $request );
-    }
-}
+#foreach my $function ( grep /request$/, @encode_functions ) {
+#    foreach my $bad_topics (
+#            @not_array,
+#            $function =~ /metadata/ ? () : [ 'scalar' ],
+#            [ \'scalar' ],
+#            [ [] ],
+#        ) {
+#        $request->{topics} = $bad_topics;
+#        expected_error( $function, $request );
+#    }
+#}
+#
+#foreach my $function (
+#        'encode_metadata_request'
+#    ) {
+#    foreach my $bad_topic ( @not_empty_string ) {
+#        $request->{topics} = [ $bad_topic ];
+#        expected_error( $function, $request );
+#    }
+#}
 
 # TopicName
-foreach my $function (
-        'encode_fetch_request',
-        'encode_offset_request',
-        'encode_produce_request',
-    ) {
-    foreach my $bad_TopicName ( @not_string ) {
-        $request->{topics} = [ { TopicName => $bad_TopicName } ];
-        expected_error( $function, $request );
-    }
-}
+
+#foreach my $function (
+#        'encode_fetch_request',
+#        'encode_offset_request',
+#        'encode_produce_request',
+#    ) {
+#    foreach my $bad_TopicName ( @not_string ) {
+#        $request->{topics} = [ { TopicName => $bad_TopicName } ];
+#        expected_error( $function, $request );
+#    }
+#}
 $request->{topics} = [ { TopicName => 'mytopic' } ];
 
 # partitions
-foreach my $function (
-        'encode_fetch_request',
-        'encode_offset_request',
-        'encode_produce_request',
-    ) {
-    foreach my $bad_partitions (
-            @not_array,
-            [ 'scalar' ],
-            [ \'scalar' ],
-            [ [] ],
-        ) {
-        $request->{topics}->[0]->{partitions} = $bad_partitions;
-        expected_error( $function, $request );
-    }
-}
+
+#foreach my $function (
+#        'encode_fetch_request',
+#        'encode_offset_request',
+#        'encode_produce_request',
+#    ) {
+#    foreach my $bad_partitions (
+#            @not_array,
+#            [ 'scalar' ],
+#            [ \'scalar' ],
+#            [ [] ],
+#        ) {
+#        $request->{topics}->[0]->{partitions} = $bad_partitions;
+#        expected_error( $function, $request );
+#    }
+#}
 
 # Partition
-foreach my $function (
-        'encode_fetch_request',
-        'encode_offset_request',
-        'encode_produce_request',
-    ) {
-    foreach my $bad_partition ( @not_isint ) {
-        $request->{topics}->[0]->{partitions} = [ { Partition => $bad_partition } ];
-        expected_error( $function, $request );
-    }
-}
+
+#foreach my $function (
+#        'encode_fetch_request',
+#        'encode_offset_request',
+#        'encode_produce_request',
+#    ) {
+#    foreach my $bad_partition ( @not_isint ) {
+#        $request->{topics}->[0]->{partitions} = [ { Partition => $bad_partition } ];
+#        expected_error( $function, $request );
+#    }
+#}
 $request->{topics}->[0]->{partitions}->[0]->{Partition} = 0;
 
 # MessageSet
-foreach my $function (
-        'encode_produce_request',
-    ) {
-    foreach my $bad_MessageSet (
-            @not_array,
-            [ 'scalar' ],
-            [ \'scalar' ],
-            [ [] ],
-        ) {
-        $request->{topics}->[0]->{partitions}->[0]->{MessageSet} = $bad_MessageSet;
-        expected_error( $function, $request );
-    }
-}
+
+#foreach my $function (
+#        'encode_produce_request',
+#    ) {
+#    foreach my $bad_MessageSet (
+#            @not_array,
+#            [ 'scalar' ],
+#            [ \'scalar' ],
+#            [ [] ],
+#        ) {
+#        $request->{topics}->[0]->{partitions}->[0]->{MessageSet} = $bad_MessageSet;
+#        expected_error( $function, $request );
+#    }
+#}
 $request->{topics}->[0]->{partitions}->[0]->{MessageSet} = [ {} ];
 
 # FetchOffset
-foreach my $function (
-        'encode_fetch_request',
-    ) {
-    foreach my $bad_FetchOffset ( @not_isint ) {
-        $request->{topics}->[0]->{partitions}->[0]->{FetchOffset} = $bad_FetchOffset;
-        expected_error( $function, $request );
-    }
-}
+
+#foreach my $function (
+#        'encode_fetch_request',
+#    ) {
+#    foreach my $bad_FetchOffset ( @not_isint ) {
+#        $request->{topics}->[0]->{partitions}->[0]->{FetchOffset} = $bad_FetchOffset;
+#        expected_error( $function, $request );
+#    }
+#}
 $request->{topics}->[0]->{partitions}->[0]->{FetchOffset} = 0;
 
 # MaxBytes
-foreach my $function (
-        'encode_fetch_request',
-    ) {
-    foreach my $bad_MaxBytes ( @not_isint ) {
-        $request->{topics}->[0]->{partitions}->[0]->{MaxBytes} = $bad_MaxBytes;
-        expected_error( $function, $request );
-    }
-}
+
+#foreach my $function (
+#        'encode_fetch_request',
+#    ) {
+#    foreach my $bad_MaxBytes ( @not_isint ) {
+#        $request->{topics}->[0]->{partitions}->[0]->{MaxBytes} = $bad_MaxBytes;
+#        expected_error( $function, $request );
+#    }
+#}
 $request->{topics}->[0]->{partitions}->[0]->{MaxBytes} = $DEFAULT_MAX_BYTES;
 
 # Time
-foreach my $function (
-        'encode_offset_request',
-    ) {
-    foreach my $bad_Time ( @not_isint ) {
-        $request->{topics}->[0]->{partitions}->[0]->{Time} = $bad_Time;
-        expected_error( $function, $request );
-    }
-}
+
+#foreach my $function (
+#        'encode_offset_request',
+#    ) {
+#    foreach my $bad_Time ( @not_isint ) {
+#        $request->{topics}->[0]->{partitions}->[0]->{Time} = $bad_Time;
+#        expected_error( $function, $request );
+#    }
+#}
 $request->{topics}->[0]->{partitions}->[0]->{Time} = $RECEIVE_LATEST_OFFSET;
 
 # MaxNumberOfOffsets
-foreach my $function (
-        'encode_offset_request',
-    ) {
-    foreach my $bad_MaxNumberOfOffsets ( @not_isint ) {
-        $request->{topics}->[0]->{partitions}->[0]->{MaxNumberOfOffsets} = $bad_MaxNumberOfOffsets;
-        expected_error( $function, $request );
-    }
-}
+
+#foreach my $function (
+#        'encode_offset_request',
+#    ) {
+#    foreach my $bad_MaxNumberOfOffsets ( @not_isint ) {
+#        $request->{topics}->[0]->{partitions}->[0]->{MaxNumberOfOffsets} = $bad_MaxNumberOfOffsets;
+#        expected_error( $function, $request );
+#    }
+#}
 $request->{topics}->[0]->{partitions}->[0]->{MaxNumberOfOffsets} = $DEFAULT_MAX_NUMBER_OF_OFFSETS;
 
 #- MessageSet internal
 
 # Offset
-foreach my $function (
-        'encode_produce_request',
-    ) {
-    foreach my $bad_Offset ( @not_isint ) {
-        $request->{topics}->[0]->{partitions}->[0]->{MessageSet}->[0]->{Offset} = $bad_Offset;
-        expected_error( $function, $request );
-    }
-}
+
+#foreach my $function (
+#        'encode_produce_request',
+#    ) {
+#    foreach my $bad_Offset ( @not_isint ) {
+#        $request->{topics}->[0]->{partitions}->[0]->{MessageSet}->[0]->{Offset} = $bad_Offset;
+#        expected_error( $function, $request );
+#    }
+#}
 $request->{topics}->[0]->{partitions}->[0]->{MessageSet}->[0]->{Offset} = $PRODUCER_ANY_OFFSET;
 
 # NOTE: MagicByte, Attributes should not be assigned by the user
@@ -319,6 +337,7 @@ $request->{topics}->[0]->{partitions}->[0]->{MessageSet}->[0]->{MagicByte}  = $C
 $request->{topics}->[0]->{partitions}->[0]->{MessageSet}->[0]->{Attributes} = $COMPRESSION_NONE;
 
 # Key, Value
+
 foreach my $field (
         'Key',
         'Value',
@@ -387,7 +406,7 @@ foreach my $corrupted (
         {
             hex_stream      => '0000006e000000000000000100076d79746f706963000000010000000000000000000000000002000000150000000000000000000000148dc795a20000ffffffff0000000648656c6c6f2100000000000000010000001b989feb390000ffffffff0000000d48656c6c6f2c20576f726c6421',
             received        => 0,
-            descripition    => 'no decoded messages',
+            description     => 'no decoded messages',
         },
         {
             hex_stream      => '0000006e000000000000000100076d79746f706963000000010000000000000000000000000002000000150000000000000000000000148dc795a20000ffffff',

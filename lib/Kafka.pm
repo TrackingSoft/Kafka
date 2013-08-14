@@ -2,8 +2,6 @@ package Kafka;
 
 # Kafka allows you to produce and consume messages using the Apache Kafka distributed publish/subscribe messaging service.
 
-#TODO: ? Kafka::Cluster - test environment should be cleaned including t/data or it should do the test
-
 #-- Pragmas --------------------------------------------------------------------
 
 use 5.010;
@@ -52,6 +50,7 @@ our @EXPORT_OK = qw(
     $ERROR_UNKNOWN_APIKEY
     $ERROR_UNKNOWN_TOPIC_OR_PARTITION
     $KAFKA_SERVER_PORT
+    $MESSAGE_SIZE_OVERHEAD
     $MIN_BYTES_RESPOND_HAS_DATA
     $MIN_BYTES_RESPOND_IMMEDIATELY
     $NOT_SEND_ANY_RESPONSE
@@ -63,7 +62,7 @@ our @EXPORT_OK = qw(
     $WAIT_WRITTEN_TO_LOCAL_LOG
 );
 
-our $VERSION = '0.8001';
+our $VERSION = '0.800_1';
 
 #-- load the modules -----------------------------------------------------------
 
@@ -104,7 +103,21 @@ const our $BLOCK_UNTIL_IS_COMMITED              => -1;  # the server will block 
 # The maximum amount of time (ms) to block waiting if insufficient data is available at the time the request is issued
 const our $DEFAULT_MAX_WAIT_TIME                => 100;
 
-const our $DEFAULT_MAX_NUMBER_OF_OFFSETS        => 100; # Kafka is return up to 'MaxNumberOfOffsets' of offsets
+const our $DEFAULT_MAX_NUMBER_OF_OFFSETS        => 100; # Kafka returns up to 'MaxNumberOfOffsets' of offsets
+
+# Look at the structure of 'Message sets'
+# https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-Messagesets
+# for example the case with an empty key:
+# MessageSet => [Offset MessageSize Message]
+#   00:00:00:00:00:00:00:00:        # Offset => int64
+#   00:00:00:14:                    # MessageSize => int32 (a size 0x14 = 20 bytes)
+# Message => Crc MagicByte Attributes Key Value
+#   8d:c7:95:a2:                    # Crc => int32
+#   00:                             # MagicByte => int8
+#   00:                             # Attributes => int8 (the last 3 bits - Compression None)
+#   ff:ff:ff:ff:                    # Key => bytes (a length -1 = null bytes)
+#   00:00:00:06:                    # Value => bytes (a length 0x6 = 6 bytes)
+const our $MESSAGE_SIZE_OVERHEAD                => 26;  # size of protocol overhead (data added by protocol) for each message
 
 #-- Errors fixed by Kafka package
 const our $ERROR_MISMATCH_ARGUMENT              => -1000;
@@ -185,46 +198,41 @@ Kafka - constants and messages used by the Kafka package modules
 
 =head1 VERSION
 
-This documentation refers to C<Kafka> package version 0.12
+This documentation refers to C<Kafka> package version 0.800_1
 
 =head1 SYNOPSIS
 
-An example of C<Kafka> usage:
+    use 5.010;
+    use strict;
 
     use Kafka qw(
-        BITS64
-        KAFKA_SERVER_PORT
-        DEFAULT_TIMEOUT
-        TIMESTAMP_EARLIEST
-        DEFAULT_MAX_OFFSETS
-        DEFAULT_MAX_SIZE
-        );
+        $BITS64
+    );
+
+    # A simple example of Kafka usage:
 
     # common information
-    print "This is Kafka package $Kafka::VERSION\n";
-    print "You have a ", BITS64 ? "64" : "32", " bit system\n";
+    say 'This is Kafka package ', $Kafka::VERSION;
+    say 'You have a ', $BITS64 ? '64' : '32', ' bit system';
 
-    use Kafka::IO;
+    use Kafka::Connection;
 
-    # connect to local server with the defaults
-    my $io = Kafka::IO->new( host => "localhost" );
+    # connect to local cluster with the defaults
+    my $connect = Kafka::Connection->new( host => 'localhost' );
 
-    # decoding of the error code
-    unless ( $io )
-    {
-        print STDERR "last error: ",
-            $Kafka::ERROR[Kafka::IO::last_errorcode], "\n";
-    }
+    # decoding of the error
+    say STDERR 'last error: ', $connect->last_error
+        unless $connect->last_errorcode;
 
-To see a brief but working code example of the C<Kafka> package usage
-look at the L</"An Example"> section.
+    # To see a brief but working code example of the Kafka package usage
+    # look at the "An Example" section.
 
 =head1 ABSTRACT
 
 The Kafka package is a set of Perl modules which provides a simple and
-consistent application programming interface (API) to Apache Kafka 0.7,
+consistent application programming interface (API) to Apache Kafka 0.8,
 a high-throughput distributed messaging system.
-This is a low-level API implementation which DOES NOT interract with
+This is a low-level API implementation which DOES NOT interact with
 an Apache ZooKeeper for consumer coordination and/or load balancing.
 
 =head1 DESCRIPTION
@@ -275,7 +283,7 @@ on 32 bit systems.
 
 =head1 APACHE KAFKA'S STYLE COMMUNICATION
 
-The Kafka package is based on Kafka's 0.7 Wire Format specification document at
+The Kafka package is based on Kafka's 0.8 Wire Format specification document at
 L<http://cwiki.apache.org/confluence/display/KAFKA/Wire+Format/>
 
 =over 3
@@ -589,8 +597,8 @@ maximum number of offsets to retrieve - 100
 
 =item C<MAX_SOCKET_REQUEST_BYTES>
 
-The maximum size of a request that the socket server will accept
-(protection against OOM). Default limit (as configured in server.properties)
+The maximum size of a request that the socket server will accept.
+Default limit (as configured in server.properties)
 is 104857600
 
 =back
@@ -790,7 +798,7 @@ If the optional modules are missing, some "prereq" tests are skipped.
 =head1 BUGS AND LIMITATIONS
 
 Currently, the package does not implement send and response of compressed
-messages. Also does not implement the MULTIFETCH and MULTIPRODUCE requests.
+messages. Also does not implement the ... and ... requests.
 
 Use only one C<Kafka::Mock> object at the same time (it has class variables
 for the exchange of TCP server processes).

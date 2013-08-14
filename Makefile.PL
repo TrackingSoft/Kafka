@@ -9,20 +9,10 @@ if ( $^O eq 'MSWin32' ) {
     exit( 255 );
 }
 
-use File::Basename;
 use ExtUtils::MakeMaker qw( prompt );
-use Getopt::Long;
-
-my ( $no_full_tests, $full_tests, $answer, $topic );
-
-GetOptions(
-    'no_full_tests!'    => \$no_full_tests,
-    'full_tests!'       => \$full_tests,
-    'topic=s'           => \$topic,
+use File::Spec::Functions qw(
+    catdir
 );
-$answer = 'no'  if $no_full_tests;
-$answer = 'yes' if $full_tests;
-$answer //= 'no';
 
 my %config = (
     NAME                        => 'Kafka',
@@ -33,7 +23,7 @@ my %config = (
         'List::MoreUtils'       => 0.33,
         'Params::Util'          => 1.07,
         'Scalar::Util::Numeric' => 0.22,
-        'String::CRC32'         => 1.4,
+        'String::CRC32'         => '1.4',
         'Sys::SigAction'        => 0.15,
         },
     BUILD_REQUIRES              => {            # more to the list $Module::CoreList::version{5.010}
@@ -57,56 +47,19 @@ my %config = (
     NO_MYMETA   => 1,
 );
 
-my @patterns = qw( t/*.t t/*/*.t );
+my @patterns = qw( t/*.t );
 $config{test} = { TESTS => join ' ', map { glob } @patterns };
 
-print "=  => To run a full tests requires a running local server kafka (port 9092) <=  =\n" unless $answer;
-$answer ||= prompt( 'Do you want to run a full tests of the client?', 'no' );
-
-if ( $answer =~ m/^y/i )
-{
-    print "I'm going to run a full tests.\n";
-    $answer = $topic || prompt( 'Please specify the topic for use with the kafka server:', 'test' );
-
-    my @files = $config{test}->{TESTS} =~ m| (t\/99_usage\/\d\d_kafka.*?\.t)|g;
-    foreach my $f_name ( @files )
-    {
-        if ( open( my $fh, "+<", $f_name ) )
-        {
-            my $content = "";
-            while ( <$fh> )
-            {
-                if ( /^__DATA__/ )
-                {
-                    chomp $_;
-                    $content .= "$_\n$answer";
-                    seek $fh, 0, 0;
-                    print $fh $content if truncate $fh, 0;
-                    last;
-                }
-                else
-                {
-                    $content .= $_;
-                }
-            }
-            close $fh;
-        }
-    }
-}
-else
-{
-    $config{test}->{TESTS} =~ s| t\/99_usage\/\d\d_kafka.*?\.t||g;
-    print "Miss the interaction with the kafka server.\n";
-}
-
 if( $ENV{AUTHOR_TESTS} ) {
-    @patterns = qw( xt/author/*.t xt/author/*/*.t );
+    @patterns = qw( xt/author/*.t );
     $config{test}->{TESTS} .= ' '.join ' ', map { glob } @patterns;
 }
 
 if( $ENV{RELEASE_TESTS} ) {
-    @patterns = qw( xt/release/*.t xt/release/*/*.t );
+    @patterns = qw( xt/release/*.t );
     $config{test}->{TESTS} .= ' '.join ' ', map { glob } @patterns;
 }
+
+mkdir 't/data' unless -d 't/data';
 
 ExtUtils::MakeMaker::WriteMakefile( %config );

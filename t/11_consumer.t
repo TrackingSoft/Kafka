@@ -46,6 +46,7 @@ use Kafka qw(
     $DEFAULT_MAX_NUMBER_OF_OFFSETS
     $DEFAULT_MAX_WAIT_TIME
     $ERROR_MISMATCH_ARGUMENT
+    $MESSAGE_SIZE_OVERHEAD
     $MIN_BYTES_RESPOND_IMMEDIATELY
     $RECEIVE_EARLIEST_OFFSETS
     $RECEIVE_LATEST_OFFSET
@@ -53,9 +54,6 @@ use Kafka qw(
 use Kafka::Cluster;
 use Kafka::Connection;
 use Kafka::Consumer;
-use Kafka::Internals qw(
-    $MIN_MAXBYTES
-);
 use Kafka::MockIO;
 use Kafka::Producer;
 use Kafka::TestInternals qw(
@@ -284,7 +282,7 @@ sub testing {
     new_ERROR_MISMATCH_ARGUMENT( 'MinBytes', @not_isint );
 
 # MaxBytes
-    new_ERROR_MISMATCH_ARGUMENT( 'MaxBytes', @not_posint, $MIN_MAXBYTES - 1 );
+    new_ERROR_MISMATCH_ARGUMENT( 'MaxBytes', @not_posint, $MESSAGE_SIZE_OVERHEAD - 1 );
 
 # MaxNumberOfOffsets
     new_ERROR_MISMATCH_ARGUMENT( 'MaxNumberOfOffsets', @not_isint );
@@ -305,7 +303,7 @@ sub testing {
 
 # max_size
     fetch_ERROR_MISMATCH_ARGUMENT( $topic, $partition, 0, $_ )
-        foreach grep( { defined $_ } @not_nonnegint ), $MIN_MAXBYTES - 1;
+        foreach grep( { defined $_ } @not_nonnegint ), $MESSAGE_SIZE_OVERHEAD - 1;
 
 #-- offsets
 

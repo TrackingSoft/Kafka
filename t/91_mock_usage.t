@@ -181,7 +181,7 @@ if( $offsets ) {
     }
 }
 # may be both physical and logical errors
-if ( !$offsets or $consumer->last_error ) {
+if ( !$offsets || $consumer->last_error ) {
     fail '('.$consumer->last_errorcode.') '.$consumer->last_error;
 }
 
@@ -212,7 +212,7 @@ if ( $messages ) {
     }
 }
 # may be both physical and logical errors
-if ( !$messages or $consumer->last_error ) {
+if ( !$messages || $consumer->last_error ) {
     fail '('.$consumer->last_errorcode.') '.$consumer->last_error;
 }
 

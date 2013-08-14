@@ -1,5 +1,8 @@
 package Kafka::IO;
 
+# WARNING: in order to achieve better performance,
+# methods of this module do not perform arguments validation
+
 #-- Pragmas --------------------------------------------------------------------
 
 use 5.010;
@@ -10,19 +13,12 @@ use sigtrap;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.8001';
+our $VERSION = '0.800_1';
 
 #-- load the modules -----------------------------------------------------------
 
 use Errno;
 use Fcntl;
-use Params::Util qw(
-    _ARRAY0
-    _NONNEGINT
-    _NUMBER
-    _POSINT
-    _STRING
-);
 use Scalar::Util qw(
     dualvar
 );
@@ -72,20 +68,14 @@ sub new {
 
     $self->{not_accepted} = 0;
     $self->{socket} = undef;
-
-    if    ( !( defined( $self->{host} ) && defined( _STRING( $self->{host} ) ) && !utf8::is_utf8( $self->{host} ) ) )   { $self->_error( $ERROR_MISMATCH_ARGUMENT, __PACKAGE__.'->new - host' ); }
-    elsif ( !_POSINT( $self->{port} ) )                                 { $self->_error( $ERROR_MISMATCH_ARGUMENT, __PACKAGE__.'->new - port' ); }
-    elsif ( !( _NUMBER( $self->{timeout} ) && $self->{timeout} > 0 ) )  { $self->_error( $ERROR_MISMATCH_ARGUMENT, __PACKAGE__.'->new - timeout' ); }
-    else  {
-        local $@;
-        eval { $self->_connect() };
-        if ( $@ ) {
-            $self->_error( $ERROR_CANNOT_BIND, __PACKAGE__."->new - $@" );
-        }
-        else {
-            $self->_error( $ERROR_NO_ERROR )
-                if $self->last_error;
-        }
+    local $@;
+    eval { $self->_connect() };
+    if ( $@ ) {
+        $self->_error( $ERROR_CANNOT_BIND, __PACKAGE__."->new - $@" );
+    }
+    else {
+        $self->_error( $ERROR_NO_ERROR )
+            if $self->last_error;
     }
 
     return $self;
@@ -111,13 +101,8 @@ sub last_errorcode {
 sub send {
     my ( $self, $message ) = @_;
 
-    my $description = __PACKAGE__.'->send';
-    defined( _STRING( $message ) )
-        or return $self->_error( $ERROR_MISMATCH_ARGUMENT, $description );
-    !utf8::is_utf8( $message )
-        or return $self->_error( $ERROR_NOT_BINARY_STRING, $description );
-    ( my $len = length( $message .= q{} ) ) <= $MAX_SOCKET_REQUEST_BYTES
-        or return $self->_error( $ERROR_MISMATCH_ARGUMENT, $description );
+    ( my $len = length( $message ) ) <= $MAX_SOCKET_REQUEST_BYTES
+        or return $self->_error( $ERROR_MISMATCH_ARGUMENT, __PACKAGE__.'->send' );
 
     $self->_error( $ERROR_NO_ERROR )
         if $self->last_error;
@@ -132,10 +117,10 @@ sub send {
     }
     $self->{not_accepted} = 0;
 
-    my ( $sent, $from_send, $mask );
+    my ( $sent, $mask );
     {
         last unless ( select( undef, $mask = $self->{_select}, undef, $self->{timeout} ) );
-        $sent += ( $from_send = send( $self->{socket}, $message, 0 ) ) || 0;
+        $sent += send( $self->{socket}, $message, 0 ) // 0;
         redo if $sent < $len;
     }
 
@@ -147,9 +132,6 @@ sub send {
 
 sub receive {
     my ( $self, $length ) = @_;
-
-    _POSINT( $length )
-        or return $self->_error( $ERROR_MISMATCH_ARGUMENT, __PACKAGE__.'->receive' );
 
     $self->_error( $ERROR_NO_ERROR )
         if $self->last_error;
@@ -163,8 +145,7 @@ sub receive {
         $message .= $buf;
         redo if length( $message ) < $length;
     }
-    $self->{not_accepted} = $length - length( $message );
-    $self->{not_accepted} *= $self->{not_accepted} >= 0;
+    $self->{not_accepted} = ( $length - length( $message ) ) * ( $self->{not_accepted} >= 0 );
 
     ( defined( $from_recv ) && !$self->{not_accepted} )
         or return $self->_error( $ERROR_CANNOT_RECV, __PACKAGE__."->receive - $!" );
@@ -222,6 +203,7 @@ sub _connect {
         alarm 0;                                # race condition protection
         die $@ if $@;
         die( "gethostbyname $name: $?\n" ) unless defined $ip;
+        undef $h;
         $ip = inet_ntoa( $ip );
     }
     else {
@@ -242,7 +224,7 @@ sub _connect {
     fcntl( $connection, F_SETFL, $_ | O_NONBLOCK ) or die "fcntl F_SETFL O_NONBLOCK: $!\n"; # 0 for error, 0e0 for 0.
 
     # Connect returns immediately because of O_NONBLOCK.
-    connect( $connection, pack_sockaddr_in( $port, inet_aton( $ip ) ) ) || $!{EINPROGRESS} or die( "connect ${ip}:${port} (${name}): $!\n" );
+    connect( $connection, pack_sockaddr_in( $port, inet_aton( $ip ) ) ) || $!{EINPROGRESS} || die( "connect ${ip}:${port} (${name}): $!\n" );
 
     $self->{socket}     = $connection;
     $self->{_select}    = undef;
@@ -306,7 +288,7 @@ sub _error {
 sub _debug_msg {
     my ( $self, $header, $colour, $message ) = @_;
 
-    if ( $DEBUG && !$_hdr ) {
+    unless ( $_hdr ) {
         require Data::HexDump::Range;
         $_hdr = Data::HexDump::Range->new(
             FORMAT                          => 'ANSI',  # 'ANSI'|'ASCII'|'HTML'
@@ -356,72 +338,26 @@ __END__
 
 =head1 NAME
 
-Kafka::IO - object interface to socket communications with the Apache Kafka 0.7
+Kafka::IO - object interface to socket communications with the Apache Kafka 0.8
 server without using the Apache ZooKeeper
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::IO> version 0.12
+This documentation refers to C<Kafka::IO> version 0.800_1
 
 =head1 SYNOPSIS
 
-Setting up:
+    use 5.010;
+    use strict;
 
-    use Kafka qw( KAFKA_SERVER_PORT DEFAULT_TIMEOUT );
     use Kafka::IO;
 
-    my $io;
-
-    eval { $io = Kafka::IO->new(
-        host        => "localhost",
-        port        => KAFKA_SERVER_PORT,
-        timeout     => "bad thing",
-        RaiseError  => 1
-        ) };
-    print "expecting to die: (",
-        Kafka::IO::last_errorcode, ") ",
-        Kafka::IO::last_error, "\n" if $@;
-
-    unless ( $io = Kafka::IO->new(
-        host        => "localhost",
-        port        => KAFKA_SERVER_PORT,
-        timeout     => DEFAULT_TIMEOUT, # Optional,
-                                        # default = DEFAULT_TIMEOUT
-        RaiseError  => 0                # Optional, default = 0
-        ) )
-    {
-        print "unexpecting to die: (",
-            Kafka::IO::last_errorcode, ") ",
-            Kafka::IO::last_error, "\n" if $@;
-    }
-
-Producer:
-
-    use Kafka::Producer;
-
-    my $producer = Kafka::Producer->new(
-        IO          => $io,
-        RaiseError  => 0                # Optional, default = 0
-        );
-
-    # ... the application body
-
-    # Closes the producer and cleans up
-    $producer->close;
-
-Or Consumer:
-
-    use Kafka::Consumer;
-
-    my $consumer = Kafka::Consumer->new(
-        IO          => $io,
-        RaiseError  => 0                # Optional, default = 0
-        );
-
-    # ... the application body
+    # WARNING: in order to achieve better performance,
+    # methods of this module do not perform arguments validation
+    my $io = Kafka::IO->new( host => 'localhost' );
 
     # Closes the consumer and cleans up
-    $consumer->close;
+    $io->close;
 
 =head1 DESCRIPTION
 
@@ -435,7 +371,7 @@ Provides an object oriented model of communication.
 
 =item *
 
-To provide the class that allows you to write the Apache Kafka 0.7 clients
+To provide the class that allows you to write the Apache Kafka 0.8 clients
 without using the Apache ZooKeeper service.
 
 =back
@@ -522,6 +458,10 @@ the undefined value if the L</RaiseError> is not true.
 The argument must be a value that is a positive number. That is, it is defined
 and Perl thinks it's a number.
 
+=head3 C<is_alive( blah-blah-blah )>
+
+blah-blah-blah
+
 =head3 C<close>
 
 The method to close the C<Kafka::IO> object and clean up.
@@ -557,7 +497,7 @@ mode to true.
 =head1 DIAGNOSTICS
 
 Look at the C<RaiseError> description for additional information on
-error handeling.
+error handling.
 
 The methods for the possible error to analyse: L</last_errorcode> and
 more descriptive L</last_error>.

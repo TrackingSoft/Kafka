@@ -10,11 +10,10 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.8001';
+our $VERSION = '0.800_1';
 
 #-- load the modules -----------------------------------------------------------
 
-use Carp;
 use Params::Util qw(
     _ARRAY0
     _INSTANCE
@@ -80,7 +79,7 @@ sub new {
     elsif ( !_INSTANCE( $self->{Connection}, 'Kafka::Connection' ) )                    { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'Connection' ); }
     elsif ( !isint( $self->{CorrelationId} ) )                                          { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'CorrelationId' ); }
     elsif ( !( $self->{ClientId} eq q{} || defined( _STRING( $self->{ClientId} ) ) && !utf8::is_utf8( $self->{ClientId} ) ) )   { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'ClientId' ); }
-    elsif ( !isint( $self->{RequiredAcks} ) )                                           { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'RequiredAcks' ); }
+    elsif ( !( defined( $self->{RequiredAcks} ) && isint( $self->{RequiredAcks} ) ) )   { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'RequiredAcks' ); }
     elsif ( !_NONNEGINT( $self->{Timeout} ) )                                           { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'Timeout' ); }
     else {
         $self->_error( $ERROR_NO_ERROR )
@@ -99,9 +98,9 @@ sub send {
 
     $key //= q{};
 
+    if    ( !( $topic eq q{} || defined( _STRING( $topic ) ) && !utf8::is_utf8( $topic ) ) )    { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$topic' ); }
+    elsif ( !( defined( $partition ) && isint( $partition ) ) )             { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$partition' ); }
 # Checking the encoding of strings is performed in the functions of module Kafka::Protocol
-    if    ( !( $topic eq q{} || defined( _STRING( $topic ) ) ) )            { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$topic' ); }
-    elsif ( !isint( $partition ) )                                          { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$partition' ); }
     elsif ( !( defined( _STRING( $messages ) ) || _ARRAY0( $messages ) ) )  { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$messages' ); }
     elsif ( !( $key eq q{} || defined( _STRING( $key ) ) ) )                { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$key' ); }
 
@@ -163,65 +162,46 @@ Kafka::Producer - object interface to the producer client
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Producer> version 0.12
+This documentation refers to C<Kafka::Producer> version 0.800_1
 
 =head1 SYNOPSIS
 
-Setting up:
+    use 5.010;
+    use strict;
 
-    #-- IO
-    use Kafka qw( KAFKA_SERVER_PORT DEFAULT_TIMEOUT );
-    use Kafka::IO;
+    #-- Connection
+    use Kafka::Connection;
 
-    my $io;
-
-    $io = Kafka::IO->new(
-        host        => "localhost",
-        port        => KAFKA_SERVER_PORT,
-        timeout     => DEFAULT_TIMEOUT, # Optional,
-                                        # default = DEFAULT_TIMEOUT
-        RaiseError  => 0                # Optional, default = 0
-        );
-
-Producer:
+    my $connect = Kafka::Connection->new( host => 'localhost' );
 
     #-- Producer
     use Kafka::Producer;
 
-    my $producer = Kafka::Producer->new(
-        IO          => $io,
-        RaiseError  => 0    # Optional, default = 0
-        );
+    my $producer = Kafka::Producer->new( Connection => $connect );
 
     # Sending a single message
-    $producer->send(
-        "test",             # topic
+    my $response = $producer->send(
+        'mytopic',          # topic
         0,                  # partition
-        "Single message"    # message
-        );
+        'Single message'    # message
+    );
 
-    unless ( $producer )
-    {
-        die "(",
-            Kafka::Producer::last_errorcode(), .") ",
-            Kafka::Producer::last_error(), "\n";
-    }
+    die 'Error: ('.$producer->last_errorcode.') '.$producer->last_error."\n"
+        unless $response;
 
     # Sending a series of messages
-    $producer->send(
-        "test",             # topic
+    $response = $producer->send(
+        'mytopic',          # topic
         0,                  # partition
         [                   # messages
-            "The first message",
-            "The second message",
-            "The third message",
+            'The first message',
+            'The second message',
+            'The third message',
         ]
-        );
+    );
 
     # Closes the producer and cleans up
-    $producer->close;
-
-Use only one C<Kafka::Producer> object at the same time.
+    undef $producer;
 
 =head1 DESCRIPTION
 
@@ -335,7 +315,7 @@ additional details and do not comply with the C<Kafka::ERROR> array.
 =head1 DIAGNOSTICS
 
 Look at the C<RaiseError> description for additional information on
-error handeling.
+error handling.
 
 The methods for the possible error to analyse: L</last_errorcode> and
 more descriptive L</last_error>.

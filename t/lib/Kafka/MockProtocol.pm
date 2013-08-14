@@ -1,5 +1,7 @@
 package Kafka::MockProtocol;
 
+#TODO: title - the name, purpose, and a warning that this one is for internal use only
+
 #-- Pragmas --------------------------------------------------------------------
 
 use 5.010;
@@ -22,7 +24,7 @@ our @EXPORT_OK = qw(
     encode_produce_response
 );
 
-our $VERSION = '0.8001';
+our $VERSION = '0.800_1';
 
 #-- load the modules -----------------------------------------------------------
 
@@ -30,6 +32,7 @@ use Params::Util qw(
     _ARRAY0
     _HASH
     _POSINT
+    _SCALAR
     _STRING
 );
 use Scalar::Util::Numeric qw(
@@ -47,7 +50,6 @@ use Kafka::Internals qw(
     $APIKEY_METADATA
     $APIKEY_OFFSET
     $APIKEY_PRODUCE
-    _is_suitable_int
 );
 use Kafka::Protocol qw(
     $APIVERSION
@@ -65,82 +67,70 @@ use Kafka::Protocol qw(
     _decode_MessageSet_array
     _decode_MessageSet_template
     _protocol_error
-    _is_hex_stream_correct
     _pack64
     _unpack64
     _verify_string
+);
+use Kafka::TestInternals qw(
+    _is_suitable_int
 );
 
 #-- declarations ---------------------------------------------------------------
 
 my ( $_Response_header_template,                            $_Response_header_length ) = (
-    q{
-        l>      # Size
-        l>      # 4 CorrelationId
-        l>      # 4 topics array size (Broker array size)
-    },
-    8           # 'Size' is not included in the calculation of length
+    q{l>l>l>},      # Size
+                    # 4 CorrelationId
+                    # 4 topics array size (Broker array size)
+    8               # 'Size' is not included in the calculation of length
 );
 my ( $_ProduceResponse_body_template,                       $_ProduceResponse_body_length ) = (
-    q{
-        l>      # 4 Partition
-        s>      # 2 ErrorCode
-        a8      # 8 Offset
-    },
+    q{l>s>a[8]},    # 4 Partition
+                    # 2 ErrorCode
+                    # 8 Offset
     14
 );
 my ( $_FetchResponse_body_template,                         $_FetchResponse_body_length ) = (
-    q{
-        l>      # 4 Partition
-        s>      # 2 ErrorCode
-        a8      # 8 HighwaterMarkOffset
-    },
+    q{l>s>a[8]},    # 4 Partition
+                    # 2 ErrorCode
+                    # 8 HighwaterMarkOffset
     14
 );
 my ( $_OffsetResponse_body_template,                        $_OffsetResponse_body_length ) = (
-    q{
-        l>      # 4 Partition
-        s>      # 2 ErrorCode
-        l>      # 4 Offset array size
-    },
+    q{l>s>l>},      # 4 Partition
+                    # 2 ErrorCode
+                    # 4 Offset array size
     10
 );
 my ( $_MetadataResponse_Broker_body_template,               $_MetadataResponse_Broker_body_length ) = (
-    q{
-        l>      # 4 NodeId
-        s>      # 2 Host length
-        a*      # Host
-        l>      # 4 Port
-    },
+    q{l>s>a*l>},    # 4 NodeId
+                    # 2 Host length
+                    # Host
+                    # 4 Port
     10          # without real Host length
 );
 my ( $_MetadataResponse_PartitionMetadata_body_template,    $_MetadataResponse_PartitionMetadata_body_length ) = (
-    q{
-        s>      # 2 ErrorCode
-        l>      # 4 Partition
-        l>      # 4 Leader
-        l>      # 4 Replicas array size
-    },
+    q{s>l>l>l>},    # 2 ErrorCode
+                    # 4 Partition
+                    # 4 Leader
+                    # 4 Replicas array size
     14
 );
 my ( $_ProduceRequest_header_template,                      $_ProduceRequest_header_length ) = (
-    q{
-        x[l]    # 4 Size (skip)
-        s>      # 2 ApiKey
-        s>      # 2 ApiVersion
-        l>      # 4 CorrelationId
-        s>/a    # ClientId
-        s>      # RequiredAcks
-        l>      # Timeout
-        l>      # topics array size
-    },
+    q{x[l]s>s>l>s>/as>l>l>},
+                    # 4 Size (skip)
+                    # 2 ApiKey
+                    # 2 ApiVersion
+                    # 4 CorrelationId
+                    # ClientId
+                    # RequiredAcks
+                    # Timeout
+                    # topics array size
     12          # bytes before ClientId length
 );
-my $_ProduceRequest_topic_body_template = q{
-    s>/a        # TopicName
-    l>          # partitions array size
-    l>          # Partition
-};
+my $_ProduceRequest_topic_body_template = q{s>/al>l>};
+                    # TopicName
+                    # partitions array size
+                    # Partition
 
 #-- public functions -----------------------------------------------------------
 
@@ -152,7 +142,16 @@ sub decode_produce_request {
     _is_hex_stream_correct( $hex_stream_ref )
         or return _protocol_error( $ERROR_MISMATCH_ARGUMENT );
 
-    my @data = unpack( _decode_produce_request_template( $hex_stream_ref ), $$hex_stream_ref );
+    my @data;
+    my $request = {
+                                                # template      => '...',
+                                                # stream_offset => ...,
+        hex_stream  => $hex_stream_ref,
+        data        => \@data,
+    };
+
+    _decode_produce_request_template( $request );
+    @data = unpack( $request->{template}, $$hex_stream_ref );
 
     my ( $i, $Produce_Request ) = ( 0, {} );
 
@@ -184,7 +183,7 @@ sub decode_produce_request {
             my $MessageSetSize                               =  $data[ $i++ ];      # MessageSetSize
             my $MessageSet_array = $partition->{MessageSet}  =  [];
 
-            _decode_MessageSet_array( $MessageSetSize, \@data, \$i, $MessageSet_array );
+            _decode_MessageSet_array( $request, $MessageSetSize, \$i, $MessageSet_array );
 
             push( @$partitions_array, $partition );
         }
@@ -203,17 +202,18 @@ sub encode_produce_response {
     _HASH( $Produce_Response )
         or return _protocol_error( $ERROR_MISMATCH_ARGUMENT );
 
-    my (
-        $template,
-        $response_length,
-        @data,
-    );
+    my @data = ();
+    my $response = {
+                                                # template    => '...',
+                                                # len         => ...,
+        data        => \@data,
+    };
 
     ( defined( $Produce_Response->{CorrelationId} ) && isint( $Produce_Response->{CorrelationId} ) )    # CorrelationId
         ? push( @data, $Produce_Response->{CorrelationId} )
         : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'CorrelationId' );
-    $template           = $_Response_header_template;
-    $response_length    = $_Response_header_length;
+    $response->{template}   = $_Response_header_template;
+    $response->{len}        = $_Response_header_length;
 
     my $topics_array = $Produce_Response->{topics};
     _ARRAY0( $topics_array )                                                # topics array size
@@ -221,17 +221,16 @@ sub encode_produce_response {
         : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'topics' );
 
     foreach my $topic ( @$topics_array ) {
-        $template           .= qq{    s>      # 2 string length\n};         # string length
-        $response_length    += 2;
-        _encode_string( $topic->{TopicName}, \$response_length, \@data, \$template, 'TopicName' )   # TopicName
-            or return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'TopicName ('.last_error().')' );
+        $response->{template}   .= q{s>};                                   # string length
+        $response->{len}        += 2;
+        _encode_string( $response, $topic->{TopicName} );                   # TopicName
 
         my $partitions_array = $topic->{partitions};
         _ARRAY0( $partitions_array )
             ? push( @data, scalar( @$partitions_array ) )
             : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'partitions' );
-        $template .= q{l>};                                                 # partitions array size
-        $response_length += 4;  # [l] partitions array size
+        $response->{template}   .= q{l>};                                   # partitions array size
+        $response->{len}        += 4;   # [l] partitions array size
 
         foreach my $partition ( @$partitions_array ) {
             ( defined( $partition->{Partition} ) && isint( $partition->{Partition} ) )  # Partition
@@ -243,40 +242,39 @@ sub encode_produce_response {
             _is_suitable_int( $partition->{Offset} )
                 ? push( @data, _pack64( $partition->{Offset} ) )            # Offset
                 : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'Offset' );
-            $template           .= $_ProduceResponse_body_template;
-            $response_length    += $_ProduceResponse_body_length;
+            $response->{template}   .= $_ProduceResponse_body_template;
+            $response->{len}        += $_ProduceResponse_body_length;
         }
     }
 
-    return pack( $template, $response_length, @data );
+    return pack( $response->{template}, $response->{len}, @data );
 }
 
 # FETCH Request ----------------------------------------------------------------
 
-my $_decode_fetch_request_template = qq{
-    x[l]                    # Size (skip)
-    s>                      # ApiKey
-    s>                      # ApiVersion
-    l>                      # CorrelationId
-    s>/a                    # ClientId
-    l>                      # ReplicaId
-    l>                      # MaxWaitTime
-    l>                      # MinBytes
+my $_decode_fetch_request_template = qq{x[l]s>s>l>s>/al>l>l>l>X[l]l>/(s>/al>X[l]l>/(l>${_int64_template}l>))};
+                                        # x[l]                    # Size (skip)
+                                        # s>                      # ApiKey
+                                        # s>                      # ApiVersion
+                                        # l>                      # CorrelationId
+                                        # s>/a                    # ClientId
+                                        # l>                      # ReplicaId
+                                        # l>                      # MaxWaitTime
+                                        # l>                      # MinBytes
 
-    l>                      # topics array size
-    X[l]
-    l>/(                    # topics array
-        s>/a                    # TopicName
+                                        # l>                      # topics array size
+                                        # X[l]
+                                        # l>/(                    # topics array
+                                        #     s>/a                    # TopicName
 
-        l>                      # partitions array size
-        X[l]
-        l>/(                    # partitions array
-            l>                      # Partition
-            $_int64_template        # FetchOffset
-            l>                      # MaxBytes
-        )
-    )
-};
+                                        #     l>                      # partitions array size
+                                        #     X[l]
+                                        #     l>/(                    # partitions array
+                                        #         l>                      # Partition
+                                        #         $_int64_template        # FetchOffset
+                                        #         l>                      # MaxBytes
+                                        #     )
+                                        # )
 
 sub decode_fetch_request {
     my ( $hex_stream_ref ) = @_;
@@ -333,17 +331,18 @@ sub encode_fetch_response {
     _HASH( $Fetch_Response )
         or return _protocol_error( $ERROR_MISMATCH_ARGUMENT );
 
-    my (
-        $template,
-        $response_length,
-        @data,
-    );
+    my @data = ();
+    my $response = {
+                                                # template    => '...',
+                                                # len         => ...,
+        data        => \@data,
+    };
 
     ( defined( $Fetch_Response->{CorrelationId} ) && isint( $Fetch_Response->{CorrelationId} ) )    # CorrelationId
         ? push( @data, $Fetch_Response->{CorrelationId} )
         : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'CorrelationId' );
-    $template           = $_Response_header_template;
-    $response_length    = $_Response_header_length;
+    $response->{template}   = $_Response_header_template;
+    $response->{len}        = $_Response_header_length;
 
     my $topics_array = $Fetch_Response->{topics} // [];
     _ARRAY0( $topics_array )
@@ -351,17 +350,16 @@ sub encode_fetch_response {
         : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'topics' );
 
     foreach my $topic ( @$topics_array ) {
-        $template           .= qq{    s>      # 2 string length\n};         # string length
-        $response_length    += 2;
-        _encode_string( $topic->{TopicName}, \$response_length, \@data, \$template, 'TopicName' )   # TopicName
-            or return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'TopicName ('.last_error().')' );
+        $response->{template}   .= q{s>};                                   # string length
+        $response->{len}        += 2;
+        _encode_string( $response, $topic->{TopicName} );                   # TopicName
 
         my $partitions_array = $topic->{partitions} // [];
         _ARRAY0( $partitions_array )
             ? push( @data, scalar( @$partitions_array ) )
             : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'partitions' );
-        $template .= q{l>};                                                 # partitions array size
-        $response_length += 4;  # [l] partitions array size
+        $response->{template}   .= q{l>};                                   # partitions array size
+        $response->{len}        += 4;       # [l] partitions array size
 
         foreach my $partition ( @$partitions_array ) {
             ( defined( $partition->{Partition} ) && isint( $partition->{Partition} ) )  # Partition
@@ -373,41 +371,40 @@ sub encode_fetch_response {
             _is_suitable_int( $partition->{HighwaterMarkOffset} )           # HighwaterMarkOffset
                 ? push( @data, _pack64( $partition->{HighwaterMarkOffset} ) )
                 : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'HighwaterMarkOffset' );
-            $template           .= $_FetchResponse_body_template;
-            $response_length    += $_FetchResponse_body_length;
+            $response->{template}   .= $_FetchResponse_body_template;
+            $response->{len}        += $_FetchResponse_body_length;
 
-            _encode_MessageSet_array( $partition->{MessageSet}, \$response_length, \@data, \$template )
+            _encode_MessageSet_array( $response, $partition->{MessageSet} )
                 or return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'MessageSet'.( last_error() ? ' ('.last_error().')' : q{} ) );
         }
     }
 
-    return pack( $template, $response_length, @data );
+    return pack( $response->{template}, $response->{len}, @data );
 }
 
 # OFFSET Request ---------------------------------------------------------------
 
-my $_decode_offset_request_template = qq{
-    x[l]                    # Size (skip)
-    s>                      # ApiKey
-    s>                      # ApiVersion
-    l>                      # CorrelationId
-    s>/a                    # ClientId
-    l>                      # ReplicaId
+my $_decode_offset_request_template = qq{x[l]s>s>l>s>/al>l>X[l]l>/(s>/al>X[l]l>/(l>${_int64_template}l>))};
+                                        # x[l]                    # Size (skip)
+                                        # s>                      # ApiKey
+                                        # s>                      # ApiVersion
+                                        # l>                      # CorrelationId
+                                        # s>/a                    # ClientId
+                                        # l>                      # ReplicaId
 
-    l>                      # topics array size
-    X[l]
-    l>/(                    # topics array
-        s>/a                    # TopicName
+                                        # l>                      # topics array size
+                                        # X[l]
+                                        # l>/(                    # topics array
+                                        #     s>/a                    # TopicName
 
-        l>                      # partitions array size
-        X[l]
-        l>/(                    # partitions array
-            l>                      # Partition
-            $_int64_template        # Time
-            l>                      # MaxNumberOfOffsets
-        )
-    )
-};
+                                        #     l>                      # partitions array size
+                                        #     X[l]
+                                        #     l>/(                    # partitions array
+                                        #         l>                      # Partition
+                                        #         $_int64_template        # Time
+                                        #         l>                      # MaxNumberOfOffsets
+                                        #     )
+                                        # )
 
 sub decode_offset_request {
     my ( $hex_stream_ref ) = @_;
@@ -426,7 +423,7 @@ sub decode_offset_request {
     $Offset_Request->{CorrelationId}                         =  $data[ $i++ ];      # CorrelationId
     $Offset_Request->{ClientId}                              =  $data[ $i++ ];      # ClientId
 
-    $data[ $i++ ] == $CONSUMERS_REPLICAID                                           # ReplicaId
+    $CONSUMERS_REPLICAID                                     == $data[ $i++ ]       # ReplicaId
         or return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'ReplicaId' );
 
     my $topics_array = $Offset_Request->{topics}             =  [];
@@ -462,18 +459,18 @@ sub encode_offset_response {
     _HASH( $Offset_Response )
         or return _protocol_error( $ERROR_MISMATCH_ARGUMENT );
 
-    my (
-        $template,
-        $response_length,
-        @data,
-        $topics_array_size,
-    );
+    my @data;
+    my $response = {
+                                                # template    => '...',
+                                                # len         => ...,
+        data        => \@data,
+    };
 
     ( defined( $Offset_Response->{CorrelationId} ) && isint( $Offset_Response->{CorrelationId} ) )  # CorrelationId
         ? push( @data, $Offset_Response->{CorrelationId} )
         : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'CorrelationId' );
-    $template           = $_Response_header_template;
-    $response_length    = $_Response_header_length;
+    $response->{template}   = $_Response_header_template;
+    $response->{len}        = $_Response_header_length;
 
     my $topics_array = $Offset_Response->{topics} // [];
     _ARRAY0( $topics_array )                                                # topics array size
@@ -481,17 +478,16 @@ sub encode_offset_response {
         : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'topics' );
 
     foreach my $topic ( @$topics_array ) {
-        $template           .= qq{    s>      # 2 string length\n};         # string length
-        $response_length    += 2;
-        _encode_string( $topic->{TopicName}, \$response_length, \@data, \$template, 'TopicName' )   # TopicName
-            or return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'TopicName ('.last_error().')' );
+        $response->{template}   .= q{s>};                                   # string length
+        $response->{len}        += 2;
+        _encode_string( $response, $topic->{TopicName} );                   # TopicName
 
         my $PartitionOffsets_array = $topic->{PartitionOffsets} // [];
         _ARRAY0( $PartitionOffsets_array )
             ? push( @data, scalar( @$PartitionOffsets_array ) )
             : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'PartitionOffsets' );
-        $template .= q{l>};                                                 # PartitionOffsets array size
-        $response_length += 4;  # [l] PartitionOffsets array size
+        $response->{template}   .= q{l>};                                   # PartitionOffsets array size
+        $response->{len}        += 4;   # [l] PartitionOffsets array size
 
         foreach my $PartitionOffsets ( @$PartitionOffsets_array ) {
             ( defined( $PartitionOffsets->{Partition} ) && isint( $PartitionOffsets->{Partition} ) )    # Partition
@@ -504,37 +500,36 @@ sub encode_offset_response {
             _ARRAY0( $Offset_array )                                        # Offset array size
                 ? push( @data, scalar( @$Offset_array ) )
                 : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'Offset array' );
-            $template           .= $_OffsetResponse_body_template;
-            $response_length    += $_OffsetResponse_body_length;
+            $response->{template}   .= $_OffsetResponse_body_template;
+            $response->{len}        += $_OffsetResponse_body_length;
 
             foreach my $Offset ( @$Offset_array ) {
                 _is_suitable_int( $Offset )                                 # Offset
                     ? push( @data, _pack64( $Offset ) )
                     : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'Offset' );
-                $template           .= q{a8};
-                $response_length    += 8;
+                $response->{template}   .= q{a[8]};
+                $response->{len}        += 8;
             }
         }
     }
 
-    return pack( $template, $response_length, @data );
+    return pack( $response->{template}, $response->{len}, @data );
 }
 
 # METADATA Request -------------------------------------------------------------
 
-my $_decode_metadata_request_template = q{
-    x[l]                    # Size (skip)
-    s>                      # ApiKey
-    s>                      # ApiVersion
-    l>                      # CorrelationId
-    s>/a                    # ClientId
+my $_decode_metadata_request_template = q{x[l]s>s>l>s>/al>X[l]l>/(s>/a)};
+                                        # x[l]                    # Size (skip)
+                                        # s>                      # ApiKey
+                                        # s>                      # ApiVersion
+                                        # l>                      # CorrelationId
+                                        # s>/a                    # ClientId
 
-    l>                      # topics array size
-    X[l]
-    l>/(                    # topics array
-        s>/a                    # TopicName
-    )
-};
+                                        # l>                      # topics array size
+                                        # X[l]
+                                        # l>/(                    # topics array
+                                        #     s>/a                    # TopicName
+                                        # )
 
 sub decode_metadata_request {
     my ( $hex_stream_ref ) = @_;
@@ -570,17 +565,18 @@ sub encode_metadata_response {
     _HASH( $Metadata_Response )
         or return _protocol_error( $ERROR_MISMATCH_ARGUMENT );
 
-    my (
-        $template,
-        $response_length,
-        @data,
-    );
+    my @data;
+    my $response = {
+                                                # template    => '...',
+                                                # len         => ...,
+        data        => \@data,
+    };
 
     ( defined( $Metadata_Response->{CorrelationId} ) && isint( $Metadata_Response->{CorrelationId} ) )  # CorrelationId
         ? push( @data, $Metadata_Response->{CorrelationId} )
         : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'CorrelationId' );
-    $template           = $_Response_header_template;
-    $response_length    = $_Response_header_length;
+    $response->{template}   = $_Response_header_template;
+    $response->{len}        = $_Response_header_length;
 
     my $Broker_array = $Metadata_Response->{Broker} // [];
     _ARRAY0( $Broker_array )                                                # Broker array size
@@ -599,12 +595,12 @@ sub encode_metadata_response {
         _STRING( $Broker->{Host} )                                          # Host
             ? push( @data, $Host_length, $Broker->{Host} )
             : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'Host' );
-        $response_length += $Host_length;
+        $response->{len} += $Host_length;
         _POSINT( $Broker->{Port} )                                          # Port
             ? push( @data, $Broker->{Port} )
             : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'Port' );
-        $template           .= $_MetadataResponse_Broker_body_template;
-        $response_length    += $_MetadataResponse_Broker_body_length;
+        $response->{template}   .= $_MetadataResponse_Broker_body_template;
+        $response->{len}        += $_MetadataResponse_Broker_body_length;
     }
 
     my $TopicMetadata_array = $Metadata_Response->{TopicMetadata} // [];
@@ -612,27 +608,25 @@ sub encode_metadata_response {
     _ARRAY0( $TopicMetadata_array )                                         # TopicMetadata array size
         ? push( @data, scalar( @$TopicMetadata_array ) )
         : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'TopicMetadata' );
-    $template           .= q{l>};
-    $response_length    += 4;
+    $response->{template}   .= q{l>};
+    $response->{len}        += 4;
 
     foreach my $TopicMetadata ( @$TopicMetadata_array ) {
         ( defined( $TopicMetadata->{ErrorCode} ) && isint( $TopicMetadata->{ErrorCode} ) )  # ErrorCode
             ? push( @data, $TopicMetadata->{ErrorCode} )
             : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'ErrorCode' );
-        $template           .= q{
-            s>      # 2 ErrorCode
-            s>      # 2 string length
-        };
-        $response_length    += 4;
-        _encode_string( $TopicMetadata->{TopicName}, \$response_length, \@data, \$template, 'TopicName' )   # TopicName
-            or return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'TopicName ('.last_error().')' );
+        $response->{template} .= q{s>s>};
+                    # 2 ErrorCode
+                    # 2 string length
+        $response->{len} += 4;
+        _encode_string( $response, $TopicMetadata->{TopicName} );           # TopicName
 
         my $PartitionMetadata_array = $TopicMetadata->{PartitionMetadata} // [];
         _ARRAY0( $PartitionMetadata_array )
             ? push( @data, scalar( @$PartitionMetadata_array ) )
             : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'PartitionMetadata' );
-        $template           .= q{l>};                                       # PartitionMetadata array size
-        $response_length    += 4;
+        $response->{template}   .= q{l>};                                   # PartitionMetadata array size
+        $response->{len}        += 4;
 
         foreach my $PartitionMetadata ( @$PartitionMetadata_array ) {
             ( defined( $PartitionMetadata->{ErrorCode} ) && isint( $PartitionMetadata->{ErrorCode} ) )  # ErrorCode
@@ -648,112 +642,113 @@ sub encode_metadata_response {
             _ARRAY0( $Replicas_array )                                      # Replicas array size
                 ? push( @data, scalar( @$Replicas_array ) )
                 : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'Replicas' );
-            $template           .= $_MetadataResponse_PartitionMetadata_body_template;
-            $response_length    += $_MetadataResponse_PartitionMetadata_body_length;
+            $response->{template}   .= $_MetadataResponse_PartitionMetadata_body_template;
+            $response->{len}        += $_MetadataResponse_PartitionMetadata_body_length;
 
             foreach my $Replica ( @$Replicas_array ) {
                 ( defined( $Replica ) && isint( $Replica ) )                 # ReplicaId
                     ? push( @data, $Replica )
                     : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'Replicas ReplicaId' );
-                $template           .= q{l>};
-                $response_length    += 4;
+                $response->{template}   .= q{l>};
+                $response->{len}        += 4;
             }
 
             my $Isr_array = $PartitionMetadata->{Isr} // [];
             _ARRAY0( $Isr_array )                                           # Isr array size
                 ? push( @data, scalar( @$Isr_array ) )
                 : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'Isr' );
-            $template           .= q{l>};
-            $response_length    += 4;
+            $response->{template}   .= q{l>};
+            $response->{len}        += 4;
 
             foreach my $Isr ( @$Isr_array ) {
                 ( defined( $Isr ) && isint( $Isr ) )                        # ReplicaId
                     ? push( @data, $Isr )
                     : return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'Isr ReplicaId' );
-                $template           .= q{l>};
-                $response_length    += 4;
+                $response->{template}   .= q{l>};
+                $response->{len}        += 4;
             }
         }
     }
 
-    return pack( $template, $response_length, @data );
+    return pack( $response->{template}, $response->{len}, @data );
 }
 
 #-- private functions ----------------------------------------------------------
 
 sub _decode_produce_request_template {
-    my ( $hex_stream_ref ) = @_;
+    my ( $request ) = @_;
 
     my (
-        $template,
-        $stream_offset,
         $ClientId_length,
         $topics_array_size,
         $TopicName_length,
         $partitions_array_size,
     );
 
-    $template = $_ProduceRequest_header_template;
-    $stream_offset = $_ProduceRequest_header_length;    # bytes before ClientId length
+    $request->{template}        = $_ProduceRequest_header_template;
+    $request->{stream_offset}   = $_ProduceRequest_header_length;   # bytes before ClientId length
                                                                                 # [l] Size
                                                                                 # [s] ApiKey
                                                                                 # [s] ApiVersion
                                                                                 # [l] CorrelationId
 
-    $ClientId_length = unpack( qq{
-        x$stream_offset
-        s>                              # ClientId length
-        }, $$hex_stream_ref
+    $ClientId_length = unpack(
+         q{x[}.$request->{stream_offset}
+        .q{]s>},                        # ClientId length
+        ${ $request->{hex_stream} }
     );
 
-    $stream_offset += 8                 # bytes before RequiredAcks
+    $request->{stream_offset} += 8      # bytes before RequiredAcks
                                                                                 # [s] ClientId length
         + $ClientId_length                                                      # ClientId
                                         # bytes before topics array size
                                                                                 # [s] RequiredAcks
                                                                                 # [l] Timeout
         ;
-    $topics_array_size = unpack( qq{
-        x$stream_offset
-        l>                              # topics array size
-        }, $$hex_stream_ref
+    $topics_array_size = unpack(
+         q{x[}.$request->{stream_offset}
+        .q{]l>},                        # topics array size
+        ${ $request->{hex_stream} }
     );
 
-    $stream_offset += 4;                # bytes before TopicName length
+    $request->{stream_offset} += 4;     # bytes before TopicName length
                                                                                 # [l] topics array size
 
     while ( $topics_array_size-- ) {
-
-        $template .= $_ProduceRequest_topic_body_template;
+        $request->{template} .= $_ProduceRequest_topic_body_template;
                                         # TopicName
                                         # partitions array size
                                         # Partition
 
-        $TopicName_length = unpack( qq{
-            x$stream_offset
-            s>                          # TopicName length
-            }, $$hex_stream_ref
+        $TopicName_length = unpack(
+             q{x[}.$request->{stream_offset}
+            .q{]s>},                    # TopicName length
+            ${ $request->{hex_stream} }
         );
-        $stream_offset +=               # bytes before partitions array size
+        $request->{stream_offset} +=    # bytes before partitions array size
               2                                                                 # [s] TopicName length
             + $TopicName_length                                                 # TopicName
             ;
 
-        $partitions_array_size = unpack( qq{
-            x$stream_offset
-            l>                          # partitions array size
-            }, $$hex_stream_ref
+        $partitions_array_size = unpack(
+             q{x[}.$request->{stream_offset}
+            .q{]l>},                    # partitions array size
+            ${ $request->{hex_stream} }
         );
 
-        $stream_offset += 8;            # bytes before Partition
+        $request->{stream_offset} += 8; # bytes before Partition
                                                                                 # [l] partitions array size
                                         # bytes before MessageSetSize
                                                                                 # [l] Partition
 
-        _decode_MessageSet_template( $hex_stream_ref, $stream_offset, \$template );
+        _decode_MessageSet_template( $request );
     }
+}
 
-    return $template;
+sub _is_hex_stream_correct {
+    my ( $hex_stream_ref ) = @_;
+
+    return _SCALAR( $hex_stream_ref ) && _STRING( $$hex_stream_ref );
 }
 
 1;

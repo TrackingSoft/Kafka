@@ -50,6 +50,7 @@ use Kafka qw(
     $DEFAULT_MAX_NUMBER_OF_OFFSETS
     $ERROR_CANNOT_BIND
     $KAFKA_SERVER_PORT
+    $MESSAGE_SIZE_OVERHEAD
     $REQUEST_TIMEOUT
     $NOT_SEND_ANY_RESPONSE
     $WAIT_WRITTEN_TO_LOCAL_LOG
@@ -151,7 +152,7 @@ sub next_offset {
         ok( _ARRAY0( $offsets ), 'offsets are obtained' ) if $is_package;
         return $offsets->[0];
     }
-    if ( !$offsets or $consumer->last_error ) {
+    if ( !$offsets || $consumer->last_error ) {
         fail '('.$consumer->last_errorcode.') '.$consumer->last_error;
         return;
     }
@@ -188,16 +189,16 @@ sub fetch_messages {
         foreach my $m ( @$messages ) {
             push @fetch, $m->payload;
             unless ( $m->valid ) {
-                diag "Message No $cnt, Error: ", $m->error;
-                diag 'Payload    : ', length( $m->payload ) > 100 ? substr( $m->payload, 0, 100 ).'...' : $m->payload;
-                diag 'offset     : ', $m->offset;
-                diag 'next_offset: ', $m->next_offset;
+                note "Message No $cnt, Error: ", $m->error;
+                note 'Payload    : ', length( $m->payload ) > 100 ? substr( $m->payload, 0, 100 ).'...' : $m->payload;
+                note 'offset     : ', $m->offset;
+                note 'next_offset: ', $m->next_offset;
             }
             ++$cnt;
         }
         return ( \@fetch, $time_after - $time_before );
     }
-    if ( !$messages or $consumer->last_error ) {
+    if ( !$messages || $consumer->last_error ) {
         fail '('.$consumer->last_errorcode.') '.$consumer->last_error;
         return;
     }
@@ -220,10 +221,10 @@ sub random_strings {
 }
 
 sub report {
-#    diag 'Legend:';
-    diag "Message length: $min_len .. $max_len";
-    diag "Messages      : package - $number_of_package, single - $number_of_single";
-    diag "IO timeout    : $timeout";
+#    note 'Legend:';
+    note "Message length: $min_len .. $max_len";
+    note "Messages      : package - $number_of_package, single - $number_of_single";
+    note "IO timeout    : $timeout";
 
     my @indicators = qw(
         send_package
@@ -235,9 +236,9 @@ sub report {
         fetch_inseries
     );
 
-    diag 'Total:';
+    note 'Total:';
     foreach my $k ( @indicators ) {
-        diag sprintf( '%-14s ', $k ), sprintf( '%.4f', $bench{ $k } );
+        note sprintf( '%-14s ', $k ), sprintf( '%.4f', $bench{ $k } );
     }
 
     foreach my $result ( (
@@ -267,14 +268,14 @@ sub report {
         $result /= $number_of_single;
     }
 
-    diag 'Seconds per message:';
+    note 'Seconds per message:';
     foreach my $k ( @indicators ) {
-        diag sprintf( '%-14s ', $k ), sprintf( '%.4f', $bench{ $k } );
+        note sprintf( '%-14s ', $k ), sprintf( '%.4f', $bench{ $k } );
     }
 
-    diag 'Messages per second:';
+    note 'Messages per second:';
     foreach my $k ( @indicators ) {
-        diag sprintf( '%-14s ', $k ), $bench{ $k } ? sprintf( '%4d', int( 1 / $bench{ $k } ) ) : 'N/A';
+        note sprintf( '%-14s ', $k ), $bench{ $k } ? sprintf( '%4d', int( 1 / $bench{ $k } ) ) : 'N/A';
     }
 }
 
@@ -297,7 +298,7 @@ $first_offset = next_offset( $consumer, $TOPIC, $PARTITION, 1 );
 while (1) {
     sleep 1;
     if ( $first_offset != next_offset( $consumer, $TOPIC, $PARTITION, 1 ) ) {
-        diag 'to wait for forcing a flush of previous data to disk';
+        note 'to wait for forcing a flush of previous data to disk';
         $first_offset = next_offset( $consumer, $TOPIC, $PARTITION, 1 );
     }
     else {
@@ -416,11 +417,7 @@ while (1) {
             $TOPIC,
             $PARTITION,
             $first_offset + $delta,
-# Consider only the size of the data.
-# WARNING: Here, 26 is required for the service information for the message without the Key
-#   Look at the structure of 'Message sets'
-#   https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-Messagesets
-            length( $$messages[ $idx ] ) + 26,
+            length( $$messages[ $idx ] ) + $MESSAGE_SIZE_OVERHEAD,
             );
         ++$delta;
 

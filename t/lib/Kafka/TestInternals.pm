@@ -1,5 +1,7 @@
 package Kafka::TestInternals;
 
+#TODO: title - the name, purpose, and a warning that this one is for internal use only
+
 #-- Pragmas --------------------------------------------------------------------
 
 use 5.010;
@@ -13,6 +15,7 @@ use Exporter qw(
 );
 
 our @EXPORT_OK = qw(
+    _is_suitable_int
     @not_array
     @not_array0
     @not_empty_string
@@ -30,11 +33,15 @@ our @EXPORT_OK = qw(
     $topic
 );
 
-our $VERSION = '0.8001';
+our $VERSION = '0.800_1';
 
 #-- load the modules -----------------------------------------------------------
 
 use Const::Fast;
+use Scalar::Util::Numeric qw(
+    isbig
+    isint
+);
 
 use Kafka::Cluster;
 use Kafka::Internals qw(
@@ -289,6 +296,13 @@ our @not_hash = (
 );
 
 #-- public functions -----------------------------------------------------------
+
+sub _is_suitable_int {
+    my ( $n ) = @_;
+
+    $n // return;
+    return isint( $n ) || isbig( $n );
+}
 
 #-- private functions ----------------------------------------------------------
 

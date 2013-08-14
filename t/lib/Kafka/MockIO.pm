@@ -1,5 +1,7 @@
 package Kafka::MockIO;
 
+#TODO: title - the name, purpose, and a warning that this one is for internal use only
+
 # Kafka::IO imitation
 
 #-- Pragmas --------------------------------------------------------------------
@@ -10,7 +12,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.8001';
+our $VERSION = '0.800_1';
 
 #-- load the modules -----------------------------------------------------------
 
@@ -303,11 +305,11 @@ sub send {
 
     my $description = 'Kafka::IO->send';
     defined( _STRING( $message ) )
-        or return Kafka::IO::_error( $self, $ERROR_MISMATCH_ARGUMENT, $description );
+        || return Kafka::IO::_error( $self, $ERROR_MISMATCH_ARGUMENT, $description );
     !utf8::is_utf8( $message )
-        or return Kafka::IO::_error( $self, $ERROR_NOT_BINARY_STRING, $description );
+        || return Kafka::IO::_error( $self, $ERROR_NOT_BINARY_STRING, $description );
     ( my $len = length( $message .= q{} ) ) <= $MAX_SOCKET_REQUEST_BYTES
-        or return Kafka::IO::_error( $self, $ERROR_MISMATCH_ARGUMENT, $description );
+        || return Kafka::IO::_error( $self, $ERROR_MISMATCH_ARGUMENT, $description );
 
     $self->_error( $ERROR_NO_ERROR )
         if $self->last_error;

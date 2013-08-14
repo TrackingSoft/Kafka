@@ -76,6 +76,7 @@ else {
         use bigint;
 
 #-- intsum
+
         foreach my $pair (
                 [ 0,        $n0,        0 ],
                 [ 0,        $n4,        4 ],
@@ -97,16 +98,18 @@ else {
             isa_ok( $ret, 'Math::BigInt' );
         }
 
-        foreach my $pair (
-                [ undef,    $n4 ],
-                [ 2,        undef ],
-                [ 2,        $n45 ],
-                [ 'string', $n4 ],
-                [ 2,        'string' ],
-            ) {
-            eval { Kafka::Int64::intsum( $pair->[0], $pair->[1] ) };
-            like( $@, $qr, 'expecting to die: Invalid argument' );
-        }
+# NOTE: We presume that the verification of the correctness of the arguments made by the user.
+
+        #foreach my $pair (
+        #        [ undef,    $n4 ],
+        #        [ 2,        undef ],
+        #        [ 2,        $n45 ],
+        #        [ 'string', $n4 ],
+        #        [ 2,        'string' ],
+        #    ) {
+        #    eval { Kafka::Int64::intsum( $pair->[0], $pair->[1] ) };
+        #    like( $@, $qr, 'expecting to die: Invalid argument' );
+        #}
 
 #-- packq
         foreach my $num (
@@ -123,18 +126,21 @@ else {
             is( length( Kafka::Int64::packq( $num ) ), 8, 'binary string of length 64 bits ('.( ref( $num ) eq 'Math::BigInt' ? q{} : 'non ' )."bigint '$num)" );
         }
 
-        foreach my $arg (
-                $n45,
-                undef,
-                $n_neg3,
-                -3,
-                'string',
-            ) {
-            eval { Kafka::Int64::packq( $arg ) };
-            like( $@, $qr, 'expecting to die: Invalid argument' );
-        }
+# NOTE: We presume that the verification of the correctness of the arguments made by the user.
+
+        #foreach my $arg (
+        #        $n45,
+        #        undef,
+        #        $n_neg3,
+        #        -3,
+        #        'string',
+        #    ) {
+        #    eval { Kafka::Int64::packq( $arg ) };
+        #    like( $@, $qr, 'expecting to die: Invalid argument' );
+        #}
 
 #-- unpackq
+
         foreach my $pair (
                 [ chr(0)    x 8, 0 ],
                 [ chr(0xff) x 8, 18446744073709551615 ],
@@ -146,21 +152,23 @@ else {
             isa_ok( $ret, "Math::BigInt" );
         }
 
-        foreach my $arg (
-                undef,
-                $n0,
-                $n4,
-                q{},
-                '4',
-                'abcd',
-                4,
-                4.5,
-                0,
-                -2,
-            ) {
-            eval { Kafka::Int64::unpackq( $arg ) };
-            like( $@, $qr, 'expecting to die: Invalid argument' );
-        }
+# NOTE: We presume that the verification of the correctness of the arguments made by the user.
+
+        #foreach my $arg (
+        #        undef,
+        #        $n0,
+        #        $n4,
+        #        q{},
+        #        '4',
+        #        'abcd',
+        #        4,
+        #        4.5,
+        #        0,
+        #        -2,
+        #    ) {
+        #    eval { Kafka::Int64::unpackq( $arg ) };
+        #    like( $@, $qr, 'expecting to die: Invalid argument' );
+        #}
     }
 }
 

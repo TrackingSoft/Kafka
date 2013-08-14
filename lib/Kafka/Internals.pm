@@ -19,10 +19,8 @@ our @EXPORT_OK = qw(
     $APIKEY_METADATA
     $DEFAULT_RAISE_ERROR
     $MAX_SOCKET_REQUEST_BYTES
-    $MIN_MAXBYTES
     $PRODUCER_ANY_OFFSET
     _get_CorrelationId
-    _is_suitable_int
     last_error
     last_errorcode
     RaiseError
@@ -32,7 +30,7 @@ our @EXPORT_OK = qw(
     _set_error
 );
 
-our $VERSION = '0.8001';
+our $VERSION = '0.800_1';
 
 #-- load the modules -----------------------------------------------------------
 
@@ -40,10 +38,6 @@ use Carp;
 use Const::Fast;
 use Scalar::Util qw(
     dualvar
-);
-use Scalar::Util::Numeric qw(
-    isbig
-    isint
 );
 
 use Kafka qw(
@@ -67,31 +61,14 @@ const our $APIKEY_OFFSETCOMMIT                  => 6;   # Not used now
 const our $APIKEY_OFFSETFETCH                   => 7;   # Not used now
 
 # Important configuration properties
-const our $MIN_MAXBYTES                         =>                      # minimum allowable value 'MaxBytes':
-                                                     8                  # [q]   Offset
-                                                   + 4                  # [l]   MessageSize
-                                                   + 4                  # [l]   Crc
-                                                   + 1                  # [c]   MagicByte
-                                                   + 1                  # [c]   Attributes
-                                                   + 4                  # [l]   Key (a length -1 = null bytes)
-                                                   + 4                  # [l]   Value (a length -1 = null bytes)
-                                                   ;
 const our $MAX_SOCKET_REQUEST_BYTES             => 100 * 1024 * 1024;   # The maximum number of bytes in a socket request
-
 const our $PRODUCER_ANY_OFFSET                  => 0;                   # RTFM: When the producer is sending messages it doesn't actually know the offset and can fill in any value here it likes.
 
-const my $MAX_CORRELATIONID                     => 2**31 - 1;           # Largest positive integer on 32-bit machines
+const my  $MAX_CORRELATIONID                    => 2**31 - 1;           # Largest positive integer on 32-bit machines
 
 #-- public functions -----------------------------------------------------------
 
 #-- private functions ----------------------------------------------------------
-
-sub _is_suitable_int {
-    my ( $n ) = @_;
-
-    $n // return;
-    return isint( $n ) || isbig( $n );
-}
 
 sub _get_CorrelationId {
     return int( rand( $MAX_CORRELATIONID ) );
@@ -182,3 +159,102 @@ sub _set_error {
 1;
 
 __END__
+
+=head1 NAME
+
+Kafka::Internals - blah-blah-blah
+
+=head1 VERSION
+
+This documentation refers to C<Kafka::Internals> version 0.800_1
+
+=head1 SYNOPSIS
+
+    use 5.010;
+    use strict;
+
+    use Kafka::Internals;
+
+    my $hex_stream_size = $Kafka::Internals::MAX_SOCKET_REQUEST_BYTES;
+
+=head1 DESCRIPTION
+
+blah-blah-blah
+
+=head2 EXPORT
+
+blah-blah-blah
+
+=head2 GLOBAL VARIABLES
+
+=over
+
+=item C<@Kafka::ERROR>
+
+Contain the descriptions for possible error codes returned by
+C<last_errorcode> methods and functions of the package modules.
+
+=item C<%Kafka::ERROR_CODE>
+
+blah-blah-blah
+
+=back
+
+=head1 DEPENDENCIES
+
+blah-blah-blah
+
+=head2 FUNCTIONS
+
+blah-blah-blah
+
+=head3 C<last_errorcode>
+
+blah-blah-blah
+
+=head3 C<last_error>
+
+blah-blah-blah
+
+=head3 C<RaiseError>
+
+blah-blah-blah
+
+=head1 BUGS AND LIMITATIONS
+
+blah-blah-blah
+
+=head1 MORE DOCUMENTATION
+
+All modules contain detailed information on the interfaces they provide.
+
+=head1 SEE ALSO
+
+blah-blah-blah
+
+=head1 AUTHOR
+
+Sergey Gladkov, E<lt>sgladkov@trackingsoft.comE<gt>
+
+=head1 CONTRIBUTORS
+
+Alexander Solovey
+
+Jeremy Jordan
+
+Vlad Marchenko
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright (C) 2012-2013 by TrackingSoft LLC.
+
+This package is free software; you can redistribute it and/or modify it under
+the same terms as Perl itself. See I<perlartistic> at
+L<http://dev.perl.org/licenses/artistic.html>.
+
+This program is
+distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE.
+
+=cut

@@ -32,4 +32,4 @@ requires:
   Scalar::Util::Numeric: 0.22
   String::CRC32: 1.4
   Sys::SigAction: 0.15
-version: 0.12
+version: 0.800_1

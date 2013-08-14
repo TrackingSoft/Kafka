@@ -1,0 +1,23 @@
+# PerlCritic Profile
+
+[CodeLayout::ProhibitQuotedWordLists]
+severity = 5
+min_elements = 5
+strict = 1
+
+[CodeLayout::ProhibitHardTabs]
+severity = 5
+allow_leading_tabs = 0
+
+[CodeLayout::ProhibitTrailingWhitespace]
+severity = 5
+
+[ValuesAndExpressions::ProhibitMixedBooleanOperators]
+severity = 5
+
+[ValuesAndExpressions::ProhibitMismatchedOperators]
+severity = 5
+
+[Documentation::RequirePackageMatchesPodName]
+severity = 5
+

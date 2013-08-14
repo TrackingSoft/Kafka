@@ -1,5 +1,7 @@
 package Kafka::Cluster;
 
+#TODO: title - the name, purpose, and a warning that this one is for internal use only
+
 # Both Path::Class::Dir and Path::Class::File offer further useful behaviors.
 
 #-- Pragmas --------------------------------------------------------------------
@@ -10,7 +12,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.8001';
+our $VERSION = '0.800_1';
 
 =for If you want to set up a Zookeeper cluster on multiple servers
 
@@ -85,6 +87,8 @@ const my    $START_ZOOKEEPER_ARG            => 'org.apache.zookeeper.server.quor
 # File mask specific to version 0.8
 const my    $KAFKA_0_8_REF_FILE_MASK        => catfile( 'bin', 'kafka-create-topic.sh' );
 
+my $start_dir;
+
 #-- constructor ----------------------------------------------------------------
 
 # protection against re-create the cluster object
@@ -97,7 +101,7 @@ sub new {
 
     # protection against re-create the cluster object
     !$_used
-        or confess "The object of class '$class' already exists";
+        || confess "The object of class '$class' already exists";
 
     # The argument is needed because multiple versions can be installed simultaneously
     defined( _STRING( $args{kafka_dir} ) )      # must match the settings of your system
@@ -106,6 +110,8 @@ sub new {
     my $kafka_cluster_factor = $args{cluster_factor} //= $DEFAULT_CLUSTER_FACTOR;
     _POSINT( $kafka_cluster_factor )
         // confess( "The value of 'cluster_factor' should be a positive integer" );
+
+    $start_dir = $args{t_dir} // $Bin;
 
     my $self = {
         kafka   => {},                          # {
@@ -130,17 +136,15 @@ sub new {
     my ( $does_not_start, $kafka_base_dir, $kafka_bin_dir, $kafka_config_dir, $kafka_data_dir );
     $does_not_start         = $self->{kafka}->{does_not_start}  = $args{does_not_start};
     $kafka_base_dir         = $self->{kafka}->{base_dir}        = $args{kafka_dir};
-    $kafka_bin_dir          = $self->{kafka}->{bin_dir}         = catdir( $Bin, 'bin' );
-    $kafka_config_dir       = $self->{kafka}->{config_dir}      = catdir( $Bin, 'config' );
+    $kafka_bin_dir          = $self->{kafka}->{bin_dir}         = catdir( $start_dir, 'bin' );
+    $kafka_config_dir       = $self->{kafka}->{config_dir}      = catdir( $start_dir, 'config' );
     my $run_in_base_dir     = $self->is_run_in_base_dir;
     if ( $run_in_base_dir ) {
         $kafka_data_dir     = $self->{kafka}->{data_dir}        = '/tmp';
     }
     else {
-        $kafka_data_dir     = $self->{kafka}->{data_dir}        = catdir( $Bin, 'data' );
+        $kafka_data_dir     = $self->{kafka}->{data_dir}        = catdir( $start_dir, 'data' );
     }
-    mkdir $kafka_data_dir or confess "Cannot create directory '$kafka_data_dir': $!"
-        unless -d $kafka_data_dir;
 
     # verification environment
     confess( "File does not exist (kafka version is not 0.8 ?): $KAFKA_0_8_REF_FILE_MASK" )
@@ -216,16 +220,11 @@ sub new {
     else {
         my $port    = $START_PORT;
         my $node_id = 0;
-        foreach my $server_num ( 1..$kafka_cluster_factor ) {
+        for ( 1..$kafka_cluster_factor ) {
             $port = empty_port( $port - 1 );
-            # server in the cluster identify by its port
-            my $server = $self->{cluster}->{ $port } = {};
+            my $server = $self->{cluster}->{ $port } = {};  # server in the cluster identify by its port
+            $server->{node_id} = $node_id;
 
-            my $log_dir         = $self->log_dir( $port );
-            my $metrics_dir     = $self->_metrics_dir( $port );
-            $server->{node_id}  = $node_id;
-        }
-        continue {
             ++$port;
             ++$node_id;
         }
@@ -276,7 +275,7 @@ sub zookeeper_port {
 #-- public methods -------------------------------------------------------------
 
 sub init {
-    my ( $self, $port ) = @_;
+    my ( $self ) = @_;
 
     $self->_verify_run_dir;
 
@@ -421,7 +420,7 @@ sub request {
 sub is_run_in_base_dir {
     my ( $self ) = @_;
 
-    return $self->base_dir eq $Bin;;
+    return $self->base_dir eq $start_dir;
 }
 
 sub close {

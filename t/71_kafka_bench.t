@@ -55,6 +55,7 @@ use Kafka qw(
     $DEFAULT_MAX_BYTES
     $DEFAULT_MAX_NUMBER_OF_OFFSETS
     $ERROR_CANNOT_BIND
+    $MESSAGE_SIZE_OVERHEAD
     $REQUEST_TIMEOUT
     $NOT_SEND_ANY_RESPONSE
     $WAIT_WRITTEN_TO_LOCAL_LOG
@@ -159,7 +160,7 @@ sub next_offset {
         ok( _ARRAY0( $offsets ), 'offsets are obtained' ) if $is_package;
         return $offsets->[0];
     }
-    if ( !$offsets or $consumer->last_error ) {
+    if ( !$offsets || $consumer->last_error ) {
         fail '('.$consumer->last_errorcode.') '.$consumer->last_error;
         return;
     }
@@ -205,7 +206,7 @@ sub fetch_messages {
         }
         return ( \@fetch, $time_after - $time_before );
     }
-    if ( !$messages or $consumer->last_error ) {
+    if ( !$messages || $consumer->last_error ) {
         fail '('.$consumer->last_errorcode.') '.$consumer->last_error;
         return;
     }
@@ -440,12 +441,8 @@ while (1) {
             $topic,
             $partition,
             $first_offset + $delta,
-# Consider only the size of the data.
-# WARNING: Here, 26 is required for the service information for the message without the Key
-#   Look at the structure of 'Message sets'
-#   https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-Messagesets
-            length( $$messages[ $idx ] ) + 26,
-            );
+            length( $$messages[ $idx ] ) + $MESSAGE_SIZE_OVERHEAD,
+        );
         ++$delta;
 
         push @$fetch, $$fetched[0];

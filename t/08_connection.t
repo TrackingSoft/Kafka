@@ -197,54 +197,61 @@ sub testing {
 
 #-- receive_response_to_request
 
-    foreach my $RaiseError ( 0, 1 ) {
-# right example:
-#{
-#    ApiKey  => 0,
-#    topics  => [
-#        {
-#            TopicName   => 'mytopic',
-#            partitions  => [
-#                {
-#                    Partition   => 0,
-#                },
-#            ],
-#        },
-#    ],
-#},
-        foreach my $bad_request (
-                @not_hash,
-                { foo       => 'bar' }, # no ApiKey
-                { ApiKey    => 999 },   # bad ApiKey
-                @not_topics_array,
-            ) {
-            $connect = Kafka::Connection->new(
-                host        => 'localhost',
-                port        => $port,
-                RaiseError  => $RaiseError,
-            );
+# NOTE: We presume that the verification of the correctness of the arguments made by the user.
 
-            $response = $@ = undef;
-#-- last_errorcode, last_error
-            ok !$connect->last_errorcode(), 'no error';
-#use Data::Dumper;
-#say Data::Dumper->Dump( [ $bad_request ], [ 'bad_request' ] );
-            $response = eval { $connect->receive_response_to_request( $bad_request ); };
-            ok !defined( $response ), 'no response';
-            if ( !$RaiseError && _HASH( $bad_request ) && exists( $bad_request->{ApiKey} ) ) {
-                ok !$@, "\$@ not changed";
-            }
-            else {
-                ok $@, "\$@ changed";
-            }
-            ok defined( $connect ), 'connection object is alive';
-#-- last_errorcode, last_error
-            ok $connect->last_errorcode(), 'an error is detected';
-            ok $connect->last_error(), 'expected error';
-        }
-    }
+#    foreach my $RaiseError ( 0, 1 ) {
+## right example:
+##{
+##    ApiKey  => 0,
+##    topics  => [
+##        {
+##            TopicName   => 'mytopic',
+##            partitions  => [
+##                {
+##                    Partition   => 0,
+##                },
+##            ],
+##        },
+##    ],
+##},
+#        foreach my $bad_request (
+#                @not_hash,
+#                { foo       => 'bar' }, # no ApiKey
+#                { ApiKey    => 999 },   # bad ApiKey
+#                @not_topics_array,
+#            ) {
+#            $connect = Kafka::Connection->new(
+#                host        => 'localhost',
+#                port        => $port,
+#                RaiseError  => $RaiseError,
+#            );
+#
+#            $response = $@ = undef;
+##-- last_errorcode, last_error
+#            ok !$connect->last_errorcode(), 'no error';
+##use Data::Dumper;
+##say Data::Dumper->Dump( [ $bad_request ], [ 'bad_request' ] );
+#            $response = eval { $connect->receive_response_to_request( $bad_request ); };
+#            ok !defined( $response ), 'no response';
+#            if ( !$RaiseError && _HASH( $bad_request ) && exists( $bad_request->{ApiKey} ) ) {
+#                ok !$@, "\$@ not changed";
+#            }
+#            else {
+#                ok $@, "\$@ changed";
+#            }
+#            ok defined( $connect ), 'connection object is alive';
+##-- last_errorcode, last_error
+#            ok $connect->last_errorcode(), 'an error is detected';
+#            ok $connect->last_error(), 'expected error';
+#        }
+#    }
 
 #-- ProduceRequest
+
+    $connect = Kafka::Connection->new(
+        host    => 'localhost',
+        port    => $port,
+    );
 
 # Here and below, the query explicitly indicate ApiKey - producer and consumer must act also
 

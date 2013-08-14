@@ -116,60 +116,62 @@ ok !$io->is_alive, 'socket not alive';
 
 #-- last_errorcode, last_error
 
-undef $io;
-$io = Kafka::IO->new(
-    host    => 'incorrect host',
-    port    => 'incorrect port',
-    timeout => 'incorrect timeout',
-);
-ok $io->last_errorcode, 'errorcode present: '.$io->last_errorcode;
-ok $io->last_error, 'error present: '.$io->last_error;
+# NOTE: We presume that the verification of the correctness of the arguments made by the user.
 
-#-- new
-
-# host
-
-$@ = $test_message;
-
-foreach my $bad_host ( @not_string ) {
-    undef $io;
-    $io = Kafka::IO->new(
-        host    => $bad_host,
-        port    => $port,
-        timeout => $REQUEST_TIMEOUT,
-    );
-    is $@, $test_message, '$@ not changed';
-    isa_ok( $io, 'Kafka::IO');
-    ok $io->last_errorcode, 'Invalid host: '.$io->last_error;
-}
-
-# port
-
-foreach my $bad_port ( @not_posint ) {
-    undef $io;
-    $io = Kafka::IO->new(
-        host    => 'localhost',
-        port    => $bad_port,
-        timeout => $REQUEST_TIMEOUT,
-    );
-    is $@, $test_message, '$@ not changed';
-    isa_ok( $io, 'Kafka::IO');
-    ok $io->last_errorcode, 'Invalid port: '.$io->last_error;
-}
-
-# port
-
-foreach my $bad_timeout ( @not_posnumber ) {
-    undef $io;
-    $io = Kafka::IO->new(
-        host        => 'localhost',
-        port        => $port,
-        timeout     => $bad_timeout,
-    );
-    is $@, $test_message, '$@ not changed';
-    isa_ok( $io, 'Kafka::IO');
-    ok $io->last_errorcode, 'Invalid timeout: '.$io->last_error;
-}
+#undef $io;
+#$io = Kafka::IO->new(
+#    host    => 'incorrect host',
+#    port    => 'incorrect port',
+#    timeout => 'incorrect timeout',
+#);
+#ok $io->last_errorcode, 'errorcode present: '.$io->last_errorcode;
+#ok $io->last_error, 'error present: '.$io->last_error;
+#
+##-- new
+#
+## host
+#
+#$@ = $test_message;
+#
+#foreach my $bad_host ( @not_string ) {
+#    undef $io;
+#    $io = Kafka::IO->new(
+#        host    => $bad_host,
+#        port    => $port,
+#        timeout => $REQUEST_TIMEOUT,
+#    );
+#    is $@, $test_message, '$@ not changed';
+#    isa_ok( $io, 'Kafka::IO');
+#    ok $io->last_errorcode, 'Invalid host: '.$io->last_error;
+#}
+#
+## port
+#
+#foreach my $bad_port ( @not_posint ) {
+#    undef $io;
+#    $io = Kafka::IO->new(
+#        host    => 'localhost',
+#        port    => $bad_port,
+#        timeout => $REQUEST_TIMEOUT,
+#    );
+#    is $@, $test_message, '$@ not changed';
+#    isa_ok( $io, 'Kafka::IO');
+#    ok $io->last_errorcode, 'Invalid port: '.$io->last_error;
+#}
+#
+## timeout
+#
+#foreach my $bad_timeout ( @not_posnumber ) {
+#    undef $io;
+#    $io = Kafka::IO->new(
+#        host        => 'localhost',
+#        port        => $port,
+#        timeout     => $bad_timeout,
+#    );
+#    is $@, $test_message, '$@ not changed';
+#    isa_ok( $io, 'Kafka::IO');
+#    ok $io->last_errorcode, 'Invalid timeout: '.$io->last_error;
+#}
 
 #-- send
 
@@ -186,30 +188,32 @@ ok !$io->last_errorcode, 'No errorcode';
 
 is( ${ $io->receive( length( $test_message ) ) }, $test_message, 'receive OK' );
 
-#-- send
+# NOTE: We presume that the verification of the correctness of the arguments made by the user.
 
-foreach my $bad_message ( @not_string ) {
-    $io = Kafka::IO->new(
-        host    => 'localhost',
-        port    => $port,
-        timeout => $REQUEST_TIMEOUT,
-    );
-    ok $io->is_alive, 'socket alive';
-
-    $io->send( $bad_message );
-    is $@, $test_message, '$@ not changed';
-    ok $io->last_errorcode, 'send error: '.$io->last_error;
-}
-
-#-- receive
-
-ok $io->is_alive, 'socket alive';
-
-foreach my $bad_len ( @not_posint ) {
-    $io->receive( $bad_len );
-    is $@, $test_message, '$@ not changed';
-    ok $io->last_errorcode, 'receive error: '.$io->last_error;
-}
+##-- send
+#
+#foreach my $bad_message ( @not_string ) {
+#    $io = Kafka::IO->new(
+#        host    => 'localhost',
+#        port    => $port,
+#        timeout => $REQUEST_TIMEOUT,
+#    );
+#    ok $io->is_alive, 'socket alive';
+#
+#    $io->send( $bad_message );
+#    is $@, $test_message, '$@ not changed';
+#    ok $io->last_errorcode, 'send error: '.$io->last_error;
+#}
+#
+##-- receive
+#
+#ok $io->is_alive, 'socket alive';
+#
+#foreach my $bad_len ( @not_posint ) {
+#    $io->receive( $bad_len );
+#    is $@, $test_message, '$@ not changed';
+#    ok $io->last_errorcode, 'receive error: '.$io->last_error;
+#}
 
 $@ = undef;
 

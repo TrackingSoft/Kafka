@@ -36,6 +36,7 @@ plan 'no_plan';
 our (
     $constants_Kafka,               $functions_Kafka,
     $constants_Kafka_Internals,     $functions_Kafka_Internals,
+    $constants_Kafka_TestInternals, $functions_Kafka_TestInternals,
     $constants_Kafka_Int64,         $functions_Kafka_Int64,
     $constants_Kafka_Protocol,      $functions_Kafka_Protocol,
     $constants_Kafka_MockProtocol,  $functions_Kafka_MockProtocol,
@@ -50,20 +51,22 @@ our (
 );
 
 my %ordinary = (
-    'Kafka'                 => [ $constants_Kafka,              $functions_Kafka ],
-    'Kafka::Int64'          => [ $constants_Kafka_Int64,        $functions_Kafka_Int64 ],
-    'Kafka::Protocol'       => [ $constants_Kafka_Protocol,     $functions_Kafka_Protocol ],
-    'Kafka::MockProtokol'   => [ $constants_Kafka_MockProtocol, $functions_Kafka_MockProtocol ],
+    'Kafka'                 => [ $constants_Kafka,                  $functions_Kafka ],
+    'Kafka::Internals'      => [ $constants_Kafka_Internals,        $functions_Kafka_Internals ],
+    'Kafka::TestInternals'  => [ $constants_Kafka_TestInternals,    $functions_Kafka_TestInternals ],
+    'Kafka::Int64'          => [ $constants_Kafka_Int64,            $functions_Kafka_Int64 ],
+    'Kafka::Protocol'       => [ $constants_Kafka_Protocol,         $functions_Kafka_Protocol ],
+    'Kafka::MockProtokol'   => [ $constants_Kafka_MockProtocol,     $functions_Kafka_MockProtocol ],
 );
 
 my %OO = (
-    'Kafka::IO'             => [ $ours_Kafka_IO,                $methods_Kafka_IO ],
-    'Kafka::MockIO'         => [ $ours_Kafka_MockIO,            $methods_Kafka_MockIO ],
-    'Kafka::Connection'     => [ $ours_Kafka_Connection,        $methods_Kafka_Connection ],
-    'Kafka::Message'        => [ $ours_Kafka_Message,           $methods_Kafka_Message ],
-    'Kafka::Consumer'       => [ $ours_Kafka_Consumer,          $methods_Kafka_Consumer ],
-    'Kafka::Producer'       => [ $ours_Kafka_Producer,          $methods_Kafka_Producer ],
-    'Kafka::Cluster'        => [ $ours_Kafka_Cluster,           $methods_Kafka_Cluster ],
+    'Kafka::IO'             => [ $ours_Kafka_IO,                    $methods_Kafka_IO ],
+    'Kafka::MockIO'         => [ $ours_Kafka_MockIO,                $methods_Kafka_MockIO ],
+    'Kafka::Connection'     => [ $ours_Kafka_Connection,            $methods_Kafka_Connection ],
+    'Kafka::Message'        => [ $ours_Kafka_Message,               $methods_Kafka_Message ],
+    'Kafka::Consumer'       => [ $ours_Kafka_Consumer,              $methods_Kafka_Consumer ],
+    'Kafka::Producer'       => [ $ours_Kafka_Producer,              $methods_Kafka_Producer ],
+    'Kafka::Cluster'        => [ $ours_Kafka_Cluster,               $methods_Kafka_Cluster ],
 );
 
 # INSTRUCTIONS -----------------------------------------------------------------
@@ -138,13 +141,11 @@ BEGIN {
         $APIKEY_OFFSET
         $APIKEY_METADATA
         $MAX_SOCKET_REQUEST_BYTES
-        $MIN_MAXBYTES
         $PRODUCER_ANY_OFFSET
     ) ];
 
     $functions_Kafka_Internals = [ qw(
         _get_CorrelationId
-        _is_suitable_int
         last_error
         last_errorcode
         RaiseError
@@ -157,6 +158,37 @@ BEGIN {
     use_ok 'Kafka::Internals',
         @$constants_Kafka_Internals,
         @$functions_Kafka_Internals,
+    ;
+}
+
+# Kafka::TestInternals
+
+BEGIN {
+    $constants_Kafka_TestInternals = [ qw(
+        @not_array
+        @not_array0
+        @not_empty_string
+        @not_hash
+        @not_is_like_server_list
+        @not_isint
+        @not_nonnegint
+        @not_number
+        @not_posint
+        @not_posnumber
+        @not_right_object
+        @not_string
+        @not_string_array
+        @not_topics_array
+        $topic
+    ) ];
+
+    $functions_Kafka_TestInternals = [ qw(
+        _is_suitable_int
+    ) ];
+
+    use_ok 'Kafka::TestInternals',
+        @$constants_Kafka_TestInternals,
+        @$functions_Kafka_TestInternals,
     ;
 }
 
@@ -209,7 +241,6 @@ BEGIN {
         _decode_MessageSet_array
         _encode_MessageSet_array
         _encode_string
-        _is_hex_stream_correct
         _pack64
         _protocol_error
         _unpack64

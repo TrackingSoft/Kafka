@@ -4,6 +4,9 @@ package Kafka::Int64;
 # limited to 32 bits and slow bigint must be used instead. Use subs from this module
 # in such case.
 
+# WARNING: in order to achieve better performance,
+# methods of this module do not perform arguments validation
+
 #-- Pragmas --------------------------------------------------------------------
 
 use 5.010;
@@ -24,21 +27,15 @@ our @EXPORT_OK = qw(
     unpackq
 );
 
-our $VERSION = '0.8001';
+our $VERSION = '0.800_1';
 
 #-- load the modules -----------------------------------------------------------
 
 use Carp;
-use Params::Util qw(
-    _STRING
-);
 
 use Kafka qw(
     %ERROR
     $ERROR_MISMATCH_ARGUMENT
-);
-use Kafka::Internals qw(
-    _is_suitable_int
 );
 
 #-- declarations ---------------------------------------------------------------
@@ -47,9 +44,6 @@ use Kafka::Internals qw(
 
 sub intsum {
     my ( $frst, $scnd ) = @_;
-
-    ( defined( $frst ) && defined( $scnd ) && _is_suitable_int( $frst ) && _is_suitable_int( $scnd ) )
-        or confess $ERROR{ $ERROR_MISMATCH_ARGUMENT };
 
     my $ret = $frst + $scnd + 0;    # bigint coercion
     confess $ERROR{ $ERROR_MISMATCH_ARGUMENT }
@@ -61,9 +55,6 @@ sub intsum {
 sub packq {
     my ( $n ) = @_;
 
-    ( defined( $n ) && _is_suitable_int( $n ) )
-        or confess $ERROR{ $ERROR_MISMATCH_ARGUMENT };
-
     if      ( $n == -1 )    { return pack q{C8}, ( 255 ) x 8; }
     elsif   ( $n == -2 )    { return pack q{C8}, ( 255 ) x 7, 254; }
     elsif   ( $n < 0 )      { confess $ERROR{ $ERROR_MISMATCH_ARGUMENT }; }
@@ -73,11 +64,6 @@ sub packq {
 
 sub unpackq {
     my ( $s ) = @_;
-
-    ( _STRING( $s ) && !utf8::is_utf8( $s ) )
-        or confess $ERROR{ $ERROR_MISMATCH_ARGUMENT };
-
-    confess $ERROR{ $ERROR_MISMATCH_ARGUMENT } if length( $s ) != 8;
 
     return Math::BigInt->from_hex( '0x'.unpack( q{H16}, $s ) );
 }
@@ -95,34 +81,37 @@ the Apache Kafka Wire Format protocol on 32 bit systems
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Int64> version 0.12
+This documentation refers to C<Kafka::Int64> version 0.800_1
 
 =head1 SYNOPSIS
 
-    use Kafka qw( BITS64 );
+    use 5.010;
+    use strict;
 
-    # Apache Kafka Wire Format: OFFSET, TIME
+    use Kafka qw(
+        $BITS64
+    );
 
-    $encoded = BITS64 ?
-        pack( "q>", $offset + 0 )
-        : Kafka::Int64::packq( $offset + 0 );
+    # Apache Kafka Protocol: FetchOffset, Time
 
-    $offset = BITS64 ?
-        unpack( "q>", substr( $response, 0, 8 ) )
+    my $offset = 123;
+
+    my $encoded = $BITS64 ?
+        pack( 'q>', $offset )
+        : Kafka::Int64::packq( $offset );
+
+    my $response = chr( 0 ) x 8;
+
+    $offset = $BITS64 ?
+        unpack( 'q>', substr( $response, 0, 8 ) )
         : Kafka::Int64::unpackq( substr( $response, 0, 8 ) );
 
-    if ( BITS64 )
-    {
-        $message->{offset} = $next_offset;
-        $next_offset += $message->{length} + 4;
+    my $next_offset;
+    if ( $BITS64 ) {
+        $next_offset = $offset + 1;
     }
-    else
-    {
-        $message->{offset} = Kafka::Int64::intsum( $next_offset, 0 );
-        $next_offset = Kafka::Int64::intsum(
-            $next_offset,
-            $message->{length} + 4
-            );
+    else {
+        $next_offset = Kafka::Int64::intsum( $offset, 1 );
     }
 
 =head1 DESCRIPTION

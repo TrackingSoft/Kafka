@@ -10,15 +10,13 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.8001';
+our $VERSION = '0.800_1';
 
 #-- load the modules -----------------------------------------------------------
 
-use Carp;
 use Params::Util qw(
     _INSTANCE
     _NONNEGINT
-    _NUMBER
     _POSINT
     _STRING
 );
@@ -38,6 +36,7 @@ use Kafka qw(
     $ERROR_NO_ERROR
     $ERROR_PARTITION_DOES_NOT_MATCH
     $ERROR_TOPIC_DOES_NOT_MATCH
+    $MESSAGE_SIZE_OVERHEAD
     $MIN_BYTES_RESPOND_IMMEDIATELY
     $RECEIVE_EARLIEST_OFFSETS
 );
@@ -45,7 +44,6 @@ use Kafka::Internals qw(
     $APIKEY_FETCH
     $APIKEY_OFFSET
     $DEFAULT_RAISE_ERROR
-    $MIN_MAXBYTES
     _get_CorrelationId
     last_error
     last_errorcode
@@ -94,12 +92,12 @@ sub new {
         $self->_error( $ERROR_MISMATCH_ARGUMENT, 'RaiseError' );
     }
     elsif ( !_INSTANCE( $self->{Connection}, 'Kafka::Connection' ) )                    { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'Connection' ); }
-    elsif ( !isint( $self->{CorrelationId} ) )                                          { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'CorrelationId' ); }
+    elsif ( !( defined( $self->{CorrelationId} ) && isint( $self->{CorrelationId} ) ) ) { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'CorrelationId' ); }
     elsif ( !( $self->{ClientId} eq q{} || defined( _STRING( $self->{ClientId} ) ) && !utf8::is_utf8( $self->{ClientId} ) ) )   { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'ClientId' ); }
-    elsif ( !isint( $self->{MaxWaitTime} ) )                                            { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'MaxWaitTime' ); }
-    elsif ( !isint( $self->{MinBytes} ) )                                               { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'MinBytes' ); }
-    elsif ( !( _POSINT( $self->{MaxBytes} ) && $self->{MaxBytes} >= $MIN_MAXBYTES ) )   { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'MaxBytes' ); }
-    elsif ( !isint( $self->{MaxNumberOfOffsets} ) )                                     { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'MaxNumberOfOffsets' ); }
+    elsif ( !( defined( $self->{MaxWaitTime} ) && isint( $self->{MaxWaitTime} ) ) )     { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'MaxWaitTime' ); }
+    elsif ( !( defined( $self->{MinBytes} ) && isint( $self->{MinBytes} ) ) )           { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'MinBytes' ); }
+    elsif ( !( _POSINT( $self->{MaxBytes} ) && $self->{MaxBytes} >= $MESSAGE_SIZE_OVERHEAD ) )      { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'MaxBytes' ); }
+    elsif ( !( defined( $self->{MaxNumberOfOffsets} ) && isint( $self->{MaxNumberOfOffsets} ) ) )   { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'MaxNumberOfOffsets' ); }
     else {
         $self->_error( $ERROR_NO_ERROR )
             if $self->last_error;
@@ -115,11 +113,10 @@ sub new {
 sub fetch {
     my ( $self, $topic, $partition, $offset, $max_size ) = @_;
 
-# Checking the encoding of strings is performed in the functions of module Kafka::Protocol
-    if    ( !( $topic eq q{} || defined( _STRING( $topic ) ) ) )                            { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$topic' ); }
-    elsif ( !isint( $partition ) )                                                          { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$partition' ); }
+    if    ( !( $topic eq q{} || defined( _STRING( $topic ) ) && !utf8::is_utf8( $topic ) ) )    { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$topic' ); }
+    elsif ( !( defined( $partition ) && isint( $partition ) ) )                                 { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$partition' ); }
     elsif ( !( defined( $offset ) && ( isbig( $offset ) && $offset >= 0 ) || defined( _NONNEGINT( $offset ) ) ) )   { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$offset' ); }
-    elsif ( defined( $max_size ) && !( _POSINT( $max_size ) && $max_size >= $MIN_MAXBYTES ) )   { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$max_size' ); }
+    elsif ( defined( $max_size ) && !( _POSINT( $max_size ) && $max_size >= $MESSAGE_SIZE_OVERHEAD ) )  { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$max_size' ); }
 
     my $request = {
         ApiKey                              => $APIKEY_FETCH,
@@ -189,8 +186,8 @@ sub fetch {
 sub offsets {
     my ( $self, $topic, $partition, $time, $max_number ) = @_;
 
-    if    ( !( $topic eq q{} || defined( _STRING( $topic ) ) ) )                                { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$topic' ); }
-    elsif ( !isint( $partition ) )                                                              { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$partition' ); }
+    if    ( !( $topic eq q{} || defined( _STRING( $topic ) ) && !utf8::is_utf8( $topic ) ) )    { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$topic' ); }
+    elsif ( !( defined( $partition ) && isint( $partition ) ) )                                 { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$partition' ); }
     elsif ( !( defined( $time ) && ( isbig( $time ) || isint( $time ) ) && $time >= $RECEIVE_EARLIEST_OFFSETS ) )   { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$time' ); }
     elsif ( defined( $max_number ) && !_POSINT( $max_number ) )                                 { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$max_number' ); }
 
@@ -246,85 +243,63 @@ Kafka::Consumer - object interface to the consumer client
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Consumer> version 0.12
+This documentation refers to C<Kafka::Consumer> version 0.800_1
 
 =head1 SYNOPSIS
 
-Setting up:
+    use 5.010;
+    use strict;
 
-    #-- IO
-    use Kafka qw( KAFKA_SERVER_PORT DEFAULT_TIMEOUT );
-    use Kafka::IO;
-
-    my $io;
-
-    $io = Kafka::IO->new(
-        host        => "localhost",
-        port        => KAFKA_SERVER_PORT,
-        timeout     => DEFAULT_TIMEOUT, # Optional,
-                                        # default = DEFAULT_TIMEOUT
-        RaiseError  => 0                # Optional, default = 0
-        );
-
-Consumer:
-
-    #-- Consumer
+    use Kafka qw(
+        $DEFAULT_MAX_BYTES
+        $DEFAULT_MAX_NUMBER_OF_OFFSETS
+        $RECEIVE_EARLIEST_OFFSETS
+    );
+    use Kafka::Connection;
     use Kafka::Consumer;
 
-    my $consumer = Kafka::Consumer->new(
-        IO          => $io,
-        RaiseError  => 0    # Optional, default = 0
-        );
+    #-- Connection
+    my $connect = Kafka::Connection->new( host => 'localhost' );
+
+    #-- Consumer
+    my $consumer = Kafka::Consumer->new( Connection  => $connect );
 
     # Get a list of valid offsets up max_number before the given time
     my $offsets = $consumer->offsets(
-        "test",             # topic
-        0,                  # partition
-        TIMESTAMP_EARLIEST, # time
-        DEFAULT_MAX_OFFSETS # max_number
+        'mytopic',                      # topic
+        0,                              # partition
+        $RECEIVE_EARLIEST_OFFSETS,      # time
+        $DEFAULT_MAX_NUMBER_OF_OFFSETS  # max_number
         );
-    if( $offsets )
-    {
-        foreach my $offset ( @$offsets )
-        {
-            print "Received offset: $offset\n";
-        }
+    if( $offsets ) {
+        say "Received offset: $_" foreach @$offsets;
     }
-    if ( !$offsets or $consumer->last_error )
-    {
-        print STDERR
-            "(", $consumer->last_errorcode, ") ",
-            $consumer->last_error, "\n";
-    }
+    say STDERR 'Error: (', $consumer->last_errorcode, ') ', $consumer->last_error
+        if !$offsets || $consumer->last_errorcode;
 
     # Consuming messages
     my $messages = $consumer->fetch(
-        "test",             # topic
-        0,                  # partition
-        0,                  # offset
-        DEFAULT_MAX_SIZE    # Maximum size of MESSAGE(s) to receive
-        );
-    if ( $messages )
-    {
-        foreach my $message ( @$messages )
-        {
-            if( $message->valid )
-            {
-                print "payload    : ", $message->payload,       "\n";
-                print "offset     : ", $message->offset,        "\n";
-                print "next_offset: ", $message->next_offset,   "\n";
+        'mytopic',                      # topic
+        0,                              # partition
+        0,                              # offset
+        $DEFAULT_MAX_BYTES              # Maximum size of MESSAGE(s) to receive
+    );
+    if ( $messages ) {
+        foreach my $message ( @$messages ) {
+            if( $message->valid ) {
+                say 'key        : ', $message->key;
+                say 'payload    : ', $message->payload;
+                say 'offset     : ', $message->offset;
+                say 'next_offset: ', $message->next_offset;
             }
-            else
-            {
-                print "error      : ", $message->error,         "\n";
+            else {
+                say 'error      : ', $message->error;
             }
         }
     }
 
     # Closes the consumer and cleans up
-    $consumer->close;
-
-Use only one C<Kafka::Consumer> object at the same time.
+    undef $consumer;
 
 =head1 DESCRIPTION
 
@@ -340,7 +315,7 @@ Provides an object oriented model of communication.
 
 =item *
 
-Supports parsing the Apache Kafka 0.7 Wire Format protocol.
+Supports parsing the Apache Kafka 0.8 Wire Format protocol.
 
 =item *
 
@@ -513,7 +488,7 @@ additional details and do not comply with the C<Kafka::ERROR> array.
 =head1 DIAGNOSTICS
 
 Look at the C<RaiseError> description for additional information on
-error handeling.
+error handling.
 
 The methods for the possible error to analyse: L</last_errorcode> and
 more descriptive L</last_error>.
