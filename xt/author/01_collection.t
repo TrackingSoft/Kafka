@@ -129,6 +129,7 @@ if ( has_working_spellchecker ) {
                 if -f $File::Find::name;
         },
         $modules_dir,
+        $t_modules_dir,
     );
 }
 
@@ -178,6 +179,8 @@ bla
 Checksum
 ClientId
 codec
+codecs
+COMMITTED
 CorrelationId
 Crc
 CRC
@@ -186,11 +189,14 @@ FetchOffset
 Gladkov
 HighwaterMarkOffset
 hostname
+ie
 inconsistence
+intra
 IP
 ISR
 Isr
 kafka
+LeaderNotAvailable
 LLC
 MagicByte
 Marchenko
@@ -201,7 +207,9 @@ MERCHANTABILITY
 MessageSets
 MessageSetSize
 MessageSize
+metadata
 Metadata
+METADATA
 MinBytes
 NodeId
 occured

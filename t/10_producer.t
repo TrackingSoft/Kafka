@@ -42,7 +42,7 @@ use Params::Util qw(
 use Sub::Install;
 
 use Kafka qw(
-    $BLOCK_UNTIL_IS_COMMITED
+    $BLOCK_UNTIL_IS_COMMITTED
     $ERROR_MISMATCH_ARGUMENT
     $NOT_SEND_ANY_RESPONSE
     $REQUEST_TIMEOUT
@@ -56,6 +56,7 @@ use Kafka::TestInternals qw(
     @not_empty_string
     @not_isint
     @not_nonnegint
+    @not_number
     @not_right_object
     @not_string_array
     $topic
@@ -225,7 +226,7 @@ sub testing {
     new_ERROR_MISMATCH_ARGUMENT( 'RequiredAcks', @not_isint );
 
 # Timeout
-    new_ERROR_MISMATCH_ARGUMENT( 'Timeout', @not_nonnegint );
+    new_ERROR_MISMATCH_ARGUMENT( 'Timeout', @not_number );
 
 #-- send
 
@@ -254,7 +255,7 @@ sub testing {
     for my $mode (
         $NOT_SEND_ANY_RESPONSE,
         $WAIT_WRITTEN_TO_LOCAL_LOG,
-        $BLOCK_UNTIL_IS_COMMITED,
+        $BLOCK_UNTIL_IS_COMMITTED,
         ) {
 
         $producer = Kafka::Producer->new(
@@ -301,7 +302,7 @@ sub testing {
     communication_error( 'Kafka::Connection', 'receive_response_to_request' );
 
 #-- finish
-    Kafka::MockIO::undefine()
+    Kafka::MockIO::restore()
         unless $kafka_base_dir;
 }
 

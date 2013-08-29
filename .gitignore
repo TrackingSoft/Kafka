@@ -3,6 +3,5 @@
 /blib/
 /pm_to_blib
 /Makefile.old
-/crash.t
-/tt.sh
+/crash.pl
 /Kafka-*.tar.gz

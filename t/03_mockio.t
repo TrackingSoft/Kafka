@@ -85,9 +85,9 @@ $original_IO_API{ $_ } = \&{ "Kafka::IO::$_" } foreach @IO_API_names;
 Kafka::MockIO::override();
 ok( \&{ "Kafka::IO::$_" } ne $original_IO_API{ $_ }, "IO API mocked: $_" ) foreach @IO_API_names;
 
-#-- undefine
+#-- restore
 
-Kafka::MockIO::undefine();
+Kafka::MockIO::restore();
 ok( \&{ "Kafka::IO::$_" } eq $original_IO_API{ $_ }, "IO API restored: $_" ) foreach @IO_API_names;
 
 #-- Kafka::MockIO API ----------
@@ -269,4 +269,4 @@ foreach my $encoded_request (
 
 # POSTCONDITIONS ---------------------------------------------------------------
 
-Kafka::MockIO::undefine();
+Kafka::MockIO::restore();

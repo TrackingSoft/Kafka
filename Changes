@@ -1,5 +1,23 @@
 Revision history for Kafka package
 
+0.800_1 Fri Sep  06 2013
+
+    !!! This is a major upgrade that changes API. It's strongly advised to study
+    revised documentation and update your code where necessary !!!
+
+    CHANGES:
+    - Implement Kafka API ver 0.8. For communication with earlier versions of Kafka
+      use Kafka module versions before 0.8.
+    - added Kafka::Connection, Kafka::Internals.
+    - Kafka::Mock renamed to Kafka::MockIO and moved to t/lib.
+    - Additional testing units (in t/lib) for the following modules:
+      Kafka::Cluster, Kafka::MockProtocol, Kafka::TestInternals.
+    - Various service scripts & configurations added in t/bin and t/config.
+    - Profiling scripts are added to the tools directory.
+    - Introducted KAFKA_BASE_DIR environment variable to specify alternative location
+      to Kafka base directory. Defaults to t/data.
+    - Updated service files needed to build the package.
+
 0.12  Fri Mar  08 2013
     CHANGES:
     - Change the port used in the Kafka::Mock

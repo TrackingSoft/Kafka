@@ -44,7 +44,6 @@ use Kafka::Internals qw(
 );
 use Kafka::Protocol qw(
     $COMPRESSION_NONE
-    $COMPRESSION_NOT_EXIST
     decode_fetch_response
     decode_metadata_response
     decode_offset_response
@@ -76,18 +75,18 @@ use Kafka::TestInternals qw(
 
 #-- declarations ---------------------------------------------------------------
 
-sub expected_error {
-    my ( $function, $bad_arg ) = @_;
-
-    Kafka::Protocol::_protocol_error( $ERROR_NO_ERROR );
-    ok !Kafka::Protocol::last_errorcode(), 'no error';
-    {
-        no strict 'refs';                   ## no critic
-        &$function( $bad_arg );
-    }
-    ok Kafka::Protocol::last_errorcode(), 'an error is detected';
-    ok Kafka::Protocol::last_error(), 'expected error';
-}
+#sub expected_error {
+#    my ( $function, $bad_arg ) = @_;
+#
+#    Kafka::Protocol::_protocol_error( $ERROR_NO_ERROR );
+#    ok !Kafka::Protocol::last_errorcode(), 'no error';
+#    {
+#        no strict 'refs';                   ## no critic
+#        &$function( $bad_arg );
+#    }
+#    ok Kafka::Protocol::last_errorcode(), 'an error is detected';
+#    ok Kafka::Protocol::last_error(), 'expected error';
+#}
 
 my ( @decode_functions, @encode_functions, $request, $encoded_response, $decoded );
 
@@ -333,21 +332,22 @@ $request->{topics}->[0]->{partitions}->[0]->{MaxNumberOfOffsets} = $DEFAULT_MAX_
 $request->{topics}->[0]->{partitions}->[0]->{MessageSet}->[0]->{Offset} = $PRODUCER_ANY_OFFSET;
 
 # NOTE: MagicByte, Attributes should not be assigned by the user
-$request->{topics}->[0]->{partitions}->[0]->{MessageSet}->[0]->{MagicByte}  = $COMPRESSION_NOT_EXIST;
+$request->{topics}->[0]->{partitions}->[0]->{MessageSet}->[0]->{MagicByte}  = 0;
 $request->{topics}->[0]->{partitions}->[0]->{MessageSet}->[0]->{Attributes} = $COMPRESSION_NONE;
 
 # Key, Value
 
-foreach my $field (
-        'Key',
-        'Value',
-    ) {
-    foreach my $bad_value ( @not_empty_string ) {
-        $request->{topics}->[0]->{partitions}->[0]->{MessageSet}->[0]->{ $field } = $bad_value;
-        expected_error( 'encode_produce_request', $request );
-        $request->{topics}->[0]->{partitions}->[0]->{MessageSet}->[0]->{Key} = q{};
-    }
-}
+#foreach my $field (
+#        'Key',
+#        'Value',
+#    ) {
+#    foreach my $bad_value ( @not_empty_string ) {
+#        $request->{topics}->[0]->{partitions}->[0]->{MessageSet}->[0]->{ $field } = $bad_value;
+#        expected_error( 'encode_produce_request', $request );
+#        $request->{topics}->[0]->{partitions}->[0]->{MessageSet}->[0]->{Key} = q{};
+#    }
+#}
+$request->{topics}->[0]->{partitions}->[0]->{MessageSet}->[0]->{Key} = q{};
 $request->{topics}->[0]->{partitions}->[0]->{MessageSet}->[0]->{Value} = q{};
 
 #-- decode_fetch_response (_decode_MessageSet_template)

@@ -1,11 +1,15 @@
 package Kafka::Int64;
 
-# Transparent BigInteger support on 32-bit platforms where native integer type is
-# limited to 32 bits and slow bigint must be used instead. Use subs from this module
-# in such case.
+=head1 NAME
 
-# WARNING: in order to achieve better performance,
-# methods of this module do not perform arguments validation
+Kafka::Int64 - functions to work with 64 bit elements of the
+protocol on 32 bit systems.
+
+=head1 VERSION
+
+This documentation refers to C<Kafka::Int64> version 0.800_1 .
+
+=cut
 
 #-- Pragmas --------------------------------------------------------------------
 
@@ -17,6 +21,8 @@ use bigint; # this allows integers of practially any size at the cost of signifi
 
 # ENVIRONMENT ------------------------------------------------------------------
 
+our $VERSION = '0.800_1';
+
 use Exporter qw(
     import
 );
@@ -26,8 +32,6 @@ our @EXPORT_OK = qw(
     packq
     unpackq
 );
-
-our $VERSION = '0.800_1';
 
 #-- load the modules -----------------------------------------------------------
 
@@ -40,53 +44,11 @@ use Kafka qw(
 
 #-- declarations ---------------------------------------------------------------
 
-#-- public functions -----------------------------------------------------------
-
-sub intsum {
-    my ( $frst, $scnd ) = @_;
-
-    my $ret = $frst + $scnd + 0;    # bigint coercion
-    confess $ERROR{ $ERROR_MISMATCH_ARGUMENT }
-        if $ret->is_nan();
-
-    return $ret;
-}
-
-sub packq {
-    my ( $n ) = @_;
-
-    if      ( $n == -1 )    { return pack q{C8}, ( 255 ) x 8; }
-    elsif   ( $n == -2 )    { return pack q{C8}, ( 255 ) x 7, 254; }
-    elsif   ( $n < 0 )      { confess $ERROR{ $ERROR_MISMATCH_ARGUMENT }; }
-
-    return pack q{H16}, substr( '00000000000000000000000000000000'.substr( ( $n + 0 )->as_hex(), 2 ), -16 );
-}
-
-sub unpackq {
-    my ( $s ) = @_;
-
-    return Math::BigInt->from_hex( '0x'.unpack( q{H16}, $s ) );
-}
-
-#-- private functions ----------------------------------------------------------
-
-1;
-
-__END__
-
-=head1 NAME
-
-Kafka::Int64 - functions to work with 64 bit elements of
-the Apache Kafka Wire Format protocol on 32 bit systems
-
-=head1 VERSION
-
-This documentation refers to C<Kafka::Int64> version 0.800_1
-
 =head1 SYNOPSIS
 
     use 5.010;
     use strict;
+    use warnings;
 
     use Kafka qw(
         $BITS64
@@ -116,6 +78,11 @@ This documentation refers to C<Kafka::Int64> version 0.800_1
 
 =head1 DESCRIPTION
 
+This module is not intended to be used by end user.
+
+In order to achieve better performance, functions of this module do not perform
+validation of arguments.
+
 Transparent L<BigInteger|bigint> support on 32-bit platforms where native
 integer type is limited to 32 bits and slow bigint must be used instead.
 Use L<functions|/FUNCTIONS> from this module in such case.
@@ -131,9 +98,15 @@ on 32 bit systems.
 
 =back
 
+=cut
+
+#-- public functions -----------------------------------------------------------
+
 =head2 FUNCTIONS
 
 The following functions are available for the C<Kafka::Int64> module.
+
+=cut
 
 =head3 C<intsum( $bint, $int )>
 
@@ -146,37 +119,69 @@ integer.
 Returns the value as a L<Math::BigInt|Math::BigInt> integer, or error will
 cause the program to halt (C<confess>) if the argument is not a valid number.
 
+=cut
+sub intsum {
+    my ( $frst, $scnd ) = @_;
+
+    my $ret = $frst + $scnd + 0;    # bigint coercion
+    confess $ERROR{ $ERROR_MISMATCH_ARGUMENT }
+        if $ret->is_nan();
+
+    return $ret;
+}
+
 =head3 C<packq( $bint )>
 
-Emulates C<pack( "qE<gt>", $bint )> to 32-bit systems - assumes decimal string
+Emulates C<pack( q{qE<gt>}, $bint )> to 32-bit systems - assumes decimal string
 or integer input.
 
 An argument must be a positive number. That is, it is defined and Perl thinks
 it's a number. The argument may be a L<Math::BigInt|Math::BigInt> integer.
 
-The special values -1, -2 are allowed.
+The special values -1, -2 are allowed
+(C<$Kafka::RECEIVE_LATEST_OFFSET>, C<$Kafka::RECEIVE_EARLIEST_OFFSETS>).
 
 Returns the value as a packed binary string, or error will cause the program
-to halt (C<confess>) if the argument is not a valid number.
+to halt (C<confess>) if the argument is a negative number.
+
+=cut
+sub packq {
+    my ( $n ) = @_;
+
+    if      ( $n == -1 )    { return pack q{C8}, ( 255 ) x 8; }
+    elsif   ( $n == -2 )    { return pack q{C8}, ( 255 ) x 7, 254; }
+    elsif   ( $n < 0 )      { confess $ERROR{ $ERROR_MISMATCH_ARGUMENT }; }
+
+    return pack q{H16}, substr( '00000000000000000000000000000000'.substr( ( $n + 0 )->as_hex(), 2 ), -16 );
+}
 
 =head3 C<unpackq( $bstr )>
 
-Emulates C<unpack( "qE<gt>", $bstr )> to 32-bit systems - assumes binary input.
+Emulates C<unpack( q{qE<gt>}, $bstr )> to 32-bit systems - assumes binary input.
 
 The argument must be a binary string of 8 bytes length.
 
-Returns the value as a L<Math::BigInt|Math::BigInt> integer, or error will
-cause the program to halt (C<confess>) if the argument is not a valid binary
-string.
+Returns the value as a L<Math::BigInt|Math::BigInt> integer.
+
+=cut
+sub unpackq {
+    my ( $s ) = @_;
+
+    return Math::BigInt->from_hex( '0x'.unpack( q{H16}, $s ) );
+}
+
+#-- private functions ----------------------------------------------------------
+
+1;
+
+__END__
 
 =head1 DIAGNOSTICS
 
-C<Kafka::Int64> is not a user module and any L<functions|/FUNCTIONS> error
-is FATAL.
+Any error L<functions|/FUNCTIONS> is FATAL.
 FATAL errors will cause the program to halt (C<confess>), since the
 problem is so severe that it would be dangerous to continue. (This can
-always be trapped with C<eval>. Under the circumstances, dying is the best
-thing to do).
+always be trapped with C<eval>.
 
 =over 3
 
@@ -191,34 +196,33 @@ L<functions|/FUNCTIONS>.
 
 The basic operation of the Kafka package modules:
 
-L<Kafka|Kafka> - constants and messages used by the Kafka package modules
+L<Kafka|Kafka> - constants and messages used by the Kafka package modules.
 
-L<Kafka::IO|Kafka::IO> - object interface to socket communications with
-the Apache Kafka server
+L<Kafka::Connection|Kafka::Connection> - interface to connect to a Kafka cluster.
 
-L<Kafka::Producer|Kafka::Producer> - object interface to the producer client
+L<Kafka::Producer|Kafka::Producer> - interface for producing client.
 
-L<Kafka::Consumer|Kafka::Consumer> - object interface to the consumer client
+L<Kafka::Consumer|Kafka::Consumer> - interface for consuming client.
 
-L<Kafka::Message|Kafka::Message> - object interface to the Kafka message
-properties
-
-L<Kafka::Protocol|Kafka::Protocol> - functions to process messages in the
-Apache Kafka's wire format
+L<Kafka::Message|Kafka::Message> - interface to access Kafka message
+properties.
 
 L<Kafka::Int64|Kafka::Int64> - functions to work with 64 bit elements of the
-protocol on 32 bit systems
+protocol on 32 bit systems.
 
-L<Kafka::Mock|Kafka::Mock> - object interface to the TCP mock server for testing
+L<Kafka::Protocol|Kafka::Protocol> - functions to process messages in the
+Apache Kafka's Protocol.
 
-A wealth of detail about the Apache Kafka and Wire Format:
+L<Kafka::IO|Kafka::IO> - low level interface for communication with Kafka server.
 
-Main page at L<http://incubator.apache.org/kafka/>
+L<Kafka::Internals|Kafka::Internals> - Internal constants and functions used
+by several package modules.
 
-Wire Format at L<http://cwiki.apache.org/confluence/display/KAFKA/Wire+Format/>
+A wealth of detail about the Apache Kafka and the Kafka Protocol:
 
-Writing a Driver for Kafka at
-L<http://cwiki.apache.org/confluence/display/KAFKA/Writing+a+Driver+for+Kafka>
+Main page at L<http://kafka.apache.org/>
+
+Kafka Protocol at L<https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol>
 
 =head1 AUTHOR
 
@@ -240,8 +244,7 @@ This package is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself. See I<perlartistic> at
 L<http://dev.perl.org/licenses/artistic.html>.
 
-This program is
-distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
 without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
 PARTICULAR PURPOSE.
 

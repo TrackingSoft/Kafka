@@ -279,13 +279,13 @@ sub testing {
     new_ERROR_MISMATCH_ARGUMENT( 'MaxWaitTime', @not_isint );
 
 # MinBytes
-    new_ERROR_MISMATCH_ARGUMENT( 'MinBytes', @not_isint );
+    new_ERROR_MISMATCH_ARGUMENT( 'MinBytes', @not_nonnegint );
 
 # MaxBytes
     new_ERROR_MISMATCH_ARGUMENT( 'MaxBytes', @not_posint, $MESSAGE_SIZE_OVERHEAD - 1 );
 
 # MaxNumberOfOffsets
-    new_ERROR_MISMATCH_ARGUMENT( 'MaxNumberOfOffsets', @not_isint );
+    new_ERROR_MISMATCH_ARGUMENT( 'MaxNumberOfOffsets', @not_posint );
 
 #-- fetch
 
@@ -411,7 +411,7 @@ sub testing {
     communication_error( 'Kafka::Connection', 'receive_response_to_request' );
 
 #-- finish
-    Kafka::MockIO::undefine()
+    Kafka::MockIO::restore()
         unless $kafka_base_dir;
 }
 

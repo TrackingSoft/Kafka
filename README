@@ -5,8 +5,8 @@ The Kafka package is a set of Perl modules which provides a
 simple and consistent application programming interface (API) to the
 Apache Kafka 0.8, a high-throughput distributed messaging system.
 The main focus of the package is to provide classes
-and functions that allow you to write Apache Kafka clients
-without Apache ZooKeeper service.
+and functions that allow you to write Apache Kafka clients.
+
 
 The Kafka package was written, tested, and found working on
 recent Linux distributions.
@@ -29,17 +29,21 @@ you have the following packages installed before you install
 Kafka:
 
    Const::Fast
-   Data::HexDump::Range
+   List::MoreUtils
    Params::Util
+   Scalar::Util::Numeric
    String::CRC32
+   Sys::SigAction
 
 The Kafka package has the following optional dependencies:
 
-   File::Find::Rule
-   File::HomeDir
-   Mock::Quick
+   Capture::Tiny
+   Config::IniFiles
+   Proc::Daemon
+   Sub::Install
    Test::Deep
    Test::Exception
+   Test::TCP
 
 If the optional modules are missing, some "prereq" tests are skipped.
 
@@ -49,53 +53,39 @@ for all dependencies and compiling them manually).
 
 TESTING
 
-The following environment variables change the way Kafka Benchmark test behave
-("t/99_usage/03_kafka_bench.t"):
+The following environment variable changes the way Kafka Benchmark test behave:
 
-   # the IO timeout in secs
-   KAFKA_BENCHMARK_TIMEOUT = 0.5
-
-   # minimum length of test messages
-   KAFKA_BENCHMARK_LEN_MIN = 200
-
-   # maximum length of the test messages
-   KAFKA_BENCHMARK_LEN_MAX = 200
-
-   # number of messages for batch testing
-   KAFKA_BENCHMARK_PACKAGE = 5000
-
-   # number of messages for a single test
-   KAFKA_BENCHMARK_SINGLE = 5
+   # The root directory of the installation Kafka 0.8
+   KAFKA_BASE_DIR
 
 SIMPLE BENCHMARK
 
 Use tools/benchmark_consumer.pl and tools/benchmark_producer.pl to run a simple
 benchmark.
-Run one or more consumer instances using tools/benchmark_consumer.pl .
-and one or more producer instances using tools/benchmark_producer.pl .
+Run one or more consumer or producer instances using tools/benchmark_consumer.pl or
+tools/benchmark_producer.pl .
 
 DOCUMENTATION
 
-Every Kafka package module has a man page.
-A simple description of each module is included below in
-the SEE ALSO section.
+Every Kafka package module has a man page. A simple description of each module is
+included below in the SEE ALSO section.
 
 SEE ALSO
 
 The basic operation of the Kafka package modules:
 
-   Kafka             - constants and messages used by
-                       the Kafka package modules
-   Kafka::IO         - object interface to socket communications
-                       with the Apache Kafka server
-   Kafka::Protocol   - functions to process messages
-                       in the Apache Kafka's Wire Format
-   Kafka::Message    - object interface to the Kafka message properties
-   Kafka::Int64      - functions to work with 64 bit elements
-                       of the protocol on 32 bit systems
-   Kafka::Mock       - object interface to the TCP mock server for testing
-   Kafka::Producer   - object interface to the producer client
-   Kafka::Consumer   - object interface to the consumer client
+   Kafka             - constants and messages used by the Kafka package.
+   Kafka::Connection - API to connect to a kafka cluster.
+   Kafka::Producer   - interface to the 'producer' client.
+   Kafka::Consumer   - interface to the 'consumer' client.
+   Kafka::Message    - interface to the Kafka message properties.
+   Kafka::Int64      - functions to work with 64 bit elements of the
+                       protocol on 32 bit systems.
+   Kafka::Protocol   - functions to process messages in the
+                       Apache Kafka's Protocol.
+   Kafka::IO         - low-level communications with the Apache Kafka server.
+   Kafka::Internals  - Internal constants and functions used
+                       by several packaged modules.
 
 COPYRIGHT AND LICENCE
 

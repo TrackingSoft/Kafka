@@ -1,5 +1,15 @@
 package Kafka::Connection;
 
+=head1 NAME
+
+Kafka::Connection - object interface to connect to a kafka cluster.
+
+=head1 VERSION
+
+This documentation refers to C<Kafka::Connection> version 0.800_1 .
+
+=cut
+
 #-- Pragmas --------------------------------------------------------------------
 
 use 5.010;
@@ -19,7 +29,7 @@ use List::MoreUtils qw(
 );
 use List::Util qw(
     shuffle
-    );
+);
 use Params::Util qw(
     _ARRAY
     _ARRAY0
@@ -34,13 +44,13 @@ use Scalar::Util::Numeric qw(
 );
 use Sys::Hostname;
 use Time::HiRes qw(
-    usleep
-    );
+    sleep
+);
 
 use Kafka qw(
     %ERROR
     $ERROR_CANNOT_GET_METADATA
-    $ERROR_DESCRIPTION_LEADER_NOT_FOUND
+    $ERROR_LEADER_NOT_FOUND
     $ERROR_MISMATCH_ARGUMENT
     $ERROR_MISMATCH_CORRELATIONID
     $ERROR_NO_ERROR
@@ -81,6 +91,46 @@ use Kafka::Protocol qw(
 
 #-- declarations ---------------------------------------------------------------
 
+=head1 SYNOPSIS
+
+    use 5.010;
+    use strict;
+    use warnings;
+
+    # A simple example of Kafka::Connection usage:
+    use Kafka::Connection;
+
+    # connect to local cluster with the defaults
+    my $connect = Kafka::Connection->new( host => 'localhost' );
+
+    # decoding of the error
+    say STDERR 'last error: ', $connect->last_error
+        unless $connect->last_errorcode;
+
+    # Closes the connection and cleans up
+    undef $connect;
+
+=head1 DESCRIPTION
+
+The main features of the C<Kafka::Connection> class are:
+
+=over 3
+
+=item *
+
+Provides API for communication with Kafka 0.8 cluster.
+
+=item *
+
+Coding and decoding of requests and responses, auto-selection of a server from Kafka cluster.
+=item *
+
+Allows for getting information about Kafka cluster.
+
+=back
+
+=cut
+
 my %protocol = (
     "$APIKEY_PRODUCE"   => {
         decode                  => \&decode_produce_response,
@@ -110,6 +160,107 @@ our $_package_error;
 
 #-- constructor ----------------------------------------------------------------
 
+=head2 CONSTRUCTOR
+
+=head3 C<new>
+
+Creates C<Kafka::Connection> object for interaction with Kafka cluster.
+Returns created C<Kafka::Connection> object.
+
+Depending on the value of C<RaiseError> attribute, an error causes program
+to halt or the constructor returns C<Kafka::Connection> object.
+
+Use methods L</last_errorcode> and L</last_error> of the C<Kafka::Connection>
+object to get information about the error.
+
+C<new()> takes arguments in key-value pairs. The following arguments are currently recognized:
+
+=over 3
+
+=item C<host =E<gt> $host>
+
+C<$host> is an any Apache Kafka cluster host to connect to. It can be a hostname or the
+IP-address in the "xx.xx.xx.xx" form.
+
+Optional. Either C<host> or C<broker_list> must be supplied.
+
+=item C<port =E<gt> $port>
+
+Optional, default = C<$KAFKA_SERVER_PORT>.
+
+C<$port> is the attribute denoting the port number of the service we want to
+access (Apache Kafka service). C<$port> should be an integer number.
+
+C<$KAFKA_SERVER_PORT> is the default Apache Kafka server port that can be imported from
+the L<Kafka|Kafka> module and = 9092.
+
+=item C<broker_list =E<gt> $broker_list>
+
+Optional, C<$broker_list> is a reference to array of the host:port strings, defining the list
+of Kafka servers. This list will be used to locate the new master in case server specified
+via C<host =E<gt> $host> and C<port =E<gt> $port> arguments is unavailable. Either C<host>
+or C<broker_list> must be supplied.
+
+=item C<timeout =E<gt> $timeout>
+
+Optional, default = C<$REQUEST_TIMEOUT>.
+
+C<$timeout> specifies how long we wait for the remote server to respond before
+L<IO|Kafka::IO> object disconnects and creates an internal exception.
+C<$timeout> is in second, could be positive integer or floating-point type.
+
+C<$REQUEST_TIMEOUT> is the default timeout that can be imported from the
+L<Kafka|Kafka> module.
+
+=item C<RaiseError =E<gt> $mode>
+
+Optional, default = 0.
+
+An error will cause the program to halt if L</RaiseError> is set to true: C<confess>
+if the argument is not valid or C<die> in the other error case
+(this can always be trapped with C<eval>).
+
+You should always check for errors, when not establishing the C<RaiseError>
+mode to true.
+
+=item C<CorrelationId =E<gt> $correlation_id>
+
+Optional, default = C<undef> .
+
+C<Correlation> is a user-supplied integer. It will be passed back with the response by
+the server, unmodified. The C<$correlation_id> should be an integer number.
+
+An error will be thrown if C<CorrelationId> from response will not match one supplied
+in request.
+
+If C<CorrelationId> is not set, its value is assigned as random negative integer.
+
+=item C<SEND_MAX_RETRIES =E<gt> $retries>
+
+Optional, default = C<$SEND_MAX_RETRIES> .
+
+C<$SEND_MAX_RETRIES> is the default number of retries that can be imported from the
+L<Kafka|Kafka> module and = 3 .
+
+The leader may be unavailable transiently, which can fail the sending of a message.
+This property specifies the number of retries when such failures occur.
+The C<$retries> should be an integer number.
+
+=item C<RETRY_BACKOFF =E<gt> $backoff>
+
+Optional, default = C<$RETRY_BACKOFF> .
+
+C<$RETRY_BACKOFF> is the default timeout that can be imported from the
+L<Kafka|Kafka> module and = 100 ms.
+
+This property specifies ms before each retry, the producer refreshes the metadata of relevant topics.
+Since leader election takes a bit of time, this property specifies the amount of time
+that the producer waits before refreshing the metadata.
+The C<$backoff> should be an integer number.
+
+=back
+
+=cut
 sub new {
     my ( $class, @args ) = @_;
 
@@ -135,11 +286,10 @@ sub new {
         $self->{RaiseError} = $DEFAULT_RAISE_ERROR;
         $self->_error( $ERROR_MISMATCH_ARGUMENT, __PACKAGE__.'->new - RaiseError' );
     }
-    elsif ( !( defined( $self->{host} ) && defined( _STRING( $self->{host} ) ) && !utf8::is_utf8( $self->{host} ) ) )   { $self->_error( $ERROR_MISMATCH_ARGUMENT, __PACKAGE__.'->new - host' ); }
+    elsif ( !( defined( $self->{host} ) && ( $self->{host} eq q{} || defined( _STRING( $self->{host} ) ) ) && !utf8::is_utf8( $self->{host} ) ) )   { $self->_error( $ERROR_MISMATCH_ARGUMENT, __PACKAGE__.'->new - host' ); }
     elsif ( !_POSINT( $self->{port} ) )                                         { $self->_error( $ERROR_MISMATCH_ARGUMENT, __PACKAGE__.'->new - port' ); }
     elsif ( !( _NUMBER( $self->{timeout} ) && $self->{timeout} > 0 ) )          { $self->_error( $ERROR_MISMATCH_ARGUMENT, __PACKAGE__.'->new - timeout' ); }
     elsif ( !_ARRAY0( $self->{broker_list} ) )                                  { $self->_error( $ERROR_MISMATCH_ARGUMENT, __PACKAGE__.'->new - broker_list' ); }
-    elsif ( !all { $self->_is_like_server( $_ ) } @{ $self->{broker_list} } )   { $self->_error( $ERROR_MISMATCH_ARGUMENT, __PACKAGE__.'->new - broker_list' ); }
     elsif ( !isint( $self->{CorrelationId} ) )                                  { $self->_error( $ERROR_MISMATCH_ARGUMENT, __PACKAGE__.'->new - CorrelationId' ); }
     elsif ( !_POSINT( $self->{SEND_MAX_RETRIES} ) )                             { $self->_error( $ERROR_MISMATCH_ARGUMENT, __PACKAGE__.'->new - SEND_MAX_RETRIES' ); }
     elsif ( !_POSINT( $self->{RETRY_BACKOFF} ) )                                { $self->_error( $ERROR_MISMATCH_ARGUMENT, __PACKAGE__.'->new - RETRY_BACKOFF' ); }
@@ -174,6 +324,10 @@ sub new {
 
         # init IO cache
         foreach my $server ( ( $self->{host} ? $self->_build_server_name( $self->{host}, $self->{port} ) : (), @{ $self->{broker_list} } ) ) {
+            unless ( $self->_is_like_server( $server ) ) {
+                $self->_error( $ERROR_MISMATCH_ARGUMENT, __PACKAGE__.'->new - bad host:port or broker_list element' );
+                last;
+            }
             my ( $host, $port ) = split /:/, $server;
             $host = $self->_localhost_to_hostname( $host );
             my $correct_server = $self->_build_server_name( $host, $port );
@@ -199,14 +353,30 @@ sub new {
 
 #-- public attributes ----------------------------------------------------------
 
+=head2 METHODS
+
+The following methods are defined for the C<Kafka::Producer> class:
+
+=cut
+
 #-- public methods -------------------------------------------------------------
 
+=head3 C<get_known_servers>
+
+Returns the list of known Kafka servers (in host:port format).
+
+=cut
 sub get_known_servers {
     my ( $self ) = @_;
 
     return keys %{ $self->{_IO_cache} };
 }
 
+=head3 C<is_server_known( $server )>
+
+Returns true, if C<$server> (host:port) is known in cluster.
+
+=cut
 sub is_server_known {
     my ( $self, $server ) = @_;
 
@@ -221,6 +391,11 @@ sub is_server_known {
     }
 }
 
+=head3 C<is_server_alive( $server )>
+
+Returns true, if successful connection is established with C<$server> (host:port).
+
+=cut
 sub is_server_alive {
     my ( $self, $server ) = @_;
 
@@ -239,8 +414,29 @@ sub is_server_alive {
     return;
 }
 
-# WARNING: in order to achieve better performance,
-# this method do not perform arguments validation
+=head3 C<receive_response_to_request( $request )>
+
+C<$request> is a reference to the hash representing
+the structure of the request.
+
+This method encodes C<$request>, pass it to the leader of cluster, receives reply and returns
+it in a form of hash reference.
+
+WARNING:
+
+=over 3
+
+=item *
+
+This method is not designed to be use by the end user.
+
+=item *
+
+In order to achieve better performance, this method do not perform arguments validation.
+
+=back
+
+=cut
 sub receive_response_to_request {
     my ( $self, $request ) = @_;
 
@@ -258,9 +454,8 @@ sub receive_response_to_request {
     $self->_update_metadata( $topic_name )
         unless %{ $self->{_metadata} }; # the first request
     %{ $self->{_metadata} } # hash metadata could be updated
-        or return $self->_error( $ERROR_CANNOT_GET_METADATA, __PACKAGE__.'->receive_response_to_request' );
-    my $encoded_request = $protocol{ $api_key }->{encode}->( $request )
-        or return $self->_error( Kafka::Protocol::last_errorcode, Kafka::Protocol::last_error );
+        or return $self->_error( $ERROR_CANNOT_GET_METADATA, __PACKAGE__.'->receive_response_to_request: '.$self->last_error );
+    my $encoded_request = $protocol{ $api_key }->{encode}->( $request );
 
     my $CorrelationId = $request->{CorrelationId} // _get_CorrelationId;
 
@@ -271,7 +466,7 @@ sub receive_response_to_request {
         {
             if ( defined( my $leader = $self->{_metadata}->{ $topic_name }->{ $partition }->{Leader} ) ) {   # hash metadata could be updated
                 my $server = $self->{_leaders}->{ $leader }
-                    or return $self->_error( $ERROR_DESCRIPTION_LEADER_NOT_FOUND );
+                    or return $self->_error( $ERROR_LEADER_NOT_FOUND );
 
                 # Send a request to the leader
                 last REQUEST unless
@@ -301,8 +496,7 @@ sub receive_response_to_request {
                 else {
                     my $encoded_response_ref = $self->_receiveIO( $server )
                         or last REQUEST;
-                    $response = $protocol{ $api_key }->{decode}->( $encoded_response_ref )
-                        or return $self->_error( Kafka::Protocol::last_errorcode, Kafka::Protocol::last_error );
+                    $response = $protocol{ $api_key }->{decode}->( $encoded_response_ref );
                 }
 
                 $response->{CorrelationId} == $CorrelationId
@@ -321,7 +515,7 @@ sub receive_response_to_request {
         $self->_update_metadata( $topic_name );
     }
 
-# NOTE: Here is possible, for example to repeat the operation
+    # NOTE: it is possible to repeat the operation here
 
     $self->_error( $ERROR_NO_ERROR )
         if $self->last_error;
@@ -329,6 +523,11 @@ sub receive_response_to_request {
     return;     # IO error and !RaiseError
 }
 
+=head3 C<close_connection( $server )>
+
+Closes connection with C<$server> (defined as host:port).
+
+=cut
 sub close_connection {
     my ( $self, $server ) = @_;
 
@@ -339,6 +538,11 @@ sub close_connection {
     return;
 }
 
+=head3 C<close>
+
+Closes connection with all known Kafka servers.
+
+=cut
 sub close {
     my ( $self ) = @_;
 
@@ -354,6 +558,7 @@ sub close {
 
 #-- private methods ------------------------------------------------------------
 
+# Returns identifier of the cluster leader (host:port)
 sub _find_leader_server {
     my ( $self, $node_id ) = @_;
 
@@ -371,7 +576,7 @@ sub _find_leader_server {
     return $leader_server;
 }
 
-# Form a list of servers to attempt to query the metadata
+# Form a list of servers to attempt querying of the metadata
 sub _get_interviewed_servers {
     my ( $self ) = @_;
 
@@ -396,6 +601,7 @@ sub _get_interviewed_servers {
     return( shuffle( @priority ), shuffle( @secondary ), shuffle( @rest ) );
 }
 
+# Refresh metadata for given topic
 sub _update_metadata {
     my ( $self, $topic ) = @_;
 
@@ -406,8 +612,7 @@ sub _update_metadata {
             topics          => [
                 $topic,
             ],
-        } )
-        or return $self->_error( Kafka::Protocol::last_errorcode, Kafka::Protocol::last_error );
+        } );
 
     my $encoded_response_ref;
     my @brokers = $self->_get_interviewed_servers;
@@ -420,12 +625,11 @@ sub _update_metadata {
     }
 
     unless ( $encoded_response_ref ) {  # IO error and !RaiseError
-# NOTE: Here is possible, for example to repeat the operation
+        # NOTE: it is possible to repeat the operation here
         return;
     }
 
-    my $decoded_response = $protocol{ $APIKEY_METADATA }->{decode}->( $encoded_response_ref )
-        or return $self->_error( Kafka::Protocol::last_errorcode, Kafka::Protocol::last_error );
+    my $decoded_response = $protocol{ $APIKEY_METADATA }->{decode}->( $encoded_response_ref );
     $decoded_response->{CorrelationId} == $CorrelationId
         or return $self->_error( $ERROR_MISMATCH_CORRELATIONID );
 
@@ -449,7 +653,7 @@ sub _update_metadata {
         };
     }
 
-    #NOTE: In the IO cache not remove server records missing in the received metadata
+    #NOTE: IO cache does not remove server that's missing in metadata
 
     # Collect the received metadata
     my ( $received_metadata, $leaders ) = ( {}, {} );
@@ -483,12 +687,14 @@ sub _update_metadata {
     return 1;
 }
 
+# forms server identifier using supplied $host, $port
 sub _build_server_name {
     my ( $self, $host, $port ) = @_;
 
     return "$host:$port";
 }
 
+# connects to a server (host:port)
 sub _connectIO {
     my ( $self, $server ) = @_;
 
@@ -501,7 +707,7 @@ sub _connectIO {
             timeout     => $self->{timeout},
         );
         if ( $io->last_errorcode != $ERROR_NO_ERROR ) {
-# NOTE: Here is possible, for example to repeat the operation
+            # NOTE: it is possible to repeat the operation here
             return $self->_io_error( $server );
         }
     }
@@ -509,6 +715,7 @@ sub _connectIO {
     return $server_data->{IO};
 }
 
+# Send encoded request ($encoded_request) to server ($server)
 sub _sendIO {
     my ( $self, $server, $encoded_request ) = @_;
 
@@ -516,11 +723,12 @@ sub _sendIO {
         return 1;
     }
     else {
-# NOTE: Here is possible, for example to repeat the operation
+        # NOTE: it is possible to repeat the operation here
         return $self->_io_error( $server );
     }
 }
 
+# Receive response from a given server
 sub _receiveIO {
     my ( $self, $server ) = @_;
 
@@ -534,11 +742,12 @@ sub _receiveIO {
         return $response_ref;
     }
     else {
-# NOTE: Here is possible, for example to repeat the operation
+        # NOTE: it is possible to repeat the operation here
         return $self->_io_error( $server );
     }
 }
 
+# Close connectino to $server
 sub _closeIO {
     my ( $self, $server ) = @_;
 
@@ -550,20 +759,22 @@ sub _closeIO {
     }
 }
 
+# check validity of an argument (to match host:port format)
 sub _is_like_server {
     my ( $self, $server ) = @_;
 
     return $server
-        if defined( $server ) && defined( _STRING( $server ) ) && !utf8::is_utf8( $server ) && $server =~ /^[^:]+:\d+$/o;
+        if defined( $server ) && defined( _STRING( $server ) ) && !utf8::is_utf8( $server ) && $server =~ /^[^:]+:\d+$/;
 }
 
-# necessary because metadata using the 'Host' defined by hostname
+# transforms localhost because metadata using the 'Host' defined by hostname
 sub _localhost_to_hostname {
     my ( $self, $host ) = @_;
 
-    return $host =~ /^(?:localhost|127\.0\.0\.1)$/io ? hostname : $host;
+    return $host =~ /^(?:localhost|127\.0\.0\.1)$/i ? hostname : $host;
 }
 
+# error handler
 sub _io_error {
     my ( $self, $server ) = @_;
 
@@ -591,101 +802,104 @@ sub _io_error {
 
 __END__
 
-=head1 NAME
+=head3 C<RaiseError>
 
-Kafka::Connection - blah-blah-blah
+This method returns current value showing how errors are handled within Kafka module.
+If set to true, die() is dispatched when error during communication is detected.
 
-=head1 VERSION
+C<last_errorcode> and C<last_error> are diagnostic methods and can be used to get detailed
+error codes and messages for various cases: when server or the resource is not available,
+access to the resource was denied, etc.
 
-This documentation refers to C<Kafka::Connection> version 0.800_1
+=head3 C<last_errorcode>
 
-=head1 SYNOPSIS
+Returns code of the last error.
 
-    use 5.010;
-    use strict;
+=head3 C<last_error>
 
-    # A simple example of Kafka::Connection usage:
-    use Kafka::Connection;
+Returns an error message that contains information about the encountered failure.
 
-    # connect to local cluster with the defaults
-    my $connect = Kafka::Connection->new( host => 'localhost' );
+=head1 DIAGNOSTICS
 
-    # decoding of the error
-    say STDERR 'last error: ', $connect->last_error
-        unless $connect->last_errorcode;
+Review documentation of the L</RaiseError> method for additional information about possible errors.
 
-=head1 DESCRIPTION
+It's advised to always check L</last_errorcode> and more descriptive L</last_error> when
+L</RaiseError> is not set.
 
-blah-blah-blah
+=over 3
 
-=head2 CONSTRUCTOR
+=item C<Invalid argument>
 
-=head3 C<new>
+Invalid argument was provided to C<new> L<constructor|/CONSTRUCTOR> or to other L<method|/METHODS>.
 
-blah-blah-blah
+=item C<Can't send>
 
-=head2 METHODS
+Message can't be sent to Kafka.
 
-blah-blah-blah
+=item C<Can't recv>
 
-=head3 C<receive_response_to_request( blah-blah-blah )>
+Message can't be received from Kafka.
 
-blah-blah-blah
+=item C<Can't bind>
 
-=head3 C<get_known_servers>
+A successful TCP connection can't be established on given host and port.
 
-blah-blah-blah
+=item C<Can't get metadata>
 
-=head3 C<is_server_known( blah-blah-blah )>
+Error detected during parsing of response from Kafka.
 
-blah-blah-blah
+=item C<Leader not found>
 
-=head3 C<is_server_alive( blah-blah-blah )>
+Failed to locate leader of Kafka cluster.
 
-blah-blah-blah
+=item C<Mismatch CorrelationId>
 
-=head3 C<close_connection( blah-blah-blah )>
+Mismatch of C<CorrelationId> of request and response.
 
-blah-blah-blah
+=item C<There are no known brokers>
 
-=head3 C<close>
+Failed to locate cluster broker.
 
-blah-blah-blah
+=item C<Can't get metadata>
 
-=head2 EXPORT
-
-blah-blah-blah
-
-=head2 GLOBAL VARIABLES
-
-=over
-
-=item C<@Kafka::ERROR>
-
-Contain the descriptions for possible error codes returned by
-C<last_errorcode> methods and functions of the package modules.
-
-=item C<%Kafka::ERROR_CODE>
-
-blah-blah-blah
+Received meta data is incorrect or missing.
 
 =back
 
-=head1 DEPENDENCIES
-
-blah-blah-blah
-
-=head1 BUGS AND LIMITATIONS
-
-blah-blah-blah
-
-=head1 MORE DOCUMENTATION
-
-All modules contain detailed information on the interfaces they provide.
+Use L</last_error> method from C<Kafka::Connection> object to obtain detailed
+description of an error.
 
 =head1 SEE ALSO
 
-blah-blah-blah
+The basic operation of the Kafka package modules:
+
+L<Kafka|Kafka> - constants and messages used by the Kafka package modules.
+
+L<Kafka::Connection|Kafka::Connection> - interface to connect to a Kafka cluster.
+
+L<Kafka::Producer|Kafka::Producer> - interface for producing client.
+
+L<Kafka::Consumer|Kafka::Consumer> - interface for consuming client.
+
+L<Kafka::Message|Kafka::Message> - interface to access Kafka message
+properties.
+
+L<Kafka::Int64|Kafka::Int64> - functions to work with 64 bit elements of the
+protocol on 32 bit systems.
+
+L<Kafka::Protocol|Kafka::Protocol> - functions to process messages in the
+Apache Kafka's Protocol.
+
+L<Kafka::IO|Kafka::IO> - low level interface for communication with Kafka server.
+
+L<Kafka::Internals|Kafka::Internals> - Internal constants and functions used
+by several package modules.
+
+A wealth of detail about the Apache Kafka and the Kafka Protocol:
+
+Main page at L<http://kafka.apache.org/>
+
+Kafka Protocol at L<https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol>
 
 =head1 AUTHOR
 

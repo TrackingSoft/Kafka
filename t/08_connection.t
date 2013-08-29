@@ -39,7 +39,7 @@ use Params::Util qw(
 );
 
 use Kafka qw(
-    $BLOCK_UNTIL_IS_COMMITED
+    $BLOCK_UNTIL_IS_COMMITTED
     $DEFAULT_MAX_NUMBER_OF_OFFSETS
     $DEFAULT_MAX_BYTES
     $DEFAULT_MAX_WAIT_TIME
@@ -258,7 +258,7 @@ sub testing {
     for my $mode (
             $NOT_SEND_ANY_RESPONSE,
             $WAIT_WRITTEN_TO_LOCAL_LOG,
-            $BLOCK_UNTIL_IS_COMMITED,
+            $BLOCK_UNTIL_IS_COMMITTED,
         ) {
 
         $request = {
@@ -394,7 +394,7 @@ sub testing {
     ok !$tmp, 'server is not alive';
 
 #-- finish
-    Kafka::MockIO::undefine()
+    Kafka::MockIO::restore()
         unless $kafka_base_dir;
 }
 

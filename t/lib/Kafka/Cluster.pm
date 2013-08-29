@@ -1,8 +1,14 @@
 package Kafka::Cluster;
 
-#TODO: title - the name, purpose, and a warning that this one is for internal use only
+=head1 NAME
 
-# Both Path::Class::Dir and Path::Class::File offer further useful behaviors.
+Kafka::Cluster - object interface to manage a test kafka cluster.
+
+=head1 VERSION
+
+This documentation refers to C<Kafka::Cluster> version 0.800_1 .
+
+=cut
 
 #-- Pragmas --------------------------------------------------------------------
 
@@ -14,24 +20,14 @@ use warnings;
 
 our $VERSION = '0.800_1';
 
-=for If you want to set up a Zookeeper cluster on multiple servers
+use Exporter qw(
+    import
+);
 
-See Step 2-4 at
-https://cwiki.apache.org/confluence/display/KAFKA/Kafka+0.8+Quick+Start
-
-...
-
-First start the zookeeper server.
-> bin/zookeeper-server-start.sh config/zookeeper.properties
-
-Start the Kafka brokers in separate shells:
-> bin/kafka-server-start.sh config/server1.properties
-...
-
-Create a topic with a replication factor of N (3 for example).
-> bin/kafka-create-topic.sh --topic mytopic --replica N --zookeeper localhost:2181
-
-=cut
+our @EXPORT_OK = qw(
+    $DEFAULT_TOPIC
+    $START_PORT
+);
 
 #-- load the modules -----------------------------------------------------------
 
@@ -71,9 +67,71 @@ use Kafka::IO;
 
 #-- declarations ---------------------------------------------------------------
 
+=head1 SYNOPSIS
+
+    # For examples see:
+    # t/??_cluster.t, t/??_cluster_start.t, t/??_connection.t, t/??_cluster_stop.t
+
+=head1 DESCRIPTION
+
+This module is not a user module.
+
+The main features of the C<Kafka::Cluster> module are:
+
+=over 3
+
+=item *
+
+Automatic start and stop the zookeeper server.
+
+=item *
+
+Start-up, re-initialize, stop the kafka servers cluster.
+
+=item *
+
+The servers automatically uses free ports.
+
+=item *
+
+Create, delete the data structures used by servers.
+
+=item *
+
+Getting information about the used servers.
+
+=item *
+
+Connection to an earlier running cluster.
+
+=item *
+
+The ability to perform a query to necessary server cluster.
+
+=back
+
+=head2 EXPORT
+
+These variables are the constants and never change their values.
+
+=cut
+
+=head3 C<$START_PORT>
+
+The port used to start the search of free ports - 9094.
+Zookeeper server uses the first available port.
+
+=cut
 const our   $START_PORT                     => 9094;    # Port Number 9094-9099 Unassigned
-const my    $MAX_ATTEMPT                    => 5;
+
+=head3 C<$DEFAULT_TOPIC>
+
+Used topic name.
+
+=cut
 const our   $DEFAULT_TOPIC                  => 'mytopic';
+
+const my    $MAX_ATTEMPT                    => 5;
 const my    $INI_SECTION                    => 'GENERAL';
 const my    $RELATIVE_LOG4J_PROPERTY_FILE   => catfile( '..', '..', 'config', 'log4j.properties' );
 const my    $DEFAULT_CLUSTER_FACTOR         => 3;       # The cluster contains 3 servers
@@ -94,8 +152,52 @@ my $start_dir;
 # protection against re-create the cluster object
 our $_used = 0;
 
-# If the script is run from the directory to the installation of the kafka server,
-# then you can work on the structure of the real files on the kafka server
+
+=head2 CONSTRUCTOR
+
+=head3 C<new>
+
+Starts the server required for cluster or provides the ability to connect to a running cluster.
+In the first call in start-up, also launching a zookeeper server.
+Creates a C<Kafka::Cluster> object.
+
+An error will cause the program to halt.
+
+To identify a particular server in the cluster port is used.
+The structures of these servers are created in the C<t/data>.
+
+C<new()> takes arguments in key-value pairs.
+The following arguments are currently recognized:
+
+=over 3
+
+=item C<kafka_dir =E<gt> $kafka_dir>
+
+The root directory of the Kafka installation.
+
+=item C<cluster_factor =E<gt> $cluster_factor>
+
+Number kafka servers belonging to the generated cluster.
+
+Optional, default = 3.
+
+=item C<does_not_start =E<gt> $does_not_start>
+
+Sign of the need to connect to the already created cluster.
+
+Optional, default = false (create and run a new cluster).
+
+=item C<t_dir =E<gt> $t_dir>
+
+The required data structures are prepared to work in the directory C<t/>.
+When connected to a cluster from another directory,
+you must specify the path to the directory C<t/>.
+
+Optional - not specified (operation carried out in the directory C<t/>).
+
+=back
+
+=cut
 sub new {
     my ( $class, %args ) = @_;
 
@@ -238,12 +340,39 @@ sub new {
 
 #-- public attributes ----------------------------------------------------------
 
+=head2 METHODS
+
+The following methods are defined for the C<Kafka::Cluster> class:
+
+=cut
+
+=head3 C<base_dir>
+
+Returns the root directory of the installation of Kafka.
+
+=cut
 sub base_dir {
     my ( $self ) = @_;
 
     return $self->{kafka}->{base_dir};
 }
 
+=head3 C<log_dir( $port )>
+
+Constructs and returns the path to the data directory kafka server with the specified port.
+
+This function take argument. The following argument is currently recognized:
+
+=over 3
+
+=item C<$port>
+
+C<$port> denoting the port number of the kafka service.
+The C<$port> should be a number.
+
+=back
+
+=cut
 sub log_dir {
     my ( $self, $port ) = @_;
 
@@ -252,12 +381,35 @@ sub log_dir {
     return catdir( $self->_data_dir, "$KAFKA_LOGS_DIR_MASK$port" );
 }
 
+=head3 C<servers>
+
+Returns a sorted list of ports kafka servers in the cluster.
+
+=cut
 sub servers {
     my ( $self ) = @_;
 
     return( sort keys %{ $self->_cluster } );
 }
 
+=head3 C<node_id( $port )>
+
+Returns the node ID assigned by kafka server in the cluster.
+Returns C <undef>, if the server does not have an ID
+or a server with the specified port is not in the cluster.
+
+This function take argument. The following argument is currently recognized:
+
+=over 3
+
+=item C<$port>
+
+C<$port> denoting the port number of the kafka service.
+The C<$port> should be a number.
+
+=back
+
+=cut
 sub node_id {
     my ( $self, $port ) = @_;
 
@@ -266,6 +418,11 @@ sub node_id {
     return $self->_server( $port )->{node_id};
 }
 
+=head3 C<zookeeper_port>
+
+Returns the port number used by zookeeper server.
+
+=cut
 sub zookeeper_port {
     my ( $self ) = @_;
 
@@ -274,6 +431,13 @@ sub zookeeper_port {
 
 #-- public methods -------------------------------------------------------------
 
+=head3 C<init>
+
+Initializes the data structures used by kafka servers.
+At initialization, all the servers are stopped and deleted the data structure used by them.
+Zookeeper server does not stop, his data structure does not remove.
+
+=cut
 sub init {
     my ( $self ) = @_;
 
@@ -287,8 +451,24 @@ sub init {
     return 1;
 }
 
-sub stop
-{
+=head3 C<stop( $port )>
+
+Stops kafka server with the specified port.
+Stop all servers in the cluster, if the port is not specified.
+
+This function take argument. The following argument is currently recognized:
+
+=over 3
+
+=item C<$port>
+
+C<$port> denoting the port number of the kafka service.
+The C<$port> should be a number.
+
+=back
+
+=cut
+sub stop {
     my ( $self, $port ) = @_;
 
     unless ( $port ) {
@@ -307,6 +487,23 @@ sub stop
     $self->_stop_server( $pid_file, 'kafka', $port );
 }
 
+=head3 C<start( $port )>
+
+Starts (restarts) kafka server with the specified port.
+Starts (restarts) all servers in the cluster, if the port is not specified.
+
+This function take argument. The following argument is currently recognized:
+
+=over 3
+
+=item C<$port>
+
+C<$port> denoting the port number of the kafka service.
+The C<$port> should be a number.
+
+=back
+
+=cut
 sub start {
     my ( $self, $port ) = @_;
 
@@ -352,33 +549,29 @@ sub start {
                 RaiseError => 1,
             );
 
-=for a brief description of the request
-
-***** A MetadataRequest example:
-Hex Stream: 000000300003000000000000000C746573742D726571756573740000000100146E6F745F7265706C696361626C655F746F706963
-
-**** Common Request and Response
-RequestOrResponse => Size (RequestMessage | ResponseMessage)
-00:00:00:30:                    # MessageSize => int32 (a size 0x30 = 48 bytes)
-*** Request header
-RequestMessage => ApiKey ApiVersion CorrelationId ClientId RequestMessage
-00:03:                          # ApiKey => int16
-00:00:                          # ApiVersion => int16
-00:00:00:00:                    # CorrelationId => int32
-00:0C:                          # ClientId => string (a length 0xC = 12 bytes)
-74:65:73:74:2D:72:65:71:75:65:  #   content = 'test-request'
-73:74:
-**** MetadataRequest
-MetadataRequest => [TopicName]
-*** Array data for 'topics':
-00:00:00:01:                    # int32 array size containing the length N (repetitions of the structure)
-    [ the first element of the 'topics' array
-    00:14:                          # TopicName => string (a length 0x14 = 20 bytes)
-    6E:6F:74:5F:72:65:70:6C:69:63:  #   content = 'not_replicable_topic'
-    61:62:6C:65:5F:74:6F:70:69:63
-    ] the end of the first element of 'topics' the array
-
-=cut
+# ***** A MetadataRequest example:
+# Hex Stream: 000000300003000000000000000C746573742D726571756573740000000100146E6F745F7265706C696361626C655F746F706963
+#
+# **** Common Request and Response
+# RequestOrResponse => Size (RequestMessage | ResponseMessage)
+# 00:00:00:30:                    # MessageSize => int32 (a size 0x30 = 48 bytes)
+# *** Request header
+# RequestMessage => ApiKey ApiVersion CorrelationId ClientId RequestMessage
+# 00:03:                          # ApiKey => int16
+# 00:00:                          # ApiVersion => int16
+# 00:00:00:00:                    # CorrelationId => int32
+# 00:0C:                          # ClientId => string (a length 0xC = 12 bytes)
+# 74:65:73:74:2D:72:65:71:75:65:  #   content = 'test-request'
+# 73:74:
+# **** MetadataRequest
+# MetadataRequest => [TopicName]
+# *** Array data for 'topics':
+# 00:00:00:01:                    # int32 array size containing the length N (repetitions of the structure)
+#     [ the first element of the 'topics' array
+#     00:14:                          # TopicName => string (a length 0x14 = 20 bytes)
+#     6E:6F:74:5F:72:65:70:6C:69:63:  #   content = 'not_replicable_topic'
+#     61:62:6C:65:5F:74:6F:70:69:63
+#     ] the end of the first element of 'topics' the array
 
             $io->send( pack( 'H*', '000000300003000000000000000C746573742D726571756573740000000100146E6F745F7265706C696361626C655F746F706963' ) );
             my $response = $io->receive( 4 );
@@ -396,8 +589,34 @@ MetadataRequest => [TopicName]
     }
 }
 
+=head3 C<request( $port, $bin_stream, $without_response )>
+
+Kafka server transmits a string of binary query retrieves and returns a binary response.
+No response is expected, and returns an empty string if the argument C<$without_response> is true.
+
+Kafka server is identified by the specified port.
+
+This function take arguments. The following arguments is currently recognized:
+
+=over 3
+
+=item C<$port>
+
+C<$port> denoting the port number of the kafka service.
+The C<$port> should be a number.
+
+=item C<$bin_stream>
+
+C<$bin_stream> denoting an empty binary string of the request to kafka server.
+
+=back
+
+=cut
 sub request {
-    my ( $self, $port, $stream, $without_response ) = @_;
+    my ( $self, $port, $bin_stream, $without_response ) = @_;
+
+    defined( _STRING( $bin_stream ) )
+        // confess( "The value of '\$bin_stream' should be a string" );
 
     my $io = Kafka::IO->new(
         host       => 'localhost',
@@ -405,11 +624,11 @@ sub request {
         RaiseError => 1,
     );
 
-    $io->send( pack( 'H*', $stream ) );
+    $io->send( pack( q{H*}, $bin_stream ) );
     my $response = q{};
     unless ( $without_response ) {
         $response = $io->receive( 4 );
-        my $tail = $io->receive( unpack( 'l>', $$response ) );
+        my $tail = $io->receive( unpack( q{l>}, $$response ) );
         $$response .= $$tail;
     }
     $io->close;
@@ -417,12 +636,24 @@ sub request {
     return $response;
 };
 
+=head3 C<is_run_in_base_dir>
+
+Returns true, if the work is performed in the root directory of the installation Kafka.
+
+=cut
 sub is_run_in_base_dir {
     my ( $self ) = @_;
 
     return $self->base_dir eq $start_dir;
 }
 
+=head3 C<close>
+
+Stop all production servers (including the zookeeper server).
+Deletes all data directories used by the servers.
+After execution, the C<t/data> catalog does not contain service files.
+
+=cut
 sub close {
     my ( $self ) = @_;
 
@@ -437,12 +668,14 @@ sub close {
 
 #-- private attributes ---------------------------------------------------------
 
+# Returns a reference to a hash with descriptions kafka servers forming the cluster.
 sub _cluster {
     my ( $self ) = @_;
 
     return $self->{cluster};
 }
 
+# Returns a hash with the description kafka server with the specified port.
 sub _server {
     my ( $self, $port ) = @_;
 
@@ -456,6 +689,7 @@ sub _server {
     }
 }
 
+# Constructs and returns the path to the metrics-directory of Kafka server with the specified port.
 sub _metrics_dir {
     my ( $self, $port ) = @_;
 
@@ -464,18 +698,21 @@ sub _metrics_dir {
     return catdir( $self->_data_dir, "metrics-logs-$port" );
 }
 
+# Returns the path to the directory with the external programs.
 sub _bin_dir {
     my ( $self ) = @_;
 
     return $self->{kafka}->{bin_dir};
 }
 
+# Returns the path to the configuration file templates.
 sub _config_dir {
     my ( $self ) = @_;
 
     return $self->{kafka}->{config_dir};
 }
 
+# Returns the path to the directory with the data used by the server.
 sub _data_dir {
     my ( $self ) = @_;
 
@@ -484,8 +721,9 @@ sub _data_dir {
 
 #-- private methods ------------------------------------------------------------
 
-sub _kill_pid
-{
+# Kills the process with the specified pid (argument $pid), sending a signal ($signal).
+# Argument specifies the name of the process.
+sub _kill_pid {
     my ( $self, $pid, $what, $signal ) = @_;
 
     unless( $pid ) {
@@ -505,6 +743,7 @@ sub _kill_pid
     }
 }
 
+# Completes the program on configuration file error.
 sub _ini_error {
     my ( $self, $inifile ) = @_;
 
@@ -513,6 +752,7 @@ sub _ini_error {
     confess $error;
 }
 
+# Returns true, if set in the constructor Kafka installation directory does not contain installation version 0.8.
 sub _is_kafka_0_8 {
     my ( $self ) = @_;
 
@@ -525,21 +765,22 @@ sub _is_kafka_0_8 {
     return -f $ref_file;
 }
 
-# It can be used not only for the registered servers
-# (for example, for analysis outdated files)
+# Returns true, if the argument contains a valid port number.
 sub _verify_port {
     my ( $self, $port ) = @_;
 
     return( _NONNEGINT( $port ) // confess 'The argument must be a positive integer' );
 }
 
+# Terminates the program if you are working in an invalid directory.
 sub _verify_run_dir {
     my ( $self ) = @_;
 
-    confess "Operation is not valid because running in the Kafka server directory - perform the operation manually"
+    confess 'Operation is not valid because running in the Kafka server directory - perform the operation manually'
         if $self->is_run_in_base_dir;
 }
 
+# Constructs and returns the path to the pid-file (the server with the specified port).
 sub _get_pid_file_name {
     my ( $self, $port ) = @_;
 
@@ -548,14 +789,15 @@ sub _get_pid_file_name {
     return catfile( $self->_data_dir, "kafka-$port.pid" );
 }
 
+# Constructs and returns the path to the pid-file used by zookeeper server.
 sub _get_zookeeper_pid_file_name {
     my ( $self ) = @_;
 
     return catfile( $self->_data_dir, "zookeeper.pid" );
 }
 
-sub _read_pid_file
-{
+# pid is obtained from a specified pid-file.
+sub _read_pid_file {
     my ( $self, $pid_file ) = @_;
 
     if( !( my $PID = IO::File->new( $pid_file, 'r' ) ) ) {
@@ -573,6 +815,7 @@ sub _read_pid_file
     return; # no pid found
 }
 
+# Deletes kafka server data directory trees.
 sub _remove_log_tree {
     my ( $self, $port ) = @_;
 
@@ -595,6 +838,7 @@ sub _remove_log_tree {
     remove_tree( $self->_metrics_dir( $port ) );
 }
 
+# Starts zookeeper server.
 sub _start_zookeeper {
     my ( $self ) = @_;
 
@@ -644,6 +888,7 @@ sub _start_zookeeper {
     return $zookeeper_client_port;
 }
 
+# Creates data directories for the kafka server.
 sub _create_kafka_log_dir {
     my ( $self, $port ) = @_;
 
@@ -677,6 +922,13 @@ sub _create_kafka_log_dir {
     }
 }
 
+# Starts the server. The following arguments:
+#   $server_name    - The name of the server.
+#   $property_file  - The path to the configuration file.
+#   $arg            - Additional arguments.
+#   $pid_file       - Name of new pid-file.
+#   $log_dir        - The path to the data directory.
+#   $port           - The port that should be used to run the server.
 sub _start_server {
     my ( $self, $server_name, $property_file, $arg, $pid_file, $log_dir, $port ) = @_;
 
@@ -752,6 +1004,7 @@ sub _start_server {
         unless check_port( $port );
 }
 
+# Shuts down the zookeeper server.
 sub _stop_zookeeper {
     my ( $self ) = @_;
 
@@ -767,6 +1020,10 @@ sub _stop_zookeeper {
     delete $self->{kafka}->{zookeeper_clientPort};
 }
 
+# Kills the server process. The following arguments:
+#   $pid_file       - Path to pid-file.
+#   $server_name    - The server name.
+#   $port           - The port used by the server.
 sub _stop_server {
     my ( $self, $pid_file, $server_name, $port ) = @_;
 
@@ -790,6 +1047,7 @@ sub _stop_server {
         if check_port( $port );
 }
 
+# Create a new topic with a replication factor.
 sub _create_topic {
     my ( $self ) = @_;
 
@@ -834,3 +1092,66 @@ sub _create_topic {
 1;
 
 __END__
+
+=head1 DIAGNOSTICS
+
+Error will causes to die automatically.
+The error message will be displayed on the console.
+
+=head1 SEE ALSO
+
+The basic operation of the Kafka package modules:
+
+L<Kafka|Kafka> - constants and messages used by the Kafka package modules.
+
+L<Kafka::Connection|Kafka::Connection> - interface to connect to a Kafka cluster.
+
+L<Kafka::Producer|Kafka::Producer> - interface for producing client.
+
+L<Kafka::Consumer|Kafka::Consumer> - interface for consuming client.
+
+L<Kafka::Message|Kafka::Message> - interface to access Kafka message
+properties.
+
+L<Kafka::Int64|Kafka::Int64> - functions to work with 64 bit elements of the
+protocol on 32 bit systems.
+
+L<Kafka::Protocol|Kafka::Protocol> - functions to process messages in the
+Apache Kafka's Protocol.
+
+L<Kafka::IO|Kafka::IO> - low level interface for communication with Kafka server.
+
+L<Kafka::Internals|Kafka::Internals> - Internal constants and functions used
+by several package modules.
+
+A wealth of detail about the Apache Kafka and the Kafka Protocol:
+
+Main page at L<http://kafka.apache.org/>
+
+Kafka Protocol at L<https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol>
+
+=head1 AUTHOR
+
+Sergey Gladkov, E<lt>sgladkov@trackingsoft.comE<gt>
+
+=head1 CONTRIBUTORS
+
+Alexander Solovey
+
+Jeremy Jordan
+
+Vlad Marchenko
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright (C) 2012-2013 by TrackingSoft LLC.
+
+This package is free software; you can redistribute it and/or modify it under
+the same terms as Perl itself. See I<perlartistic> at
+L<http://dev.perl.org/licenses/artistic.html>.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE.
+
+=cut

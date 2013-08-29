@@ -1,7 +1,14 @@
 package Kafka::Protocol;
 
-# WARNING: in order to achieve better performance,
-# methods of this module do not perform arguments validation
+=head1 NAME
+
+Kafka::Protocol - functions to process messages in the Apache Kafka protocol.
+
+=head1 VERSION
+
+This documentation refers to C<Kafka::Protocol> version 0.800_1 .
+
+=cut
 
 #-- Pragmas --------------------------------------------------------------------
 
@@ -10,6 +17,8 @@ use strict;
 use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
+
+our $VERSION = '0.800_1';
 
 use Exporter qw(
     import
@@ -23,9 +32,6 @@ our @EXPORT_OK = qw(
     encode_metadata_request
     encode_offset_request
     encode_produce_request
-    last_error
-    last_errorcode
-    _protocol_error
     _decode_MessageSet_template
     _decode_MessageSet_array
     _encode_MessageSet_array
@@ -35,19 +41,11 @@ our @EXPORT_OK = qw(
     _verify_string
     $APIVERSION
     $BAD_OFFSET
-    $COMPRESSION_CODEC_MASK
-    $COMPRESSION_EXISTS
-    $COMPRESSION_GZIP
     $COMPRESSION_NONE
-    $COMPRESSION_NOT_EXIST
-    $COMPRESSION_SNAPPY
-    $CONSUMER_HAVE_NO_NODE_ID
     $CONSUMERS_REPLICAID
     $NULL_BYTES_LENGTH
     $_int64_template
 );
-
-our $VERSION = '0.800_1';
 
 #-- load the modules -----------------------------------------------------------
 
@@ -65,7 +63,7 @@ use String::CRC32;
 
 use Kafka qw(
     $BITS64
-    $BLOCK_UNTIL_IS_COMMITED
+    $BLOCK_UNTIL_IS_COMMITTED
     $DEFAULT_MAX_WAIT_TIME
     %ERROR
     $ERROR_MISMATCH_ARGUMENT
@@ -88,134 +86,237 @@ use Kafka::Internals qw(
 
 #-- declarations ---------------------------------------------------------------
 
-=for Protocol Information
+=head1 SYNOPSIS
 
-A Guide To The Kafka Protocol 0.8:
-https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol
+    use 5.010;
+    use strict;
+    use warnings;
 
--- Protocol Primitive Types
-int8, int16, int32, int64
-    Signed integers
-    stored in big endian order.
-bytes, string
-    consist of a signed integer
-    giving a length N
-    followed by N bytes of content.
-    A length of -1 indicates null.
-    string uses an int16 for its size,
-    and bytes uses an int32.
-Arrays
-    These will always be encoded as an int32 size containing the length N
-    followed by N repetitions of the structure
-    which can itself be made up of other primitive types.
+    use Data::Compare;
+    use Kafka qw(
+        $ERROR_NO_ERROR
+        $REQUEST_TIMEOUT
+        $WAIT_WRITTEN_TO_LOCAL_LOG
+    );
+    use Kafka::Internals qw(
+        $PRODUCER_ANY_OFFSET
+    );
+    use Kafka::Protocol qw(
+        $COMPRESSION_NONE
+        decode_produce_response
+        encode_produce_request
+    );
 
--- N.B.
-- The response will always match the paired request
-- One structure common to both the produce and fetch requests is the message set format.
-- MessageSets are not preceded by an int32 like other array elements in the protocol.
-- A message set is also the unit of compression in Kafka,
-    and we allow messages to recursively contain compressed message sets.
+    # a encoded produce request hex stream
+    my $encoded = pack( q{H*}, '00000049000000000000000400000001000005dc0000000100076d79746f7069630000000100000000000000200000000000000000000000148dc795a20000ffffffff0000000648656c6c6f21' );
 
--- Protocol Fields
-ApiKey => int16                 That identifies the API being invoked
-ApiVersion => int16             This is a numeric version number for this api.
-                                Currently the supported version for all APIs is 0.
-Attributes => int8              Metadata attributes about the message.
-                                In particular the last 3 bits contain the compression codec used for the message.
-ClientId => string              This is a user supplied identifier for the client application.
-CorrelationId => int32          This is a user-supplied integer.
-                                It will be passed back in the response by the server, unmodified.
-                                It is useful for matching request and response between the client and server.
-Crc => int32                    The CRC32 of the remainder of the message bytes.
-ErrorCode => int16              The error from this partition, if any.
-                                Errors are given on a per-partition basis
-                                    because a given partition may be unavailable or maintained on a different host,
-                                    while others may have successfully accepted the produce request.
-FetchOffset => int64            The offset to begin this fetch from.
-HighwaterMarkOffset => int64    The offset at the end of the log for this partition.
-                                This can be used by the client to determine how many messages behind the end of the log they are.
-                                - 0.8 documents: Replication design
-                                The high watermark is the offset of the last committed message.
-                                Each log is periodically synced to disks.
-                                Data before the flushed offset is guaranteed to be persisted on disks.
-                                As we will see, the flush offset can be before or after high watermark.
-                                - 0.7 documents: Wire protocol
-                                If the last segment file for the partition is not empty and was modified earlier than TIME,
-                                        it will return both the first offset for that segment and the high water mark.
-                                The high water mark is not the offset of the last message,
-                                        but rather the offset that the next message sent to the partition will be written to.
-Host => string                  The brokers hostname
-Isr => [ReplicaId]              The set subset of the replicas that are "caught up" to the leader - a set of in-sync replicas (ISR)
-Key => bytes                    An optional message key
-                                The key can be null.
-Leader => int32                 The node id for the kafka broker currently acting as leader for this partition.
-                                If no leader exists because we are in the middle of a leader election this id will be -1.
-MagicByte => int8               A version id used to allow backwards compatible evolution of the message binary format.
-                                0 = COMPRESSION attribute byte does not exist (v0.6 and below)
-                                1 = COMPRESSION attribute byte exists (v0.7 and above)
-                                (? 0 means that COMPRESSION is None)
-MaxBytes => int32               The maximum bytes to include in the message set for this partition.
-MaxNumberOfOffsets => int32     Kafka here is return up to 'MaxNumberOfOffsets' of offsets
-MaxWaitTime => int32            The maximum amount of time (ms)
-                                    to block waiting
-                                    if insufficient data is available at the time the request is issued.
-MessageSetSize => int32         The size in bytes of the message set for this partition
-MessageSize => int32            The size of the subsequent request or response message in bytes
-MinBytes => int32               The minimum number of bytes of messages that must be available to give a response.
-                                If the client sets this to 0 the server will always respond immediately.
-                                If this is set to 1,
-                                    the server will respond as soon
-                                    as at least one partition
-                                    has at least 1 byte of data
-                                    or the specified timeout occurs.
-                                By setting higher values
-                                    in combination with the timeout
-                                    for reading only large chunks of data
-NodeId => int32                 The id of the broker.
-                                This must be set to a unique integer for each broker.
-Offset => int64                 The offset used in kafka as the log sequence number.
-                                When the producer is sending messages it doesn't actually know the offset
-                                    and can fill in any value here it likes.
-Partition => int32              The id of the partition the fetch is for
-                                    or the partition that data is being published to
-                                    or the partition this response entry corresponds to.
-Port => int32                   The brokers port
-ReplicaId => int32              Indicates the node id of the replica initiating this request.
-                                Normal client consumers should always specify this as -1 as they have no node id.
-Replicas => [ReplicaId]         The set of alive nodes that currently acts as slaves for the leader for this partition.
-RequiredAcks => int16           Indicates how many acknowledgements the servers should receive
-                                    before responding to the request.
-                                If it is 0 the server does not send any response.
-                                If it is 1, the server will wait the data is written to the local log before sending a response.
-                                If it is -1 the server will block until the message is committed by all in sync replicas before sending a response.
-                                For any number > 1 the server will block waiting for this number of acknowledgements to occur
-                                (but the server will never wait for more acknowledgements than there are in-sync replicas).
-Size => int32                   The size of the subsequent request or response message in bytes
-Time => int64                   Used to ask for all messages before a certain time (ms).
-                                There are two special values.
-                                Specify -1 to receive the latest offset (this will only ever return one offset).
-                                Specify -2 to receive the earliest available offsets.
-Timeout => int32                This provides a maximum time (ms) the server can await the receipt
-                                    of the number of acknowledgements in RequiredAcks.
-                                The timeout is not an exact limit on the request time for a few reasons:
-                                (1) it does not include network latency,
-                                (2) the timer begins at the beginning of the processing of this request
-                                    so if many requests are queued due to server overload
-                                    that wait time will not be included,
-                                (3) we will not terminate a local write
-                                    so if the local write time exceeds this timeout it will not be respected.
-                                To get a hard timeout of this type the client should use the socket timeout.
-TopicName => string             The name of the topic.
-Value => bytes                  The actual message contents
-                                Kafka supports recursive messages in which case this may itself contain a message set.
-                                The message can be null.
+    # a decoded produce request
+    my $decoded = {
+        CorrelationId                       => 4,
+        ClientId                            => q{},
+        RequiredAcks                        => $WAIT_WRITTEN_TO_LOCAL_LOG,
+        Timeout                             => $REQUEST_TIMEOUT * 100,  # ms
+        topics                              => [
+            {
+                TopicName                   => 'mytopic',
+                partitions                  => [
+                    {
+                        Partition           => 0,
+                        MessageSet              => [
+                            {
+                                Offset          => $PRODUCER_ANY_OFFSET,
+                                MagicByte       => 0,
+                                Attributes      => $COMPRESSION_NONE,
+                                Key             => q{},
+                                Value           => 'Hello!',
+                            },
+                        ],
+                    },
+                ],
+            },
+        ],
+    };
+
+    my $encoded_request = encode_produce_request( $decoded );
+    say 'encoded correctly' if $encoded_request eq $encoded;
+
+    # a encoded produce response hex stream
+    $encoded = pack( q{H*}, '00000023000000040000000100076d79746f706963000000010000000000000000000000000000' );
+
+    # a decoded produce response
+    $decoded = {
+        CorrelationId                           => 4,
+        topics                                  => [
+            {
+                TopicName                       => 'mytopic',
+                partitions                      => [
+                    {
+                        Partition               => 0,
+                        ErrorCode               => $ERROR_NO_ERROR,
+                        Offset                  => 0,
+                    },
+                ],
+            },
+        ],
+    };
+
+    my $decoded_response = decode_produce_response( \$encoded );
+    say 'decoded correctly' if Compare( $decoded_response, $decoded );
+
+    # more examples, see t/??_decode_encode.t
+
+=head1 DESCRIPTION
+
+This module is not a user module.
+
+In order to achieve better performance,
+functions of this module do not perform arguments validation.
+
+The main features of the C<Kafka::Protocol> module are:
+
+=over 3
+
+=item *
+
+Supports parsing the Apache Kafka protocol.
+
+=item *
+
+Supports Apache Kafka Requests and Responses (PRODUCE and FETCH with
+no compression codec attribute now). Within this package we currently support
+access to PRODUCE, FETCH, OFFSET, METADATA Requests and Responses.
+
+=item *
+
+Support for working with 64 bit elements of the Kafka protocol on 32 bit systems.
+
+=back
 
 =cut
 
-our $_int64_template;                           # Used to unpack a 64 bit number
+# A Guide To The Kafka Protocol 0.8:
+# https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol
+#
+# -- Protocol Primitive Types
+# int8, int16, int32, int64
+#     Signed integers
+#     stored in big endian order.
+# bytes, string
+#     consist of a signed integer
+#     giving a length N
+#     followed by N bytes of content.
+#     A length of -1 indicates null.
+#     string uses an int16 for its size,
+#     and bytes uses an int32.
+# Arrays
+#     These will always be encoded as an int32 size containing the length N
+#     followed by N repetitions of the structure
+#     which can itself be made up of other primitive types.
+#
+# -- N.B.
+# - The response will always match the paired request
+# - One structure common to both the produce and fetch requests is the message set format.
+# - MessageSets are not preceded by an int32 like other array elements in the protocol.
+# - A message set is also the unit of compression in Kafka,
+#     and we allow messages to recursively contain compressed message sets.
+#
+# -- Protocol Fields
+# ApiKey => int16                 That identifies the API being invoked
+# ApiVersion => int16             This is a numeric version number for this api.
+#                                Currently the supported version for all APIs is 0.
+# Attributes => int8              Metadata attributes about the message.
+#                                 In particular the last 3 bits contain the compression codec used for the message.
+# ClientId => string              This is a user supplied identifier for the client application.
+# CorrelationId => int32          This is a user-supplied integer.
+#                                 It will be passed back in the response by the server, unmodified.
+#                                 It is useful for matching request and response between the client and server.
+# Crc => int32                    The CRC32 of the remainder of the message bytes.
+# ErrorCode => int16              The error from this partition, if any.
+#                                 Errors are given on a per-partition basis
+#                                     because a given partition may be unavailable or maintained on a different host,
+#                                     while others may have successfully accepted the produce request.
+# FetchOffset => int64            The offset to begin this fetch from.
+# HighwaterMarkOffset => int64    The offset at the end of the log for this partition.
+#                                 This can be used by the client to determine how many messages behind the end of the log they are.
+#                                 - 0.8 documents: Replication design
+#                                 The high watermark is the offset of the last committed message.
+#                                 Each log is periodically synced to disks.
+#                                 Data before the flushed offset is guaranteed to be persisted on disks.
+#                                 As we will see, the flush offset can be before or after high watermark.
+#                                 - 0.7 documents: Wire protocol
+#                                 If the last segment file for the partition is not empty and was modified earlier than TIME,
+#                                         it will return both the first offset for that segment and the high water mark.
+#                                 The high water mark is not the offset of the last message,
+#                                         but rather the offset that the next message sent to the partition will be written to.
+# Host => string                  The brokers hostname
+# Isr => [ReplicaId]              The set subset of the replicas that are "caught up" to the leader - a set of in-sync replicas (ISR)
+# Key => bytes                    An optional message key
+#                                 The key can be null.
+# Leader => int32                 The node id for the kafka broker currently acting as leader for this partition.
+#                                 If no leader exists because we are in the middle of a leader election this id will be -1.
+# MagicByte => int8               A version id used to allow backwards compatible evolution of the message binary format.
+# MaxBytes => int32               The maximum bytes to include in the message set for this partition.
+# MaxNumberOfOffsets => int32     Kafka here is return up to 'MaxNumberOfOffsets' of offsets
+# MaxWaitTime => int32            The maximum amount of time (ms)
+#                                     to block waiting
+#                                     if insufficient data is available at the time the request is issued.
+# MessageSetSize => int32         The size in bytes of the message set for this partition
+# MessageSize => int32            The size of the subsequent request or response message in bytes
+# MinBytes => int32               The minimum number of bytes of messages that must be available to give a response.
+#                                 If the client sets this to 0 the server will always respond immediately.
+#                                 If this is set to 1,
+#                                     the server will respond as soon
+#                                     as at least one partition
+#                                     has at least 1 byte of data
+#                                     or the specified timeout occurs.
+#                                 By setting higher values
+#                                     in combination with the timeout
+#                                     for reading only large chunks of data
+# NodeId => int32                 The id of the broker.
+#                                 This must be set to a unique integer for each broker.
+# Offset => int64                 The offset used in kafka as the log sequence number.
+#                                 When the producer is sending messages it doesn't actually know the offset
+#                                     and can fill in any value here it likes.
+# Partition => int32              The id of the partition the fetch is for
+#                                     or the partition that data is being published to
+#                                     or the partition this response entry corresponds to.
+# Port => int32                   The brokers port
+# ReplicaId => int32              Indicates the node id of the replica initiating this request.
+#                                 Normal client consumers should always specify this as -1 as they have no node id.
+# Replicas => [ReplicaId]         The set of alive nodes that currently acts as slaves for the leader for this partition.
+# RequiredAcks => int16           Indicates how many acknowledgements the servers should receive
+#                                     before responding to the request.
+#                                 If it is 0 the server does not send any response.
+#                                 If it is 1, the server will wait the data is written to the local log before sending a response.
+#                                 If it is -1 the server will block until the message is committed by all in sync replicas before sending a response.
+#                                 For any number > 1 the server will block waiting for this number of acknowledgements to occur
+#                                 (but the server will never wait for more acknowledgements than there are in-sync replicas).
+# Size => int32                   The size of the subsequent request or response message in bytes
+# Time => int64                   Used to ask for all messages before a certain time (ms).
+#                                 There are two special values.
+#                                 Specify -1 to receive the latest offset (this will only ever return one offset).
+#                                 Specify -2 to receive the earliest available offsets.
+# Timeout => int32                This provides a maximum time (ms) the server can await the receipt
+#                                     of the number of acknowledgements in RequiredAcks.
+#                                 The timeout is not an exact limit on the request time for a few reasons:
+#                                 (1) it does not include network latency,
+#                                 (2) the timer begins at the beginning of the processing of this request
+#                                     so if many requests are queued due to server overload
+#                                     that wait time will not be included,
+#                                 (3) we will not terminate a local write
+#                                     so if the local write time exceeds this timeout it will not be respected.
+#                                 To get a hard timeout of this type the client should use the socket timeout.
+# TopicName => string             The name of the topic.
+# Value => bytes                  The actual message contents
+#                                 Kafka supports recursive messages in which case this may itself contain a message set.
+#                                 The message can be null.
+
+our $_int64_template;                           # Used to unpack a 64 bit value
 if ( $BITS64 ) {
     $_int64_template    = q{q>};
+# unpack a big-endian signed quad (64-bit) value on 64 bit systems.
     *_unpack64          = sub { $_[0] };
+# pack a big-endian signed quad (64-bit) value on 64 bit systems.
     *_pack64            = sub { pack( q{q>}, $_[0] ) };
 }
 else {
@@ -223,32 +324,67 @@ else {
         or die "Cannot load Kafka::Int64 : $@";
 
     $_int64_template    = q{a[8]};
+# unpack a big-endian signed quad (64-bit) value on 32 bit systems.
     *_unpack64          = \&Kafka::Int64::unpackq;
+# pack a big-endian signed quad (64-bit) value on 32 bit systems.
     *_pack64            = \&Kafka::Int64::packq;
 }
 
-const our $APIVERSION                   => 0;       # RTFM: Currently the supported version for all APIs is 0
+=head2 EXPORT
 
-# MagicByte
-const our $COMPRESSION_NOT_EXIST        => 0;
-const our $COMPRESSION_EXISTS           => 1;
+These variables are the constants and never change their values.
+
+=cut
+
+=head3 C<$APIVERSION>
+
+RTFM: This is a numeric version number for this api.
+Currently the supported version for all APIs is 0 .
+
+=cut
+const our $APIVERSION                   => 0;
 
 # Attributes
-const our $COMPRESSION_CODEC_MASK       => 0b111;
+
+# RTFM: Attributes - Metadata attributes about the message.
+# In particular the last 3 bits contain the compression codec used for the message.
+const our $COMPRESSION_CODEC_MASK       => 0b111;   # Not used now
+
 #-- Codec numbers:
+
+=head3 C<$COMPRESSION_NONE>
+
+RTFM: Kafka currently supports two compression codecs for message sets with the following codec numbers:
+None = 0, ...
+
+=cut
 const our $COMPRESSION_NONE             => 0;
+# codec number: GZIP = 1
 const our $COMPRESSION_GZIP             => 1;       # Not used now
+# codec number: Snappy = 2
 const our $COMPRESSION_SNAPPY           => 2;       # Not used now
 
-const our $CONSUMER_HAVE_NO_NODE_ID     => -1;
+=head3 C<$CONSUMERS_REPLICAID>
 
-const our $CONSUMERS_REPLICAID          => -1;      # RTFM: Normal client consumers should always specify this as -1 as they have no node id
+RTFM: ReplicaId - Normal client consumers should always specify this as -1 as they have no node id.
 
+=cut
+const our $CONSUMERS_REPLICAID          => -1;
+
+=head3 C<$NULL_BYTES_LENGTH>
+
+RTFM: Protocol Primitive Types: ... bytes, string - A length of -1 indicates null.
+
+=cut
 const our $NULL_BYTES_LENGTH            => -1;
 
-const our $BAD_OFFSET                   => -1;
+=head3 C<$BAD_OFFSET>
 
-my $_package_error;
+RTFM: Offset - When the producer is sending messages it doesn't actually know the offset
+and can fill in any value here it likes.
+
+=cut
+const our $BAD_OFFSET                   => -1;
 
 my ( $_Request_header_template,             $_Request_header_length ) = (
     q{l>s>s>l>s>},          # Size
@@ -323,8 +459,31 @@ my $_Key_or_Value_template = q{X[l]l>/a};   # Key or Value
 
 #-- public functions -----------------------------------------------------------
 
+=head2 FUNCTIONS
+
+The following functions are available for C<Kafka::MockProtocol> module.
+
+=cut
+
 # PRODUCE Request --------------------------------------------------------------
 
+=head3 C<encode_produce_request( $Produce_Request )>
+
+Encodes the argument and returns a reference to the encoded binary string
+representing a Request buffer.
+
+This function take argument. The following argument is currently recognized:
+
+=over 3
+
+=item C<$Produce_Request>
+
+C<$Produce_Request> is a reference to the hash representing
+the structure of the PRODUCE Request (examples see C<t/??_decode_encode.t>).
+
+=back
+
+=cut
 sub encode_produce_request {
     my ( $Produce_Request ) = @_;
 
@@ -365,8 +524,7 @@ sub encode_produce_request {
             $request->{template}    .= q{l>};                               # Partition
             $request->{len}         += 4;
 
-            _encode_MessageSet_array( $request, $partition->{MessageSet} )
-                or return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'MessageSet'.( last_error() ? ' ('.last_error().')' : q{} ) );
+            _encode_MessageSet_array( $request, $partition->{MessageSet} );
         }
     }
 
@@ -393,10 +551,27 @@ my $_decode_produce_response_template = qq{x[l]l>l>X[l]l>/(s>/al>X[l]l>/(l>s>${_
                                         #     )
                                         # )
 
-sub decode_produce_response {
-    my ( $hex_stream_ref ) = @_;
+=head3 C<decode_produce_response( $bin_stream_ref )>
 
-    my @data = unpack( $_decode_produce_response_template, $$hex_stream_ref );
+Decodes the argument and returns a reference to the hash representing
+the structure of the PRODUCE Response (examples see C<t/??_decode_encode.t>).
+
+This function take argument. The following argument is currently recognized:
+
+=over 3
+
+=item C<$bin_stream_ref>
+
+C<$bin_stream_ref> is a reference to the encoded Response buffer. The buffer
+must be a non-empty binary string.
+
+=back
+
+=cut
+sub decode_produce_response {
+    my ( $bin_stream_ref ) = @_;
+
+    my @data = unpack( $_decode_produce_response_template, $$bin_stream_ref );
 
     my ( $i, $Produce_Response ) = ( 0, {} );
 
@@ -429,6 +604,23 @@ sub decode_produce_response {
 
 # FETCH Request ----------------------------------------------------------------
 
+=head3 C<encode_fetch_request( $Fetch_Request )>
+
+Encodes the argument and returns a reference to the encoded binary string
+representing a Request buffer.
+
+This function take argument. The following argument is currently recognized:
+
+=over 3
+
+=item C<$Fetch_Request>
+
+C<$Fetch_Request> is a reference to the hash representing
+the structure of the FETCH Request (examples see C<t/??_decode_encode.t>).
+
+=back
+
+=cut
 sub encode_fetch_request {
     my ( $Fetch_Request ) = @_;
 
@@ -481,8 +673,25 @@ sub encode_fetch_request {
 
 # FETCH Response ---------------------------------------------------------------
 
+=head3 C<decode_fetch_response( $bin_stream_ref )>
+
+Decodes the argument and returns a reference to the hash representing
+the structure of the FETCH Response (examples see C<t/??_decode_encode.t>).
+
+This function take argument. The following argument is currently recognized:
+
+=over 3
+
+=item C<$bin_stream_ref>
+
+C<$bin_stream_ref> is a reference to the encoded Response buffer. The buffer
+must be a non-empty binary string.
+
+=back
+
+=cut
 sub decode_fetch_response {
-    my ( $hex_stream_ref ) = @_;
+    my ( $bin_stream_ref ) = @_;
 
 # RTFM: As an optimization the server is allowed to return a partial message at the end of the message set.
 # Clients should handle this case.
@@ -493,11 +702,11 @@ sub decode_fetch_response {
                                                 # template      => '...',
                                                 # stream_offset => ...,
         data        => \@data,
-        hex_stream  => $hex_stream_ref,
+        bin_stream  => $bin_stream_ref,
     };
 
     _decode_fetch_response_template( $response );
-    @data = unpack( $response->{template}, $$hex_stream_ref );
+    @data = unpack( $response->{template}, $$bin_stream_ref );
 
     my ( $i, $Fetch_Response ) = ( 0, {} );
 
@@ -536,6 +745,23 @@ sub decode_fetch_response {
 
 # OFFSET Request ---------------------------------------------------------------
 
+=head3 C<encode_offset_request( $Offset_Request )>
+
+Encodes the argument and returns a reference to the encoded binary string
+representing a Request buffer.
+
+This function take argument. The following argument is currently recognized:
+
+=over 3
+
+=item C<$Offset_Request>
+
+C<$Offset_Request> is a reference to the hash representing
+the structure of the OFFSET Request (examples see C<t/??_decode_encode.t>).
+
+=back
+
+=cut
 sub encode_offset_request {
     my ( $Offset_Request ) = @_;
 
@@ -609,10 +835,27 @@ my $_decode_offset_response_template = qq{x[l]l>l>X[l]l>/(s>/al>X[l]l>/(l>s>l>X[
                                         #     )
                                         # )
 
-sub decode_offset_response {
-    my ( $hex_stream_ref ) = @_;
+=head3 C<decode_offset_response( $bin_stream_ref )>
 
-    my @data = unpack( $_decode_offset_response_template, $$hex_stream_ref );
+Decodes the argument and returns a reference to the hash representing
+the structure of the OFFSET Response (examples see C<t/??_decode_encode.t>).
+
+This function take argument. The following argument is currently recognized:
+
+=over 3
+
+=item C<$bin_stream_ref>
+
+C<$bin_stream_ref> is a reference to the encoded Response buffer. The buffer
+must be a non-empty binary string.
+
+=back
+
+=cut
+sub decode_offset_response {
+    my ( $bin_stream_ref ) = @_;
+
+    my @data = unpack( $_decode_offset_response_template, $$bin_stream_ref );
 
     my ( $i, $Offset_Response ) = ( 0, {} );
 
@@ -651,6 +894,23 @@ sub decode_offset_response {
 
 # METADATA Request -------------------------------------------------------------
 
+=head3 C<encode_metadata_request( $Metadata_Request )>
+
+Encodes the argument and returns a reference to the encoded binary string
+representing a Request buffer.
+
+This function take argument. The following argument is currently recognized:
+
+=over 3
+
+=item C<$Metadata_Request>
+
+C<$Metadata_Request> is a reference to the hash representing
+the structure of the METADATA Request (examples see C<t/??_decode_encode.t>).
+
+=back
+
+=cut
 sub encode_metadata_request {
     my ( $Metadata_Request ) = @_;
 
@@ -723,10 +983,27 @@ my $_decode_metadata_response_template = q{x[l]l>l>X[l]l>/(l>s>/al>)l>X[l]l>/(s>
                                         #     )
                                         # )
 
-sub decode_metadata_response {
-    my ( $hex_stream_ref ) = @_;
+=head3 C<decode_metadata_response( $bin_stream_ref )>
 
-    my @data = unpack( $_decode_metadata_response_template, $$hex_stream_ref );
+Decodes the argument and returns a reference to the hash representing
+the structure of the METADATA Response (examples see C<t/??_decode_encode.t>).
+
+This function take argument. The following argument is currently recognized:
+
+=over 3
+
+=item C<$bin_stream_ref>
+
+C<$bin_stream_ref> is a reference to the encoded Response buffer. The buffer
+must be a non-empty binary string.
+
+=back
+
+=cut
+sub decode_metadata_response {
+    my ( $bin_stream_ref ) = @_;
+
+    my @data = unpack( $_decode_metadata_response_template, $$bin_stream_ref );
 
     my ( $i, $Metadata_Response ) = ( 0, {} );
 
@@ -781,16 +1058,9 @@ sub decode_metadata_response {
     return $Metadata_Response;
 }
 
-sub last_error {
-    return ( $_package_error // q{} ).q{};
-}
-
-sub last_errorcode {
-    return ( $_package_error // 0 ) + 0;
-}
-
 #-- private functions ----------------------------------------------------------
 
+# Generates a template to encrypt the request header
 sub _encode_request_header {
     my ( $request, $api_key, $request_ref ) = @_;
 
@@ -805,6 +1075,7 @@ sub _encode_request_header {
     _encode_string( $request, $request_ref->{ClientId} );                   # ClientId
 }
 
+# Generates a template to decrypt the fetch response body
 sub _decode_fetch_response_template {
     my ( $response ) = @_;
 
@@ -821,7 +1092,7 @@ sub _decode_fetch_response_template {
     $topics_array_size = unpack(
          q{x[}.$response->{stream_offset}
         .q{]l>},                            # topics array size
-        ${ $response->{hex_stream} }
+        ${ $response->{bin_stream} }
     );
     $response->{stream_offset} += 4;        # bytes before TopicName length
                                                                                 # [l] topics array size
@@ -830,7 +1101,7 @@ sub _decode_fetch_response_template {
         $TopicName_length = unpack(
              q{x[}.$response->{stream_offset}
             .q{]s>},                        # TopicName length
-            ${ $response->{hex_stream} }
+            ${ $response->{bin_stream} }
         );
         $response->{stream_offset} +=       # bytes before partitions array size
               2                                                                 # [s] TopicName length
@@ -839,7 +1110,7 @@ sub _decode_fetch_response_template {
         $partitions_array_size = unpack(
              q{x[}.$response->{stream_offset}
             .q{]l>},                        # partitions array size
-            ${ $response->{hex_stream} }
+            ${ $response->{bin_stream} }
         );
         $response->{stream_offset} += 4;    # bytes before Partition
                                                                                 # [l] partitions array size
@@ -857,6 +1128,7 @@ sub _decode_fetch_response_template {
     }
 }
 
+# Decrypts MessageSet
 sub _decode_MessageSet_array {
     my ( $response, $MessageSetSize, $i_ref, $MessageSet_array_ref ) = @_;
 
@@ -897,6 +1169,7 @@ sub _decode_MessageSet_array {
     }
 }
 
+# Generates a template to encrypt MessageSet
 sub _encode_MessageSet_array {
     my ( $request, $MessageSet_array_ref ) = @_;
 
@@ -931,10 +1204,8 @@ sub _encode_MessageSet_array {
         $request->{template}    .= $_MessageSet_template;
         $request->{len}         += $_MessageSet_length;
 
-        ( _verify_string( $Key = $MessageSet->{Key}, 'Key' ) && _verify_string( $Value  = $MessageSet->{Value}, 'Value' ) )
-            or return;
-        $key_length   = length( $Key );
-        $value_length = length( $Value );
+        $key_length   = length( $Key    = $MessageSet->{Key} );
+        $value_length = length( $Value  = $MessageSet->{Value} );
 
         $message_body = pack(
                 q{ccl>}                                         # MagicByte
@@ -944,7 +1215,7 @@ sub _encode_MessageSet_array {
                 .q{l>}                                          # Value length
                 .( $value_length ? qq{a[$value_length]} : q{} ) # Value
             ,
-            $COMPRESSION_NOT_EXIST,
+            0,
             $COMPRESSION_NONE,  # RTFM: last 3 bits contain the compression codec
                                 # The other bits are not described in the documentation
             $key_length     ? ( $key_length,    $Key )    : ( -1 ),
@@ -965,10 +1236,9 @@ sub _encode_MessageSet_array {
                                                                                 # Value
         $request->{len} += $MessageSize;    # Message
     }
-
-    return 1;
 }
 
+# Generates a template to decrypt MessageSet
 sub _decode_MessageSet_template {
     my ( $response ) = @_;
 
@@ -979,12 +1249,12 @@ sub _decode_MessageSet_template {
         $Value_length,
     );
 
-    my $hex_stream_length = length ${ $response->{hex_stream} };
+    my $bin_stream_length = length ${ $response->{bin_stream} };
 
     $MessageSetSize = unpack(
          q{x[}.$response->{stream_offset}
         .q{]l>},                            # MessageSetSize
-        ${ $response->{hex_stream} }
+        ${ $response->{bin_stream} }
     );
     $response->{template} .= q{l>};         # MessageSetSize
     $response->{stream_offset} += 4;        # bytes before Offset
@@ -1018,7 +1288,7 @@ sub _decode_MessageSet_template {
             $MessageSize = unpack(
                  q{x[}.$response->{stream_offset}
                 .q{]l>},                        # MessageSize
-                ${ $response->{hex_stream} }
+                ${ $response->{bin_stream} }
             );
 
             $response->{stream_offset} += 10;   # bytes before Crc
@@ -1030,14 +1300,14 @@ sub _decode_MessageSet_template {
             $Key_length = unpack(
                  q{x[}.$response->{stream_offset}
                 .q{]l>},                        # Key length
-                ${ $response->{hex_stream} }
+                ${ $response->{bin_stream} }
             );
 
             $response->{stream_offset} += 4;    # bytes before Key or Value length
                                                                                 # [l] Key length
             $response->{stream_offset} += $Key_length   # bytes before Key
                 if $Key_length != $NULL_BYTES_LENGTH;                           # Key
-            if ( $hex_stream_length >= $response->{stream_offset} + 4 ) {   # + [l] Value length
+            if ( $bin_stream_length >= $response->{stream_offset} + 4 ) {   # + [l] Value length
                 $local_template .= $_Key_or_Value_template
                     if $Key_length != $NULL_BYTES_LENGTH;
             }
@@ -1051,14 +1321,14 @@ sub _decode_MessageSet_template {
             $Value_length = unpack(
                  q{x[}.$response->{stream_offset}
                 .q{]l>},                        # Value length
-                ${ $response->{hex_stream} }
+                ${ $response->{bin_stream} }
             );
             $response->{stream_offset} +=       # bytes before Value or next Message
                   4                                                             # [l] Value length
                 ;
             $response->{stream_offset} += $Value_length # bytes before next Message
                 if $Value_length != $NULL_BYTES_LENGTH;                         # Value
-            if ( $hex_stream_length >= $response->{stream_offset} ) {
+            if ( $bin_stream_length >= $response->{stream_offset} ) {
                 $local_template .= $_Key_or_Value_template
                     if $Value_length != $NULL_BYTES_LENGTH;
             }
@@ -1083,6 +1353,7 @@ sub _decode_MessageSet_template {
     }
 }
 
+# Generates a template to encrypt string
 sub _encode_string {
     my ( $request, $string ) = @_;
 
@@ -1097,164 +1368,46 @@ sub _encode_string {
     }
 }
 
-sub _protocol_error {
-    my ( $error_code, $description ) = @_;
-
-    $_package_error = dualvar $error_code, $ERROR{ $error_code }.( $description ? ': '.$description : q{} );
-    return;
-}
-
-sub _verify_string {
-    my ( $string, $description ) = @_;
-
-    return 1
-        if $string eq q{};
-    _STRING( $string )
-        // return _protocol_error( $ERROR_MISMATCH_ARGUMENT, $description );
-    utf8::is_utf8( $string )
-        and return _protocol_error( $ERROR_NOT_BINARY_STRING );
-
-    return 1;
-}
-
 1;
 
 __END__
 
-=head1 NAME
+=head1 DIAGNOSTICS
 
-Kafka::Protocol - blah-blah-blah
-
-=head1 VERSION
-
-This documentation refers to C<Kafka::Protocol> version 0.800_1
-
-=head1 SYNOPSIS
-
-    use 5.010;
-    use strict;
-
-    use Kafka qw (
-        $WAIT_WRITTEN_TO_LOCAL_LOG
-    );
-    use Kafka::Internals qw(
-        $PRODUCER_ANY_OFFSET
-    );
-    use Kafka::Protocol qw(
-        encode_produce_request
-    );
-
-    # a decoded produce request
-    my $decoded_request = {
-        CorrelationId                       => 4,
-        ClientId                            => q{},
-        RequiredAcks                        => $WAIT_WRITTEN_TO_LOCAL_LOG,
-        Timeout                             => 1_500,
-        topics                              => [
-            {
-                TopicName                   => 'mytopic',
-                partitions                  => [
-                    {
-                        Partition           => 0,
-                        MessageSet              => [
-                            {
-                                Offset          => $PRODUCER_ANY_OFFSET,
-                                MagicByte       => 0,
-                                Attributes      => 0,
-                                Key             => q{},
-                                Value           => 'Hello!',
-                            },
-                        ],
-                    },
-                ],
-            },
-        ],
-    };
-
-    my $encoded_request = encode_produce_request( $decoded_request );
-
-=head1 DESCRIPTION
-
-blah-blah-blah
-
-=head2 FUNCTIONS
-
-blah-blah-blah
-
-=head3 C<decode_fetch_response( blah-blah-blah )>
-
-blah-blah-blah
-
-=head3 C<decode_metadata_response( blah-blah-blah )>
-
-blah-blah-blah
-
-=head3 C<decode_offset_response( blah-blah-blah )>
-
-blah-blah-blah
-
-=head3 C<decode_produce_response( blah-blah-blah )>
-
-blah-blah-blah
-
-=head3 C<encode_fetch_request( blah-blah-blah )>
-
-blah-blah-blah
-
-=head3 C<encode_metadata_request( blah-blah-blah )>
-
-blah-blah-blah
-
-=head3 C<encode_offset_request( blah-blah-blah )>
-
-blah-blah-blah
-
-=head3 C<encode_produce_request( blah-blah-blah )>
-
-blah-blah-blah
-
-=head3 C<last_errorcode( blah-blah-blah )>
-
-blah-blah-blah
-
-=head3 C<last_error( blah-blah-blah )>
-
-blah-blah-blah
-
-=head2 EXPORT
-
-blah-blah-blah
-
-=head2 GLOBAL VARIABLES
-
-=over
-
-=item C<@Kafka::ERROR>
-
-Contain the descriptions for possible error codes returned by
-C<last_errorcode> methods and functions of the package modules.
-
-=item C<%Kafka::ERROR_CODE>
-
-blah-blah-blah
-
-=back
-
-=head1 DEPENDENCIES
-
-blah-blah-blah
-
-=head1 BUGS AND LIMITATIONS
-
-blah-blah-blah
-
-=head1 MORE DOCUMENTATION
-
-All modules contain detailed information on the interfaces they provide.
+In order to achieve better performance, functions of this module do not perform
+arguments validation.
 
 =head1 SEE ALSO
 
-blah-blah-blah
+The basic operation of the Kafka package modules:
+
+L<Kafka|Kafka> - constants and messages used by the Kafka package modules.
+
+L<Kafka::Connection|Kafka::Connection> - interface to connect to a Kafka cluster.
+
+L<Kafka::Producer|Kafka::Producer> - interface for producing client.
+
+L<Kafka::Consumer|Kafka::Consumer> - interface for consuming client.
+
+L<Kafka::Message|Kafka::Message> - interface to access Kafka message
+properties.
+
+L<Kafka::Int64|Kafka::Int64> - functions to work with 64 bit elements of the
+protocol on 32 bit systems.
+
+L<Kafka::Protocol|Kafka::Protocol> - functions to process messages in the
+Apache Kafka's Protocol.
+
+L<Kafka::IO|Kafka::IO> - low level interface for communication with Kafka server.
+
+L<Kafka::Internals|Kafka::Internals> - Internal constants and functions used
+by several package modules.
+
+A wealth of detail about the Apache Kafka and the Kafka Protocol:
+
+Main page at L<http://kafka.apache.org/>
+
+Kafka Protocol at L<https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol>
 
 =head1 AUTHOR
 

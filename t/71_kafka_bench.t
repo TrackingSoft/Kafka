@@ -59,7 +59,7 @@ use Kafka qw(
     $REQUEST_TIMEOUT
     $NOT_SEND_ANY_RESPONSE
     $WAIT_WRITTEN_TO_LOCAL_LOG
-    $BLOCK_UNTIL_IS_COMMITED
+    $BLOCK_UNTIL_IS_COMMITTED
 );
 use Kafka::Cluster;
 use Kafka::Connection;
@@ -129,7 +129,7 @@ unless ( $producer = Kafka::Producer->new(
         Connection      => $connect,
         RequiredAcks    => $NOT_SEND_ANY_RESPONSE,
 #        RequiredAcks    => $WAIT_WRITTEN_TO_LOCAL_LOG,
-#        RequiredAcks    => $BLOCK_UNTIL_IS_COMMITED,
+#        RequiredAcks    => $BLOCK_UNTIL_IS_COMMITTED,
 
         RaiseError      => 0                        # Optional, default = 0
     ) ) {
@@ -234,7 +234,7 @@ sub report {
     my $mode_name;
     if      ( $mode == $NOT_SEND_ANY_RESPONSE )     { $mode_name = 'NOT_SEND_ANY_RESPONSE' }
     elsif   ( $mode == $WAIT_WRITTEN_TO_LOCAL_LOG ) { $mode_name = 'WAIT_WRITTEN_TO_LOCAL_LOG' }
-    elsif   ( $mode == $BLOCK_UNTIL_IS_COMMITED )   { $mode_name = 'BLOCK_UNTIL_IS_COMMITED' }
+    elsif   ( $mode == $BLOCK_UNTIL_IS_COMMITTED )   { $mode_name = 'BLOCK_UNTIL_IS_COMMITTED' }
 
     diag "Legend: $mode_name";
     diag "Message length: $min_len .. $max_len";
@@ -298,7 +298,7 @@ sub report {
 
 $in_package = $number_of_package;
 
-foreach my $mode ( $BLOCK_UNTIL_IS_COMMITED, $WAIT_WRITTEN_TO_LOCAL_LOG, $NOT_SEND_ANY_RESPONSE ) {
+foreach my $mode ( $BLOCK_UNTIL_IS_COMMITTED, $WAIT_WRITTEN_TO_LOCAL_LOG, $NOT_SEND_ANY_RESPONSE ) {
 
 $producer = Kafka::Producer->new(
     Connection      => $connect,

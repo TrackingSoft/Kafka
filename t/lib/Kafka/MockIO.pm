@@ -1,8 +1,15 @@
 package Kafka::MockIO;
 
-#TODO: title - the name, purpose, and a warning that this one is for internal use only
+=head1 NAME
 
-# Kafka::IO imitation
+Kafka::MockIO - object interface to simulate the socket communications with
+the Apache Kafka server.
+
+=head1 VERSION
+
+This documentation refers to C<Kafka::MockIO> version 0.800_1 .
+
+=cut
 
 #-- Pragmas --------------------------------------------------------------------
 
@@ -53,7 +60,6 @@ use Kafka::Internals qw(
 use Kafka::IO;
 use Kafka::Protocol qw(
     $COMPRESSION_NONE
-    $COMPRESSION_NOT_EXIST
 );
 use Kafka::MockProtocol qw(
     decode_fetch_request
@@ -68,11 +74,51 @@ use Kafka::MockProtocol qw(
 
 #-- declarations ---------------------------------------------------------------
 
+=head1 DESCRIPTION
+
+This module is not a user module.
+
+The main features of the C<Kafka::MockIO> class are:
+
+=over 3
+
+=item *
+
+Emulates an object oriented model of communication (L<Kafka::IO|Kafka::IO> class).
+
+=item *
+
+Simplistically emulates interaction with kafka server.
+
+=back
+
+Examples see C<t/??_mock_io.t>.
+
+=cut
+
 const my $MOCKED_PACKAGE            => 'Kafka::IO';
 
-# Use Kafka::MockIO only with the following information:
+=head2 EXPORT
+
+These variables are the constants and never change their values.
+
+Use Kafka::MockIO only with the following information:
+
+=cut
+
+=head3 C<$PARTITION>
+
+Partition number.
+
+=cut
 const our $PARTITION                => 0;
 
+=head3 C<$KAFKA_MOCK_SERVER_PORT>
+
+C<$KAFKA_MOCK_SERVER_PORT> is the default Apache Kafka server port
+that can be imported from the L<Kafka|Kafka> module and = 9092.
+
+=cut
 const our $KAFKA_MOCK_SERVER_PORT   => $KAFKA_SERVER_PORT;
 
 #-- Global data ----------------------------------------------------------------
@@ -217,6 +263,17 @@ my $decoded_metadata_response = {
 
 #-- public functions -----------------------------------------------------------
 
+=head2 FUNCTIONS
+
+The following methods are defined for the C<Kafka::MockIO> class:
+
+=cut
+
+=head3 C<override>
+
+Override the C<Kafka::IO> class methods.
+
+=cut
 sub override {
     foreach my $method ( keys %_reinstall ) {
         Sub::Install::reinstall_sub( {
@@ -227,7 +284,12 @@ sub override {
     }
 }
 
-sub undefine {
+=head3 C<restore>
+
+Restore the C<Kafka::IO> class methods.
+
+=cut
+sub restore {
     foreach my $method ( keys %_reinstall ) {
         Sub::Install::reinstall_sub( {
             code    => $_reinstall{ $method }->[0],
@@ -237,6 +299,25 @@ sub undefine {
     }
 }
 
+=head3 C<add_special_case( $cases )>
+
+Adds special cases for use in the simulation of interaction with kafka server.
+
+This function take argument. The following argument is currently recognized:
+
+=over 3
+
+=item C<$cases>
+
+C<$cases> is a reference to the hash representing
+the special cases.
+
+The keys of the hash should be binary-encoded query string to kafka server.
+The values of each key must be encoded binary string of the expected response.
+
+=back
+
+=cut
 sub add_special_case {
     my ( $cases ) = @_;
 
@@ -254,6 +335,21 @@ sub add_special_case {
     }
 }
 
+=head3 C<del_special_case( $encoded_request )>
+
+Removes the special case.
+
+This function take argument. The following argument is currently recognized:
+
+=over 3
+
+=item C<$encoded_request>
+
+Binary string of the encoded request.
+
+=back
+
+=cut
 sub del_special_case {
     my ( $encoded_request ) = @_;
 
@@ -263,6 +359,14 @@ sub del_special_case {
     delete $_special_cases{ $encoded_request };
 }
 
+=head3 C<special_cases>
+
+Returns a reference to a hash of special cases.
+
+The keys of the hash are binary strings encoded requests to kafka server.
+The value of each key is encoded binary string of the expected response.
+
+=cut
 sub special_cases {
     return \%_special_cases;
 }
@@ -271,6 +375,13 @@ sub special_cases {
 
 #-- constructor ----------------------------------------------------------------
 
+=head2 CONSTRUCTOR
+
+=head3 C<new>
+
+Constructor emulation (C<Kafka::IO->new>).
+
+=cut
 sub new {
     my ( $class, @args ) = @_;
 
@@ -300,6 +411,17 @@ sub new {
 
 #-- public methods -------------------------------------------------------------
 
+=head2 METHODS
+
+The following methods are defined for the C<Kafka::MockIO> class:
+
+=cut
+
+=head3 C<send>
+
+Method emulation (C<Kafka::IO::send>).
+
+=cut
 sub send {
     my ( $self, $message ) = @_;
 
@@ -386,7 +508,7 @@ sub send {
             if ( $full_message_set_size + $message_set_size <= $MaxBytes ) {
                 push @{ $messages }, {
                     Offset      => $i,
-                    MagicByte   => $COMPRESSION_NOT_EXIST,
+                    MagicByte   => 0,
                     Attributes  => $COMPRESSION_NONE,
                     Key         => $Key,
                     Value       => $Value,
@@ -468,6 +590,11 @@ sub send {
     return $len;
 }
 
+=head3 C<receive>
+
+Method emulation (C<Kafka::IO::receive>).
+
+=cut
 sub receive {
     my ( $self, $length ) = @_;
 
@@ -485,6 +612,11 @@ sub receive {
     return \$message;
 }
 
+=head3 C<close>
+
+Method emulation (C<Kafka::IO::close>).
+
+=cut
 sub close {
     my ( $self ) = @_;
 
@@ -492,6 +624,11 @@ sub close {
     return;
 }
 
+=head3 C<is_alive>
+
+Method emulation (C<Kafka::IO::is_alive>).
+
+=cut
 sub is_alive {
     my ( $self ) = @_;
 
@@ -502,6 +639,7 @@ sub is_alive {
 
 #-- private methods ------------------------------------------------------------
 
+# Determines the type of request, the topic and partition
 sub _decoded_topic_partition {
     my ( $self, $decoded_request, $decoded_response ) = @_;
 
@@ -526,6 +664,7 @@ sub _decoded_topic_partition {
     return $topic, $partition;
 }
 
+# Verifies that the first argument is the string does not contain Unicode data
 sub _verify_string {
     my ( $self, $string, $description ) = @_;
 
@@ -544,3 +683,65 @@ sub _verify_string {
 1;
 
 __END__
+
+=head1 DIAGNOSTICS
+
+Error diagnosis emulated methods corresponds to the work of class L<Kafka::IO|Kafka::IO/"DIAGNOSTICS">.
+
+=head1 SEE ALSO
+
+The basic operation of the Kafka package modules:
+
+L<Kafka|Kafka> - constants and messages used by the Kafka package modules.
+
+L<Kafka::Connection|Kafka::Connection> - interface to connect to a Kafka cluster.
+
+L<Kafka::Producer|Kafka::Producer> - interface for producing client.
+
+L<Kafka::Consumer|Kafka::Consumer> - interface for consuming client.
+
+L<Kafka::Message|Kafka::Message> - interface to access Kafka message
+properties.
+
+L<Kafka::Int64|Kafka::Int64> - functions to work with 64 bit elements of the
+protocol on 32 bit systems.
+
+L<Kafka::Protocol|Kafka::Protocol> - functions to process messages in the
+Apache Kafka's Protocol.
+
+L<Kafka::IO|Kafka::IO> - low level interface for communication with Kafka server.
+
+L<Kafka::Internals|Kafka::Internals> - Internal constants and functions used
+by several package modules.
+
+A wealth of detail about the Apache Kafka and the Kafka Protocol:
+
+Main page at L<http://kafka.apache.org/>
+
+Kafka Protocol at L<https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol>
+
+=head1 AUTHOR
+
+Sergey Gladkov, E<lt>sgladkov@trackingsoft.comE<gt>
+
+=head1 CONTRIBUTORS
+
+Alexander Solovey
+
+Jeremy Jordan
+
+Vlad Marchenko
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright (C) 2012-2013 by TrackingSoft LLC.
+
+This package is free software; you can redistribute it and/or modify it under
+the same terms as Perl itself. See I<perlartistic> at
+L<http://dev.perl.org/licenses/artistic.html>.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE.
+
+=cut

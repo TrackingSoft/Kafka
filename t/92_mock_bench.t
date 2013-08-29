@@ -54,7 +54,7 @@ use Kafka qw(
     $REQUEST_TIMEOUT
     $NOT_SEND_ANY_RESPONSE
     $WAIT_WRITTEN_TO_LOCAL_LOG
-    $BLOCK_UNTIL_IS_COMMITED
+    $BLOCK_UNTIL_IS_COMMITTED
 );
 use Kafka::Connection;
 use Kafka::Producer;
@@ -121,7 +121,7 @@ unless ( $producer = Kafka::Producer->new(
         Connection      => $connect,
         RequiredAcks    => $NOT_SEND_ANY_RESPONSE,
 #        RequiredAcks    => $WAIT_WRITTEN_TO_LOCAL_LOG,
-#        RequiredAcks    => $BLOCK_UNTIL_IS_COMMITED,
+#        RequiredAcks    => $BLOCK_UNTIL_IS_COMMITTED,
 
         RaiseError      => 0                        # Optional, default = 0
     ) ) {

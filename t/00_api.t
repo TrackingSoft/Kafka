@@ -78,7 +78,7 @@ my %OO = (
 BEGIN {
     $constants_Kafka = [ qw(
         $BITS64
-        $BLOCK_UNTIL_IS_COMMITED
+        $BLOCK_UNTIL_IS_COMMITTED
         $DEFAULT_MAX_BYTES
         $DEFAULT_MAX_NUMBER_OF_OFFSETS
         $DEFAULT_MAX_WAIT_TIME
@@ -89,7 +89,7 @@ BEGIN {
         $ERROR_CANNOT_RECV
         $ERROR_CANNOT_SEND
         $ERROR_COMPRESSED_PAYLOAD
-        $ERROR_DESCRIPTION_LEADER_NOT_FOUND
+        $ERROR_LEADER_NOT_FOUND
         $ERROR_INVALID_MESSAGE
         $ERROR_INVALID_MESSAGE_SIZE
         $ERROR_LEADER_NOT_AVAILABLE
@@ -216,13 +216,7 @@ BEGIN {
     $constants_Kafka_Protocol = [ qw(
         $APIVERSION
         $BAD_OFFSET
-        $COMPRESSION_CODEC_MASK
-        $COMPRESSION_EXISTS
-        $COMPRESSION_GZIP
         $COMPRESSION_NONE
-        $COMPRESSION_NOT_EXIST
-        $COMPRESSION_SNAPPY
-        $CONSUMER_HAVE_NO_NODE_ID
         $CONSUMERS_REPLICAID
         $NULL_BYTES_LENGTH
         $_int64_template
@@ -242,13 +236,8 @@ BEGIN {
         _encode_MessageSet_array
         _encode_string
         _pack64
-        _protocol_error
         _unpack64
-        _verify_string
     ) ];
-# Subroutine redefined
-#        last_error
-#        last_errorcode
 
     use_ok 'Kafka::Protocol',
         @$constants_Kafka_Protocol,
@@ -315,9 +304,9 @@ BEGIN {
         new
         override
         receive
+        restore
         send
         special_cases
-        undefine
     ) ];
 
     use_ok 'Kafka::MockIO',
