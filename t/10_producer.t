@@ -75,48 +75,36 @@ my ( $port, $connect, $partition, $producer, $response );
 sub new_ERROR_MISMATCH_ARGUMENT {
     my ( $field, @bad_values ) = @_;
 
-    foreach my $RaiseError ( 0, 1 ) {
-        foreach my $bad_value ( @bad_values ) {
-            undef $producer;
-            $@ = undef;
-            $producer = eval { Kafka::Producer->new(
+    foreach my $bad_value ( @bad_values ) {
+        undef $producer;
+        throws_ok {
+            $producer = Kafka::Producer->new(
                 Connection      => $connect,
-                RaiseError      => $RaiseError,
                 CorrelationId   => undef,
                 ClientId        => 'producer',
                 RequiredAcks    => $WAIT_WRITTEN_TO_LOCAL_LOG,
                 Timeout         => $REQUEST_TIMEOUT * 1000, # This provides a maximum time (ms) the server can await the receipt of the number of acknowledgements in RequiredAcks
                 $field          => $bad_value,
-            ) };
-            ok $@, "\$@ changed";
-            ok !defined( $producer ), 'producer object is not created';
-        }
+            );
+        } 'Kafka::Exception::Producer', 'error thrown';
     }
 }
 
 sub send_ERROR_MISMATCH_ARGUMENT {
     my ( $topic, $partition, $messages, $key ) = @_;
 
-    foreach my $RaiseError ( 0, 1 ) {
-        $producer = Kafka::Producer->new(
-            Connection  => $connect,
-            RaiseError  => $RaiseError,
-        );
-        undef $response;
-        $@ = undef;
-        ok !$producer->last_errorcode(), 'no error';
-        $response = eval { $producer->send(
+    $producer = Kafka::Producer->new(
+        Connection  => $connect,
+    );
+    undef $response;
+    throws_ok {
+        $response = $producer->send(
             $topic,
             $partition,
             $messages,
             $key,
-        ) };
-        ok $@, "\$@ changed"
-            if $RaiseError;
-        ok $producer->last_errorcode(), 'an error is detected';
-        ok $producer->last_error(), 'expected error';
-        ok !defined( $response ), 'response is not received';
-    }
+        );
+    } 'Kafka::Exception', 'error thrown';
 }
 
 sub communication_error {
@@ -124,47 +112,38 @@ sub communication_error {
 
     my $method_name = "${module}::${name}";
     my $method = \&$method_name;
-    for my $RaiseError ( 0, 1 ) {
-        $connect = Kafka::Connection->new(
-            host        => 'localhost',
-            port        => $port,
-            RaiseError  => $RaiseError,
-        );
-        $producer = Kafka::Producer->new(
-            Connection  => $connect,
-            RaiseError  => $RaiseError,
-        );
 
-        Sub::Install::reinstall_sub( {
-            code    => sub {
-                my ( $self ) = @_;
-                return $self->_error( $ERROR_MISMATCH_ARGUMENT );
-            },
-            into    => $module,
-            as      => $name,
-        } );
+    $connect = Kafka::Connection->new(
+        host        => 'localhost',
+        port        => $port,
+    );
+    $producer = Kafka::Producer->new(
+        Connection  => $connect,
+    );
 
-        undef $response;
-        $@ = undef;
-        ok !$producer->last_errorcode(), 'no error';
-        $response = eval { $producer->send(
+    Sub::Install::reinstall_sub( {
+        code    => sub {
+            my ( $self ) = @_;
+            $self->_error( $ERROR_MISMATCH_ARGUMENT );
+        },
+        into    => $module,
+        as      => $name,
+    } );
+
+    undef $response;
+    throws_ok {
+        $response = $producer->send(
             $topic,
             $partition,
             'Single message',
-        ) };
-        if ( $RaiseError ) {
-            ok $@, "\$@ changed";
-        }
-        ok $producer->last_errorcode(), 'an error is detected';
-        ok $producer->last_error(), 'expected error';
-        ok !defined( $response ), 'response is not received';
+        );
+    } 'Kafka::Exception', 'error thrown';
 
-        Sub::Install::reinstall_sub( {
-            code    => $method,
-            into    => $module,
-            as      => $name,
-        } );
-    }
+    Sub::Install::reinstall_sub( {
+        code    => $method,
+        into    => $module,
+        as      => $name,
+    } );
 }
 
 #-- Global data ----------------------------------------------------------------
@@ -202,16 +181,10 @@ sub testing {
     );
     isa_ok( $producer, 'Kafka::Producer' );
 
-    ok !$producer->last_errorcode, 'No errorcode';
-    ok !$producer->last_error, 'No error';
-
     undef $producer;
     ok !$producer, 'producer object is destroyed';
 
 #-- new
-
-# RaiseError ($DEFAULT_RAISE_ERROR => 0;)
-    new_ERROR_MISMATCH_ARGUMENT( 'RaiseError', @not_nonnegint );
 
 # Connection
     new_ERROR_MISMATCH_ARGUMENT( 'Connection', @not_right_object );
@@ -263,10 +236,6 @@ sub testing {
             RequiredAcks    => $mode,
         );
         isa_ok( $producer, 'Kafka::Producer' );
-
-        if ( $producer->last_errorcode ) {
-            BAIL_OUT '('.$producer->last_errorcode.') ', $producer->last_error."\n";
-        }
 
         # Sending a single message
         $response = $producer->send(

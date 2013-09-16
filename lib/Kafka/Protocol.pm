@@ -6,7 +6,7 @@ Kafka::Protocol - functions to process messages in the Apache Kafka protocol.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Protocol> version 0.800_1 .
+This documentation refers to C<Kafka::Protocol> version 0.800_4 .
 
 =cut
 
@@ -18,7 +18,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_1';
+our $VERSION = '0.800_4';
 
 use Exporter qw(
     import
@@ -67,7 +67,6 @@ use Kafka qw(
     $DEFAULT_MAX_WAIT_TIME
     %ERROR
     $ERROR_MISMATCH_ARGUMENT
-    $ERROR_NO_ERROR
     $ERROR_NOT_BINARY_STRING
     $ERROR_REQUEST_OR_RESPONSE
     $NOT_SEND_ANY_RESPONSE
@@ -75,7 +74,6 @@ use Kafka qw(
     $RECEIVE_LATEST_OFFSET
     $WAIT_WRITTEN_TO_LOCAL_LOG
 );
-use Kafka::Int64;
 use Kafka::Internals qw(
     $APIKEY_FETCH
     $APIKEY_METADATA
@@ -314,25 +312,24 @@ Support for working with 64 bit elements of the Kafka protocol on 32 bit systems
 our $_int64_template;                           # Used to unpack a 64 bit value
 if ( $BITS64 ) {
     $_int64_template    = q{q>};
-# unpack a big-endian signed quad (64-bit) value on 64 bit systems.
+    # unpack a big-endian signed quad (64-bit) value on 64 bit systems.
     *_unpack64          = sub { $_[0] };
-# pack a big-endian signed quad (64-bit) value on 64 bit systems.
+    # pack a big-endian signed quad (64-bit) value on 64 bit systems.
     *_pack64            = sub { pack( q{q>}, $_[0] ) };
-}
-else {
-    eval q{ use Kafka::Int64; }                 ## no critic
+} else {
+    eval q{ require Kafka::Int64; }                 ## no critic
         or die "Cannot load Kafka::Int64 : $@";
 
     $_int64_template    = q{a[8]};
-# unpack a big-endian signed quad (64-bit) value on 32 bit systems.
+    # unpack a big-endian signed quad (64-bit) value on 32 bit systems.
     *_unpack64          = \&Kafka::Int64::unpackq;
-# pack a big-endian signed quad (64-bit) value on 32 bit systems.
+    # pack a big-endian signed quad (64-bit) value on 32 bit systems.
     *_pack64            = \&Kafka::Int64::packq;
 }
 
 =head2 EXPORT
 
-These variables are the constants and never change their values.
+The following constants are available for export
 
 =cut
 
@@ -573,7 +570,8 @@ sub decode_produce_response {
 
     my @data = unpack( $_decode_produce_response_template, $$bin_stream_ref );
 
-    my ( $i, $Produce_Response ) = ( 0, {} );
+    my $i = 0;
+    my $Produce_Response = {};
 
     $Produce_Response->{CorrelationId}              =  $data[ $i++ ];   # CorrelationId
 
@@ -708,7 +706,8 @@ sub decode_fetch_response {
     _decode_fetch_response_template( $response );
     @data = unpack( $response->{template}, $$bin_stream_ref );
 
-    my ( $i, $Fetch_Response ) = ( 0, {} );
+    my $i = 0;
+    my $Fetch_Response = {};
 
     $Fetch_Response->{CorrelationId}                        =  $data[ $i++ ];   # CorrelationId
 
@@ -857,7 +856,8 @@ sub decode_offset_response {
 
     my @data = unpack( $_decode_offset_response_template, $$bin_stream_ref );
 
-    my ( $i, $Offset_Response ) = ( 0, {} );
+    my $i = 0;
+    my $Offset_Response = {};
 
     $Offset_Response->{CorrelationId}                           =  $data[ $i++ ];   # CorrelationId
 
@@ -1005,7 +1005,8 @@ sub decode_metadata_response {
 
     my @data = unpack( $_decode_metadata_response_template, $$bin_stream_ref );
 
-    my ( $i, $Metadata_Response ) = ( 0, {} );
+    my $i = 0;
+    my $Metadata_Response = {};
 
     $Metadata_Response->{CorrelationId}                           =  $data[ $i++ ];   # CorrelationId
 
@@ -1079,17 +1080,11 @@ sub _encode_request_header {
 sub _decode_fetch_response_template {
     my ( $response ) = @_;
 
-    my (
-        $topics_array_size,
-        $TopicName_length,
-        $partitions_array_size,
-    );
-
     $response->{template}       = $_FetchResponse_header_template;
     $response->{stream_offset}  = $_FetchResponse_header_length;    # bytes before topics array size
                                                                                 # [l] Size
                                                                                 # [l] CorrelationId
-    $topics_array_size = unpack(
+    my $topics_array_size = unpack(
          q{x[}.$response->{stream_offset}
         .q{]l>},                            # topics array size
         ${ $response->{bin_stream} }
@@ -1097,6 +1092,7 @@ sub _decode_fetch_response_template {
     $response->{stream_offset} += 4;        # bytes before TopicName length
                                                                                 # [l] topics array size
 
+    my ( $TopicName_length, $partitions_array_size );
     while ( $topics_array_size-- ) {
         $TopicName_length = unpack(
              q{x[}.$response->{stream_offset}
@@ -1242,16 +1238,9 @@ sub _encode_MessageSet_array {
 sub _decode_MessageSet_template {
     my ( $response ) = @_;
 
-    my (
-        $MessageSetSize,
-        $MessageSize,
-        $Key_length,
-        $Value_length,
-    );
-
     my $bin_stream_length = length ${ $response->{bin_stream} };
 
-    $MessageSetSize = unpack(
+    my $MessageSetSize = unpack(
          q{x[}.$response->{stream_offset}
         .q{]l>},                            # MessageSetSize
         ${ $response->{bin_stream} }
@@ -1259,7 +1248,7 @@ sub _decode_MessageSet_template {
     $response->{template} .= q{l>};         # MessageSetSize
     $response->{stream_offset} += 4;        # bytes before Offset
 
-    my $local_template;
+    my ( $local_template, $MessageSize, $Key_length, $Value_length );
     CREATE_TEMPLATE:
     while ( $MessageSetSize ) {
 # Not the full MessageSet
@@ -1398,9 +1387,11 @@ protocol on 32 bit systems.
 L<Kafka::Protocol|Kafka::Protocol> - functions to process messages in the
 Apache Kafka's Protocol.
 
-L<Kafka::IO|Kafka::IO> - low level interface for communication with Kafka server.
+L<Kafka::IO|Kafka::IO> - low-level interface for communication with Kafka server.
 
-L<Kafka::Internals|Kafka::Internals> - Internal constants and functions used
+L<Kafka::Exceptions|Kafka::Exceptions> - module designated to handle Kafka exceptions.
+
+L<Kafka::Internals|Kafka::Internals> - internal constants and functions used
 by several package modules.
 
 A wealth of detail about the Apache Kafka and the Kafka Protocol:
@@ -1429,8 +1420,7 @@ This package is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself. See I<perlartistic> at
 L<http://dev.perl.org/licenses/artistic.html>.
 
-This program is
-distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
 without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
 PARTICULAR PURPOSE.
 

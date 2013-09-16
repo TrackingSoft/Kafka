@@ -7,6 +7,7 @@ README                              Get you started with this package
 lib/Kafka.pm
 lib/Kafka/Connection.pm
 lib/Kafka/Consumer.pm
+lib/Kafka/Exceptions.pm
 lib/Kafka/IO.pm
 lib/Kafka/Int64.pm
 lib/Kafka/Internals.pm

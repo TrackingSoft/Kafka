@@ -2,11 +2,11 @@ package Kafka::Producer;
 
 =head1 NAME
 
-Kafka::Producer -  interface to the 'producer' client.
+Kafka::Producer - Perl interface for Kafka producer client
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Producer> version 0.800_1 .
+This documentation refers to C<Kafka::Producer> version 0.800_4 .
 
 =cut
 
@@ -18,10 +18,11 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_1';
+our $VERSION = '0.800_4';
 
 #-- load the modules -----------------------------------------------------------
 
+use Carp;
 use Params::Util qw(
     _ARRAY0
     _INSTANCE
@@ -32,26 +33,19 @@ use Params::Util qw(
 use Scalar::Util::Numeric qw(
     isint
 );
+use Try::Tiny;
 
 use Kafka qw(
     %ERROR
     $ERROR_MISMATCH_ARGUMENT
-    $ERROR_NO_ERROR
     $REQUEST_TIMEOUT
     $WAIT_WRITTEN_TO_LOCAL_LOG
 );
+use Kafka::Exceptions;
 use Kafka::Internals qw(
     $APIKEY_PRODUCE
-    $DEFAULT_RAISE_ERROR
     $PRODUCER_ANY_OFFSET
     _get_CorrelationId
-    last_error
-    last_errorcode
-    RaiseError
-    _fulfill_request
-    _error
-    _connection_error
-    _set_error
 );
 use Kafka::Connection;
 
@@ -63,40 +57,53 @@ use Kafka::Connection;
     use strict;
     use warnings;
 
-    #-- Connection
+    use Scalar::Util qw(
+        blessed
+    );
+    use Try::Tiny;
+
     use Kafka::Connection;
-
-    my $connect = Kafka::Connection->new( host => 'localhost' );
-
-    #-- Producer
     use Kafka::Producer;
 
-    my $producer = Kafka::Producer->new( Connection => $connect );
+    my ( $connection, $producer );
+    try {
 
-    # Sending a single message
-    my $response = $producer->send(
-        'mytopic',          # topic
-        0,                  # partition
-        'Single message'    # message
-    );
+        #-- Connection
+        $connection = Kafka::Connection->new( host => 'localhost' );
 
-    die 'Error: ('.$producer->last_errorcode.') '.$producer->last_error."\n"
-        unless $response;
+        #-- Producer
+        $producer = Kafka::Producer->new( Connection => $connection );
 
-    # Sending a series of messages
-    $response = $producer->send(
-        'mytopic',          # topic
-        0,                  # partition
-        [                   # messages
-            'The first message',
-            'The second message',
-            'The third message',
-        ]
-    );
+        # Sending a single message
+        my $response = $producer->send(
+            'mytopic',          # topic
+            0,                  # partition
+            'Single message'    # message
+        );
+
+        # Sending a series of messages
+        $response = $producer->send(
+            'mytopic',          # topic
+            0,                  # partition
+            [                   # messages
+                'The first message',
+                'The second message',
+                'The third message',
+            ]
+        );
+
+    } catch {
+        if ( blessed( $_ ) && $_->isa( 'Kafka::Exception' ) ) {
+            warn 'Error: (', $_->code, ') ',  $_->message, "\n";
+            exit;
+        } else {
+            die $_;
+        }
+    };
 
     # Closes the producer and cleans up
     undef $producer;
-    undef $connect;
+    undef $connection;
 
 =head1 DESCRIPTION
 
@@ -108,18 +115,15 @@ The main features of the C<Kafka::Producer> class are:
 
 =item *
 
-Provides an object oriented model of communication.
+Provides object-oriented API for producing messages.
 
 =item *
 
-Supports Apache Kafka 0.8 PRODUCE Requests (with no compression codec attribute
-now).
+Provides Kafka PRODUCE requests (with no support for compression codec).
 
 =back
 
 =cut
-
-our $_package_error;
 
 #-- constructor ----------------------------------------------------------------
 
@@ -127,35 +131,16 @@ our $_package_error;
 
 =head3 C<new>
 
-Creates new producer client object. Returns the created C<Kafka::Producer>
-object.
+Creates new producer client object.
 
-An error will cause the program to halt or the constructor will return the
-C<Kafka::Producer> object without halt, depending on the value of the C<RaiseError> attribute.
-
-You can use the methods of the C<Kafka::Producer> class - L</last_errorcode>
-and L</last_error> for information about the error.
-
-C<new()> takes arguments in key-value pairs.
-The following arguments are currently recognized:
+C<new()> takes arguments in key-value pairs. The following arguments are currently recognized:
 
 =over 3
 
-=item C<Connection =E<gt> $connect>
+=item C<Connection =E<gt> $connection>
 
-C<$connect> is the L<Kafka::Connection|Kafka::Connection> object that allow you to communicate to
+C<$connection> is the L<Kafka::Connection|Kafka::Connection> object responsible for communication with
 the Apache Kafka cluster.
-
-=item C<RaiseError =E<gt> $mode>
-
-Optional, default = 0 .
-
-An error will cause the program to halt if L</RaiseError> is true: C<confess>
-if the argument is not valid or C<die> in the other error case
-(this can always be trapped with C<eval>).
-
-You should always check for errors, when not establishing the C<RaiseError>
-mode to true.
 
 =item C<CorrelationId =E<gt> $correlation_id>
 
@@ -165,11 +150,10 @@ C<Correlation> is a user-supplied integer.
 It will be passed back in the response by the server, unmodified.
 The C<$correlation_id> should be an integer number.
 
-The program will cause an error if a C<CorrelationId> in request
-does not match the C<CorrelationId> received in response.
-
 If C<CorrelationId> is not passed to constructor, its value will be assigned automatically
 (random negative integer).
+
+An exception is thrown if C<CorrelationId> sent with request does not match C<CorrelationId> received in response.
 
 =item C<ClientId =E<gt> $client_id>
 
@@ -182,12 +166,12 @@ If C<ClientId> is not passed to constructor, its value will be automatically ass
 
 The C<$acks> should be an integer number.
 
-RTFM: Indicates how many acknowledgements the servers should receive before responding to the request.
+Indicates how many acknowledgements the servers should receive before responding to the request.
 
 If it is C<$NOT_SEND_ANY_RESPONSE> the server does not send any response.
 
 If it is C<$WAIT_WRITTEN_TO_LOCAL_LOG>,
-the server will wait the data is written to the local log before sending a response.
+the server will wait until the data is written to the local log before sending a response.
 
 If it is C<$BLOCK_UNTIL_IS_COMMITTED>
 the server will block until the message is committed by all in sync replicas before sending a response.
@@ -202,7 +186,7 @@ can be imported from the L<Kafka|Kafka> module.
 This provides a maximum time the server can await the receipt
 of the number of acknowledgements in RequiredAcks.
 
-The C<$timeout> in secs, could be any integer or floating-point type.
+The C<$timeout> in seconds, could be any integer or floating-point type.
 
 Optional, default = C<$REQUEST_TIMEOUT>.
 
@@ -217,7 +201,6 @@ sub new {
 
     my $self = bless {
         Connection      => undef,
-        RaiseError      => $DEFAULT_RAISE_ERROR,
         CorrelationId   => undef,
         ClientId        => undef,
         RequiredAcks    => $WAIT_WRITTEN_TO_LOCAL_LOG,
@@ -232,19 +215,16 @@ sub new {
     $self->{CorrelationId}  //= _get_CorrelationId;
     $self->{ClientId}       //= 'producer';
 
-    if    ( !defined _NONNEGINT( $self->RaiseError ) ) {
-        $self->{RaiseError} = $DEFAULT_RAISE_ERROR;
-        $self->_error( $ERROR_MISMATCH_ARGUMENT, 'RaiseError' );
-    }
-    elsif ( !_INSTANCE( $self->{Connection}, 'Kafka::Connection' ) )                    { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'Connection' ); }
-    elsif ( !isint( $self->{CorrelationId} ) )                                          { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'CorrelationId' ); }
-    elsif ( !( $self->{ClientId} eq q{} || defined( _STRING( $self->{ClientId} ) ) && !utf8::is_utf8( $self->{ClientId} ) ) )   { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'ClientId' ); }
-    elsif ( !( defined( $self->{RequiredAcks} ) && isint( $self->{RequiredAcks} ) ) )   { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'RequiredAcks' ); }
-    elsif ( !_NUMBER( $self->{Timeout} ) )                                              { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'Timeout' ); }
-    else {
-        $self->_error( $ERROR_NO_ERROR )
-            if $self->last_error;
-    }
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'Connection' )
+        unless _INSTANCE( $self->{Connection}, 'Kafka::Connection' );
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'CorrelationId' )
+        unless isint( $self->{CorrelationId} );
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'ClientId' )
+        unless ( $self->{ClientId} eq q{} || defined( _STRING( $self->{ClientId} ) ) ) && !utf8::is_utf8( $self->{ClientId} );
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'RequiredAcks' )
+        unless defined( $self->{RequiredAcks} ) && isint( $self->{RequiredAcks} );
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'Timeout' )
+        unless _NUMBER( $self->{Timeout} );
 
     return $self;
 }
@@ -263,11 +243,10 @@ The following methods are defined for the C<Kafka::Producer> class:
 
 Sends a messages on a L<Kafka::Connection|Kafka::Connection> object.
 
-Returns a non-blank value (a reference to a hash describing the answer)
+Returns a non-blank value (a reference to a hash with server response description)
 if the message is successfully sent.
-If there's an error, returns the undefined value if the C<RaiseError> is not true.
 
-C<send()> takes arguments. The following arguments are currently recognized:
+C<send()> takes the following arguments:
 
 =over 3
 
@@ -298,16 +277,19 @@ sub send {
 
     $key //= q{};
 
-    if    ( !( $topic eq q{} || defined( _STRING( $topic ) ) && !utf8::is_utf8( $topic ) ) )    { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$topic' ); }
-    elsif ( !( defined( $partition ) && isint( $partition ) ) )             { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$partition' ); }
-# Checking the encoding of strings is performed in the functions of module Kafka::Protocol
-    elsif ( !( defined( _STRING( $messages ) ) || _ARRAY0( $messages ) ) )  { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$messages' ); }
-    elsif ( !( $key eq q{} || ( defined( _STRING( $key ) ) && !utf8::is_utf8( $key ) ) ) )      { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$key' ); }
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, '$topic' )
+        unless defined( $topic ) && ( $topic eq q{} || defined( _STRING( $topic ) ) ) && !utf8::is_utf8( $topic );
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, '$partition' )
+        unless defined( $partition ) && isint( $partition );
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, '$messages' )
+        unless defined( _STRING( $messages ) ) || _ARRAY0( $messages );
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, '$key' )
+        unless ( $key eq q{} || defined( _STRING( $key ) ) ) && !utf8::is_utf8( $key );
 
     $messages = [ $messages ] unless ref( $messages );
     foreach my $message ( @$messages ) {
-        ( $message eq q{} || ( defined( _STRING( $message ) ) && !utf8::is_utf8( $message ) ) )
-            or return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$messages' );
+        $self->_error( $ERROR_MISMATCH_ARGUMENT, 'message' )
+            unless defined( $message ) && ( $message eq q{} || ( defined( _STRING( $message ) ) && !utf8::is_utf8( $message ) ) );
     }
 
     my $MessageSet = [];
@@ -338,19 +320,19 @@ sub send {
         };
     }
 
-    $self->_error( $ERROR_NO_ERROR )
-        if $self->last_error;
-
-    if ( my $response = $self->_fulfill_request( $request ) ) {
-        return $response;
-    }
-
-    return;
+    return $self->{Connection}->receive_response_to_request( $request );
 }
 
 #-- private attributes ---------------------------------------------------------
 
 #-- private methods ------------------------------------------------------------
+
+# Handler for errors
+sub _error {
+    my $self = shift;
+
+    Kafka::Exception::Producer->throw( throw_args( @_ ) );
+}
 
 #-- Closes and cleans up -------------------------------------------------------
 
@@ -358,79 +340,58 @@ sub send {
 
 __END__
 
-=head3 C<RaiseError>
-
-This method returns current value showing how errors are handled within Kafka module.
-If set to true, die() is dispatched when error during communication is detected.
-
-C<last_errorcode> and C<last_error> are diagnostic methods and can be used to get detailed
-error codes and messages for various cases: when server or the resource is not available,
-access to the resource was denied, etc.
-
-=head3 C<last_errorcode>
-
-Returns code of the last error.
-
-=head3 C<last_error>
-
-Returns an error message that contains information about the encountered failure.
-
 =head1 DIAGNOSTICS
 
-Consult documentation of the L</RaiseError> method for additional information about possible errors.
+When error is detected, an exception, represented by object of C<Kafka::Exception::Producer> class,
+is thrown (see L<Kafka::Exceptions|Kafka::Exceptions>).
 
-It's advised to always check L</last_errorcode> and more descriptive L</last_error> when
-L</RaiseError> is not set.
+L<code|Kafka::Exceptions/code> and a more descriptive L<message|Kafka::Exceptions/message> provide
+information about thrown exception. Consult documentation of the L<Kafka::Exceptions|Kafka::Exceptions>
+for the list of all available methods.
+
+Authors suggest using of L<Try::Tiny|Try::Tiny>'s C<try> and C<catch> to handle exceptions while
+working with Kafka module.
 
 =over 3
 
 =item C<Invalid argument>
 
-This means that you didn't give the right argument to a C<new>
+Invalid arguments were provided to a C<new>
 L<constructor|/CONSTRUCTOR> or to other L<method|/METHODS>.
 
 =item C<Can't send>
 
-This means that the message can't be sent on a L<Kafka::IO|Kafka::IO> object socket.
+Request cannot be sent.
 
 =item C<Can't recv>
 
-This means that the message can't be received on a L<Kafka::IO|Kafka::IO>
-object socket.
+Response cannot be received.
 
 =item C<Can't bind>
 
-This means that the socket TCP connection can't be established on on given host
-and port.
+TCP connection can't be established on a given host and port.
 
 =item C<Can't get metadata>
 
-This means that the IO error present,
-errors found in the structure of the reply or the reply contains a non-zero error codes.
+IO error is present, errors found in the structure of the reply or the reply contains a non-zero error codes.
 
 =item C<Description leader not found>
 
-This means that information about the server-leader in the resulting metadata is missing.
+Information about the server-leader is missing in metadata.
 
 =item C<Mismatch CorrelationId>
 
-This means that do not match C<CorrelationId> request and response.
+C<CorrelationId> of response doesn't match one in request.
 
 =item C<There are no known brokers>
 
-This means that information about brokers in the cluster obtained metadata is missing.
+Information about brokers in the cluster is missing.
 
 =item C<Can't get metadata>
 
-This means that metadata obtained incorrect internal structure.
+Obtained metadata is incorrect or failed to obtain metadata.
 
 =back
-
-For more error description, always look at the message from L</last_error>
-method from C<Kafka::Producer> object.
-
-If the reply does not contain zero error codes,
-the error description can also be seen in the information of the method L</ last_error>.
 
 =head1 SEE ALSO
 
@@ -453,9 +414,11 @@ protocol on 32 bit systems.
 L<Kafka::Protocol|Kafka::Protocol> - functions to process messages in the
 Apache Kafka's Protocol.
 
-L<Kafka::IO|Kafka::IO> - low level interface for communication with Kafka server.
+L<Kafka::IO|Kafka::IO> - low-level interface for communication with Kafka server.
 
-L<Kafka::Internals|Kafka::Internals> - Internal constants and functions used
+L<Kafka::Exceptions|Kafka::Exceptions> - module designated to handle Kafka exceptions.
+
+L<Kafka::Internals|Kafka::Internals> - internal constants and functions used
 by several package modules.
 
 A wealth of detail about the Apache Kafka and the Kafka Protocol:

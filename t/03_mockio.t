@@ -121,11 +121,6 @@ $io = Kafka::IO->new(
 );
 isa_ok( $io, 'Kafka::IO' );
 
-#-- last_errorcode, last_error
-
-ok !$io->last_errorcode, 'No errorcode';
-ok !$io->last_error, 'No error';
-
 #-- is_alive
 
 ok $io->is_alive, 'socket alive';
@@ -140,16 +135,14 @@ ok !$io->{socket}, 'socket not defined';
 
 ok !$io->is_alive, 'socket not alive';
 
-#-- last_errorcode, last_error
-
 undef $io;
-$io = Kafka::IO->new(
-    host        => 'incorrect host',
-    port        => 'incorrect port',
-    timeout     => 'incorrect timeout',
-);
-ok $io->last_errorcode, 'errorcode present: '.$io->last_errorcode;
-ok $io->last_error, 'error present: '.$io->last_error;
+dies_ok {
+    $io = Kafka::IO->new(
+        host        => 'incorrect host',
+        port        => 'incorrect port',
+        timeout     => 'incorrect timeout',
+    );
+} 'expecting to die';
 
 #-- new
 
@@ -159,42 +152,39 @@ $@ = $test_message;
 
 foreach my $bad_host ( @not_string ) {
     undef $io;
-    $io = Kafka::IO->new(
-        host    => $bad_host,
-        port    => $KAFKA_SERVER_PORT,
-        timeout => $REQUEST_TIMEOUT,
-    );
-    is $@, $test_message, '$@ not changed';
-    isa_ok( $io, 'Kafka::IO');
-    ok $io->last_errorcode, 'Invalid host: '.$io->last_error;
+    dies_ok {
+        $io = Kafka::IO->new(
+            host    => $bad_host,
+            port    => $KAFKA_SERVER_PORT,
+            timeout => $REQUEST_TIMEOUT,
+        );
+    } 'Invalid host';
 }
 
 # port
 
 foreach my $bad_port ( @not_posint ) {
     undef $io;
-    $io = Kafka::IO->new(
-        host    => 'localhost',
-        port    => $bad_port,
-        timeout => $REQUEST_TIMEOUT,
-    );
-    is $@, $test_message, '$@ not changed';
-    isa_ok( $io, 'Kafka::IO');
-    ok $io->last_errorcode, 'Invalid port: '.$io->last_error;
+    dies_ok {
+        $io = Kafka::IO->new(
+            host    => 'localhost',
+            port    => $bad_port,
+            timeout => $REQUEST_TIMEOUT,
+        );
+    } 'Invalid port';
 }
 
-# port
+# timeout
 
 foreach my $bad_timeout ( @not_posnumber ) {
     undef $io;
-    $io = Kafka::IO->new(
-        host    => 'localhost',
-        port    => $KAFKA_SERVER_PORT,
-        timeout => $bad_timeout,
-    );
-    is $@, $test_message, '$@ not changed';
-    isa_ok( $io, 'Kafka::IO');
-    ok $io->last_errorcode, 'Invalid timeout: '.$io->last_error;
+    dies_ok {
+        $io = Kafka::IO->new(
+            host    => 'localhost',
+            port    => $KAFKA_SERVER_PORT,
+            timeout => $bad_timeout,
+        );
+    } 'Invalid timeout';
 }
 
 #-- send
@@ -206,7 +196,6 @@ $io = Kafka::IO->new(
 );
 
 is( $io->send( $test_message ), length( $test_message ), 'sent '.length( $test_message ).' bytes' );
-ok !$io->last_errorcode, 'No errorcode';
 
 #-- receive
 
@@ -222,9 +211,7 @@ foreach my $bad_message ( @not_string ) {
     );
     ok $io->is_alive, 'socket alive';
 
-    $io->send( $bad_message );
-    is $@, $test_message, '$@ not changed';
-    ok $io->last_errorcode, 'send error: '.$io->last_error;
+    dies_ok { $io->send( $bad_message ); } 'expecting to die';
 }
 
 #-- receive
@@ -232,12 +219,8 @@ foreach my $bad_message ( @not_string ) {
 ok $io->is_alive, 'socket alive';
 
 foreach my $bad_len ( @not_posint ) {
-    $io->receive( $bad_len );
-    is $@, $test_message, '$@ not changed';
-    ok $io->last_errorcode, 'receive error: '.$io->last_error;
+    dies_ok { $io->receive( $bad_len ); } 'expecting to die';
 }
-
-$@ = undef;
 
 #-- Kafka server capabilities ----------
 
@@ -257,9 +240,7 @@ foreach my $encoded_request (
     ) {
     $io->send( $encoded_request );
     my $encoded_response = ${ $io->receive( 4 ) };  # response length
-    ok !$io->last_errorcode, 'No errorcode';
     $encoded_response .= ${ $io->receive( unpack( 'l>', $encoded_response ) ) };
-    ok !$io->last_errorcode, 'No errorcode';
     ok( defined( _STRING( $encoded_response ) ), 'response received' );
 }
 

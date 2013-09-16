@@ -78,13 +78,11 @@ my ( $port, $connect, $partition, $consumer, $offsets, $messages );
 sub new_ERROR_MISMATCH_ARGUMENT {
     my ( $field, @bad_values ) = @_;
 
-    foreach my $RaiseError ( 0, 1 ) {
-        foreach my $bad_value ( @bad_values ) {
-            undef $consumer;
-            $@ = undef;
-            $consumer = eval { Kafka::Consumer->new(
+    foreach my $bad_value ( @bad_values ) {
+        undef $consumer;
+        throws_ok {
+            $consumer = Kafka::Consumer->new(
                 Connection          => $connect,
-                RaiseError          => $RaiseError,
                 CorrelationId       => undef,
                 ClientId            => undef,
                 MaxWaitTime         => $DEFAULT_MAX_WAIT_TIME,
@@ -92,61 +90,43 @@ sub new_ERROR_MISMATCH_ARGUMENT {
                 MaxBytes            => $DEFAULT_MAX_BYTES,
                 MaxNumberOfOffsets  => $DEFAULT_MAX_NUMBER_OF_OFFSETS,
                 $field              => $bad_value,
-            ) };
-            ok $@, "\$@ changed";
-            ok !defined( $consumer ), 'consumer object is not created';
-        }
+            );
+        } 'Kafka::Exception::Consumer', 'error thrown';
     }
 }
 
 sub fetch_ERROR_MISMATCH_ARGUMENT {
     my ( $topic, $partition, $offset, $max_size ) = @_;
 
-    foreach my $RaiseError ( 0, 1 ) {
-        $consumer = Kafka::Consumer->new(
-            Connection  => $connect,
-            RaiseError  => $RaiseError,
-        );
-        undef $messages;
-        $@ = undef;
-        ok !$consumer->last_errorcode(), 'no error';
-        $messages = eval { $consumer->fetch(
+    $consumer = Kafka::Consumer->new(
+        Connection  => $connect,
+    );
+    undef $messages;
+    throws_ok {
+        $messages = $consumer->fetch(
             $topic,
             $partition,
             $offset,
             $max_size,
-        ) };
-        ok $@, "\$@ changed"
-            if $RaiseError;
-        ok $consumer->last_errorcode(), 'an error is detected';
-        ok $consumer->last_error(), 'expected error';
-        ok !defined( $messages ), 'messages is not received';
-    }
+        );
+    } 'Kafka::Exception::Consumer', 'error thrown';
 }
 
 sub offsets_ERROR_MISMATCH_ARGUMENT {
     my ( $topic, $partition, $time, $max_number ) = @_;
 
-    foreach my $RaiseError ( 0, 1 ) {
-        $consumer = Kafka::Consumer->new(
-            Connection  => $connect,
-            RaiseError  => $RaiseError,
-        );
-        undef $offsets;
-        $@ = undef;
-        ok !$consumer->last_errorcode(), 'no error';
-        $messages = eval { $consumer->offsets(
+    $consumer = Kafka::Consumer->new(
+        Connection  => $connect,
+    );
+    undef $offsets;
+    throws_ok {
+        $messages = $consumer->offsets(
             $topic,
             $partition,
             $time,
             $max_number,
-        ) };
-        ok $@, "\$@ changed"
-            if $RaiseError;
-        ok $consumer->last_errorcode(), 'an error is detected';
-        ok $consumer->last_error(), 'expected error';
-        ok !defined( $messages ), 'messages is not received';
-    }
+        );
+    } 'Kafka::Exception::Consumer', 'error thrown';
 }
 
 sub communication_error {
@@ -154,70 +134,53 @@ sub communication_error {
 
     my $method_name = "${module}::${name}";
     my $method = \&$method_name;
-    for my $RaiseError ( 0, 1 ) {
-        $connect = Kafka::Connection->new(
-            host        => 'localhost',
-            port        => $port,
-            RaiseError  => $RaiseError,
-        );
+    $connect = Kafka::Connection->new(
+        host        => 'localhost',
+        port        => $port,
+    );
 
-        Sub::Install::reinstall_sub( {
-            code    => sub {
-                my ( $self ) = @_;
-                return $self->_error( $ERROR_MISMATCH_ARGUMENT );
-            },
-            into    => $module,
-            as      => $name,
-        } );
+    Sub::Install::reinstall_sub( {
+        code    => sub {
+            my ( $self ) = @_;
+            $self->_error( $ERROR_MISMATCH_ARGUMENT );
+        },
+        into    => $module,
+        as      => $name,
+    } );
 
 # fetch
-        $consumer = Kafka::Consumer->new(
-            Connection  => $connect,
-            RaiseError  => $RaiseError,
-        );
+    $consumer = Kafka::Consumer->new(
+        Connection  => $connect,
+    );
 
-        undef $messages;
-        $@ = undef;
-        ok !$consumer->last_errorcode(), 'no error';
-        $messages = eval { $consumer->fetch(
+    undef $messages;
+    throws_ok {
+        $messages = $consumer->fetch(
             $topic,
             $partition,
             0,
-        ) };
-        if ( $RaiseError ) {
-            ok $@, "\$@ changed";
-        }
-        ok $consumer->last_errorcode(), 'an error is detected';
-        ok $consumer->last_error(), 'expected error';
-        ok !defined( $messages ), 'messages is not received';
+        );
+    } 'Kafka::Exception::Connection', 'error thrown';
 
 # offsets
-        $consumer = Kafka::Consumer->new(
-            Connection  => $connect,
-            RaiseError  => $RaiseError,
-        );
+    $consumer = Kafka::Consumer->new(
+        Connection  => $connect,
+    );
 
-        undef $offsets;
-        $@ = undef;
-        ok !$consumer->last_errorcode(), 'no error';
-        $offsets = eval { $consumer->offsets(
+    undef $offsets;
+    throws_ok {
+        $offsets = $consumer->offsets(
             $topic,
             $partition,
             $RECEIVE_LATEST_OFFSET,
-        ) };
-        if ( $RaiseError ) {
-            ok $@, "\$@ changed";
-        }
-        ok $consumer->last_errorcode(), 'an error is detected';
-        ok $consumer->last_error(), 'expected error';
-        ok !defined( $offsets ), 'offsets is not received';
+        );
+    } 'Kafka::Exception::Connection', 'error thrown';
 
-        Sub::Install::reinstall_sub( {
-            code    => $method,
-            into    => $module,
-            as      => $name,
-        } );
-    }
+    Sub::Install::reinstall_sub( {
+        code    => $method,
+        into    => $module,
+        as      => $name,
+    } );
 }
 
 #-- Global data ----------------------------------------------------------------
@@ -255,16 +218,10 @@ sub testing {
     );
     isa_ok( $consumer, 'Kafka::Consumer' );
 
-    ok !$consumer->last_errorcode, 'No errorcode';
-    ok !$consumer->last_error, 'No error';
-
     undef $consumer;
     ok !$consumer, 'consumer object is destroyed';
 
 #-- new
-
-# RaiseError ($DEFAULT_RAISE_ERROR => 0;)
-    new_ERROR_MISMATCH_ARGUMENT( 'RaiseError', @not_nonnegint );
 
 # Connection
     new_ERROR_MISMATCH_ARGUMENT( 'Connection', @not_right_object );
@@ -344,10 +301,6 @@ sub testing {
     );
     isa_ok( $consumer, 'Kafka::Consumer' );
 
-    if ( $consumer->last_errorcode ) {
-        BAIL_OUT '('.$consumer->last_errorcode.') ', $consumer->last_error."\n";
-    }
-
 #-- OffsetRequest
 
 # RTFM:
@@ -371,9 +324,6 @@ sub testing {
         foreach my $offset ( @$offsets ) {
             note "Received offset: $offset";
         }
-    }
-    if ( !$offsets || $consumer->last_errorcode ) {
-        BAIL_OUT 'Error retrieving data: ('.$consumer->last_errorcode.') '.$consumer->last_error;
     }
 
 #-- FetchRequest

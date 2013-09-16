@@ -74,19 +74,26 @@ my $server_code = sub {
     }
 };
 
-my ( $server, $port, $io, $test_message );
+my ( $server, $port, $io, $sent, $resp, $test_message );
 
 #-- Global data ----------------------------------------------------------------
 
 $server = Test::TCP->new( code => $server_code );
 $port = $server->port;
 ok $port, "server port = $port";
+wait_port( $port );
 
 $test_message = "Test message\n";
 
 # INSTRUCTIONS -----------------------------------------------------------------
 
-# NOTE: Code is duplicated in the test t/03_mockio.t partially (Section Kafka::IO API)
+throws_ok {
+    $io = Kafka::IO->new(
+        host    => 'something bad',
+        port    => $port,
+        timeout => $REQUEST_TIMEOUT,
+    );
+} 'Kafka::Exception::IO', 'error thrown';
 
 $io = Kafka::IO->new(
     host    => 'localhost',
@@ -94,11 +101,6 @@ $io = Kafka::IO->new(
     timeout => $REQUEST_TIMEOUT,
 );
 isa_ok( $io, 'Kafka::IO' );
-
-#-- last_errorcode, last_error
-
-ok !$io->last_errorcode, 'No errorcode';
-ok !$io->last_error, 'No error';
 
 #-- is_alive
 
@@ -114,65 +116,6 @@ ok !$io->{socket}, 'socket not defined';
 
 ok !$io->is_alive, 'socket not alive';
 
-#-- last_errorcode, last_error
-
-# NOTE: We presume that the verification of the correctness of the arguments made by the user.
-
-#undef $io;
-#$io = Kafka::IO->new(
-#    host    => 'incorrect host',
-#    port    => 'incorrect port',
-#    timeout => 'incorrect timeout',
-#);
-#ok $io->last_errorcode, 'errorcode present: '.$io->last_errorcode;
-#ok $io->last_error, 'error present: '.$io->last_error;
-#
-##-- new
-#
-## host
-#
-#$@ = $test_message;
-#
-#foreach my $bad_host ( @not_string ) {
-#    undef $io;
-#    $io = Kafka::IO->new(
-#        host    => $bad_host,
-#        port    => $port,
-#        timeout => $REQUEST_TIMEOUT,
-#    );
-#    is $@, $test_message, '$@ not changed';
-#    isa_ok( $io, 'Kafka::IO');
-#    ok $io->last_errorcode, 'Invalid host: '.$io->last_error;
-#}
-#
-## port
-#
-#foreach my $bad_port ( @not_posint ) {
-#    undef $io;
-#    $io = Kafka::IO->new(
-#        host    => 'localhost',
-#        port    => $bad_port,
-#        timeout => $REQUEST_TIMEOUT,
-#    );
-#    is $@, $test_message, '$@ not changed';
-#    isa_ok( $io, 'Kafka::IO');
-#    ok $io->last_errorcode, 'Invalid port: '.$io->last_error;
-#}
-#
-## timeout
-#
-#foreach my $bad_timeout ( @not_posnumber ) {
-#    undef $io;
-#    $io = Kafka::IO->new(
-#        host        => 'localhost',
-#        port        => $port,
-#        timeout     => $bad_timeout,
-#    );
-#    is $@, $test_message, '$@ not changed';
-#    isa_ok( $io, 'Kafka::IO');
-#    ok $io->last_errorcode, 'Invalid timeout: '.$io->last_error;
-#}
-
 #-- send
 
 $io = Kafka::IO->new(
@@ -181,42 +124,18 @@ $io = Kafka::IO->new(
     timeout => $REQUEST_TIMEOUT,
 );
 
-is( $io->send( $test_message ), length( $test_message ), 'sent '.length( $test_message ).' bytes' );
-ok !$io->last_errorcode, 'No errorcode';
+lives_ok { $sent = $io->send( $test_message ); } 'expecting to live';
+is $sent, length( $test_message ), 'sent '.length( $test_message ).' bytes';
 
 #-- receive
 
-is( ${ $io->receive( length( $test_message ) ) }, $test_message, 'receive OK' );
+lives_ok { $resp = $io->receive( length( $test_message ) ); } 'expecting to live';
+is( $$resp, $test_message, 'receive OK' );
 
-# NOTE: We presume that the verification of the correctness of the arguments made by the user.
-
-##-- send
-#
-#foreach my $bad_message ( @not_string ) {
-#    $io = Kafka::IO->new(
-#        host    => 'localhost',
-#        port    => $port,
-#        timeout => $REQUEST_TIMEOUT,
-#    );
-#    ok $io->is_alive, 'socket alive';
-#
-#    $io->send( $bad_message );
-#    is $@, $test_message, '$@ not changed';
-#    ok $io->last_errorcode, 'send error: '.$io->last_error;
-#}
-#
-##-- receive
-#
-#ok $io->is_alive, 'socket alive';
-#
-#foreach my $bad_len ( @not_posint ) {
-#    $io->receive( $bad_len );
-#    is $@, $test_message, '$@ not changed';
-#    ok $io->last_errorcode, 'receive error: '.$io->last_error;
-#}
-
-$@ = undef;
+undef $server;
+ok $io, 'IO exists';
+throws_ok { $sent = $io->send( $test_message ); } 'Kafka::Exception::IO', 'error thrown';
 
 # POSTCONDITIONS ---------------------------------------------------------------
 
-undef $server;  # kill child process on DESTROY
+undef $server;

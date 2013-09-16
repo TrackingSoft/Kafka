@@ -6,7 +6,7 @@ Kafka::Connection - object interface to connect to a kafka cluster.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Connection> version 0.800_1 .
+This documentation refers to C<Kafka::Connection> version 0.800_4 .
 
 =cut
 
@@ -18,7 +18,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_1';
+our $VERSION = '0.800_4';
 
 #-- load the modules -----------------------------------------------------------
 
@@ -46,6 +46,7 @@ use Sys::Hostname;
 use Time::HiRes qw(
     sleep
 );
+use Try::Tiny;
 
 use Kafka qw(
     %ERROR
@@ -63,18 +64,13 @@ use Kafka qw(
     $RETRY_BACKOFF
     $SEND_MAX_RETRIES
 );
+use Kafka::Exceptions;
 use Kafka::Internals qw(
     $APIKEY_FETCH
     $APIKEY_METADATA
     $APIKEY_OFFSET
     $APIKEY_PRODUCE
-    $DEFAULT_RAISE_ERROR
     _get_CorrelationId
-    last_error
-    last_errorcode
-    RaiseError
-    _error
-    _set_error
 );
 use Kafka::IO;
 use Kafka::Protocol qw(
@@ -97,18 +93,29 @@ use Kafka::Protocol qw(
     use strict;
     use warnings;
 
+    use Scalar::Util qw(
+        blessed
+    );
+    use Try::Tiny;
+
     # A simple example of Kafka::Connection usage:
     use Kafka::Connection;
 
     # connect to local cluster with the defaults
-    my $connect = Kafka::Connection->new( host => 'localhost' );
-
-    # decoding of the error
-    say STDERR 'last error: ', $connect->last_error
-        unless $connect->last_errorcode;
+    my $connection;
+    try {
+        $connection = Kafka::Connection->new( host => 'localhost' );
+    } catch {
+        if ( blessed( $_ ) && $_->isa( 'Kafka::Exception' ) ) {
+            warn $_->message, "\n", $_->trace->as_string, "\n";
+            exit;
+        } else {
+            die $_;
+        }
+    };
 
     # Closes the connection and cleans up
-    undef $connect;
+    undef $connection;
 
 =head1 DESCRIPTION
 
@@ -122,10 +129,12 @@ Provides API for communication with Kafka 0.8 cluster.
 
 =item *
 
-Coding and decoding of requests and responses, auto-selection of a server from Kafka cluster.
+Performs requests encoding and responses decoding, provides automatic
+selection or promotion of a leader server from Kafka cluster.
+
 =item *
 
-Allows for getting information about Kafka cluster.
+Provides information about Kafka cluster.
 
 =back
 
@@ -156,8 +165,6 @@ my %known_api_keys = map { $_ => 1 } (
     $APIKEY_PRODUCE,
 );
 
-our $_package_error;
-
 #-- constructor ----------------------------------------------------------------
 
 =head2 CONSTRUCTOR
@@ -167,19 +174,13 @@ our $_package_error;
 Creates C<Kafka::Connection> object for interaction with Kafka cluster.
 Returns created C<Kafka::Connection> object.
 
-Depending on the value of C<RaiseError> attribute, an error causes program
-to halt or the constructor returns C<Kafka::Connection> object.
-
-Use methods L</last_errorcode> and L</last_error> of the C<Kafka::Connection>
-object to get information about the error.
-
 C<new()> takes arguments in key-value pairs. The following arguments are currently recognized:
 
 =over 3
 
 =item C<host =E<gt> $host>
 
-C<$host> is an any Apache Kafka cluster host to connect to. It can be a hostname or the
+C<$host> is any Apache Kafka cluster host to connect to. It can be a hostname or the
 IP-address in the "xx.xx.xx.xx" form.
 
 Optional. Either C<host> or C<broker_list> must be supplied.
@@ -191,37 +192,25 @@ Optional, default = C<$KAFKA_SERVER_PORT>.
 C<$port> is the attribute denoting the port number of the service we want to
 access (Apache Kafka service). C<$port> should be an integer number.
 
-C<$KAFKA_SERVER_PORT> is the default Apache Kafka server port that can be imported from
-the L<Kafka|Kafka> module and = 9092.
+C<$KAFKA_SERVER_PORT> is the default Apache Kafka server port constant (C<9092>) that can
+be imported from the L<Kafka|Kafka> module.
 
 =item C<broker_list =E<gt> $broker_list>
 
 Optional, C<$broker_list> is a reference to array of the host:port strings, defining the list
-of Kafka servers. This list will be used to locate the new master in case server specified
-via C<host =E<gt> $host> and C<port =E<gt> $port> arguments is unavailable. Either C<host>
+of Kafka servers. This list will be used to locate the new leader if the server specified
+via C<host =E<gt> $host> and C<port =E<gt> $port> arguments becomes unavailable. Either C<host>
 or C<broker_list> must be supplied.
 
 =item C<timeout =E<gt> $timeout>
 
 Optional, default = C<$REQUEST_TIMEOUT>.
 
-C<$timeout> specifies how long we wait for the remote server to respond before
-L<IO|Kafka::IO> object disconnects and creates an internal exception.
-C<$timeout> is in second, could be positive integer or floating-point type.
+C<$timeout> specifies how long we wait for the remote server to respond.
+C<$timeout> is in seconds, could be a positive integer or a floating-point number.
 
 C<$REQUEST_TIMEOUT> is the default timeout that can be imported from the
 L<Kafka|Kafka> module.
-
-=item C<RaiseError =E<gt> $mode>
-
-Optional, default = 0.
-
-An error will cause the program to halt if L</RaiseError> is set to true: C<confess>
-if the argument is not valid or C<die> in the other error case
-(this can always be trapped with C<eval>).
-
-You should always check for errors, when not establishing the C<RaiseError>
-mode to true.
 
 =item C<CorrelationId =E<gt> $correlation_id>
 
@@ -230,10 +219,10 @@ Optional, default = C<undef> .
 C<Correlation> is a user-supplied integer. It will be passed back with the response by
 the server, unmodified. The C<$correlation_id> should be an integer number.
 
-An error will be thrown if C<CorrelationId> from response will not match one supplied
+An exception is thrown if C<CorrelationId> in response does not match the one supplied
 in request.
 
-If C<CorrelationId> is not set, its value is assigned as random negative integer.
+If C<CorrelationId> is not provided, it is set to a random negative integer.
 
 =item C<SEND_MAX_RETRIES =E<gt> $retries>
 
@@ -253,9 +242,8 @@ Optional, default = C<$RETRY_BACKOFF> .
 C<$RETRY_BACKOFF> is the default timeout that can be imported from the
 L<Kafka|Kafka> module and = 100 ms.
 
-This property specifies ms before each retry, the producer refreshes the metadata of relevant topics.
-Since leader election takes a bit of time, this property specifies the amount of time
-that the producer waits before refreshing the metadata.
+Since leader election takes a bit of time, this property specifies the amount of time,
+in milliseconds, that the producer waits before refreshing the metadata.
 The C<$backoff> should be an integer number.
 
 =back
@@ -269,7 +257,6 @@ sub new {
         port                => $KAFKA_SERVER_PORT,
         broker_list         => [],
         timeout             => $REQUEST_TIMEOUT,
-        RaiseError          => $DEFAULT_RAISE_ERROR,
         CorrelationId       => undef,
         SEND_MAX_RETRIES    => $SEND_MAX_RETRIES,
         RETRY_BACKOFF       => $RETRY_BACKOFF,
@@ -282,71 +269,67 @@ sub new {
 
     $self->{CorrelationId} //= _get_CorrelationId;
 
-    if    ( !defined _NONNEGINT( $self->RaiseError ) ) {
-        $self->{RaiseError} = $DEFAULT_RAISE_ERROR;
-        $self->_error( $ERROR_MISMATCH_ARGUMENT, __PACKAGE__.'->new - RaiseError' );
-    }
-    elsif ( !( defined( $self->{host} ) && ( $self->{host} eq q{} || defined( _STRING( $self->{host} ) ) ) && !utf8::is_utf8( $self->{host} ) ) )   { $self->_error( $ERROR_MISMATCH_ARGUMENT, __PACKAGE__.'->new - host' ); }
-    elsif ( !_POSINT( $self->{port} ) )                                         { $self->_error( $ERROR_MISMATCH_ARGUMENT, __PACKAGE__.'->new - port' ); }
-    elsif ( !( _NUMBER( $self->{timeout} ) && $self->{timeout} > 0 ) )          { $self->_error( $ERROR_MISMATCH_ARGUMENT, __PACKAGE__.'->new - timeout' ); }
-    elsif ( !_ARRAY0( $self->{broker_list} ) )                                  { $self->_error( $ERROR_MISMATCH_ARGUMENT, __PACKAGE__.'->new - broker_list' ); }
-    elsif ( !isint( $self->{CorrelationId} ) )                                  { $self->_error( $ERROR_MISMATCH_ARGUMENT, __PACKAGE__.'->new - CorrelationId' ); }
-    elsif ( !_POSINT( $self->{SEND_MAX_RETRIES} ) )                             { $self->_error( $ERROR_MISMATCH_ARGUMENT, __PACKAGE__.'->new - SEND_MAX_RETRIES' ); }
-    elsif ( !_POSINT( $self->{RETRY_BACKOFF} ) )                                { $self->_error( $ERROR_MISMATCH_ARGUMENT, __PACKAGE__.'->new - RETRY_BACKOFF' ); }
-    else {
-        $self->{_metadata} = {};                # {
-                                                #   TopicName => {
-                                                #       Partition   => {
-                                                #           'Leader'    => ...,
-                                                #           'Replicas'  => [
-                                                #               ...,
-                                                #           ],
-                                                #           'Isr'       => [
-                                                #               ...,
-                                                #           ],
-                                                #       },
-                                                #       ...,
-                                                #   },
-                                                #   ...,
-                                                # }
-        $self->{_leaders} = {};                 # {
-                                                #   NodeId  => host:port,
-                                                #   ...,
-                                                # }
-        my $IO_cache = $self->{_IO_cache} = {}; # host:port => {
-                                                #       'NodeId'    => ...,
-                                                #       'IO'        => ...,
-                                                #       'timeout'   => ...,
-                                                #       'host'      => ...,
-                                                #       'port'      => ...,
-                                                #   },
-                                                #   ...,
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'host' )
+        unless defined( $self->{host} ) && ( $self->{host} eq q{} || defined( _STRING( $self->{host} ) ) ) && !utf8::is_utf8( $self->{host} );
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'port' )
+        unless _POSINT( $self->{port} );
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'timeout' )
+        unless _NUMBER( $self->{timeout} ) && $self->{timeout} > 0;
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'broker_list' )
+        unless _ARRAY0( $self->{broker_list} );
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'CorrelationId' )
+        unless isint( $self->{CorrelationId} );
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'SEND_MAX_RETRIES' )
+        unless _POSINT( $self->{SEND_MAX_RETRIES} );
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'RETRY_BACKOFF' )
+        unless _POSINT( $self->{RETRY_BACKOFF} );
 
-        # init IO cache
-        foreach my $server ( ( $self->{host} ? $self->_build_server_name( $self->{host}, $self->{port} ) : (), @{ $self->{broker_list} } ) ) {
-            unless ( $self->_is_like_server( $server ) ) {
-                $self->_error( $ERROR_MISMATCH_ARGUMENT, __PACKAGE__.'->new - bad host:port or broker_list element' );
-                last;
-            }
-            my ( $host, $port ) = split /:/, $server;
-            $host = $self->_localhost_to_hostname( $host );
-            my $correct_server = $self->_build_server_name( $host, $port );
-            $IO_cache->{ $correct_server } = {
-                NodeId  => undef,
-                IO      => undef,
-                host    => $host,
-                port    => $port,
-            };
-        }
+    $self->{_metadata} = {};                # {
+                                            #   TopicName => {
+                                            #       Partition   => {
+                                            #           'Leader'    => ...,
+                                            #           'Replicas'  => [
+                                            #               ...,
+                                            #           ],
+                                            #           'Isr'       => [
+                                            #               ...,
+                                            #           ],
+                                            #       },
+                                            #       ...,
+                                            #   },
+                                            #   ...,
+                                            # }
+    $self->{_leaders} = {};                 # {
+                                            #   NodeId  => host:port,
+                                            #   ...,
+                                            # }
+    my $IO_cache = $self->{_IO_cache} = {}; # host:port => {
+                                            #       'NodeId'    => ...,
+                                            #       'IO'        => ...,
+                                            #       'timeout'   => ...,
+                                            #       'host'      => ...,
+                                            #       'port'      => ...,
+                                            #       'error'     => ...,
+                                            #   },
+                                            #   ...,
 
-        if ( !keys( %$IO_cache ) ) {
-            $self->_error( $ERROR_MISMATCH_ARGUMENT, __PACKAGE__.'->new - server is not specified' );
-        }
-        else {
-            $self->_error( $ERROR_NO_ERROR )
-                if $self->last_error;
-        }
+    # init IO cache
+    foreach my $server ( ( $self->{host} ? $self->_build_server_name( $self->{host}, $self->{port} ) : (), @{ $self->{broker_list} } ) ) {
+        $self->_error( $ERROR_MISMATCH_ARGUMENT, 'bad host:port or broker_list element' )
+            unless $self->_is_like_server( $server );
+        my ( $host, $port ) = split /:/, $server;
+        $host = $self->_localhost_to_hostname( $host );
+        my $correct_server = $self->_build_server_name( $host, $port );
+        $IO_cache->{ $correct_server } = {
+            NodeId  => undef,
+            IO      => undef,
+            host    => $host,
+            port    => $port,
+        };
     }
+
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'server is not specified' )
+        unless keys( %$IO_cache );
 
     return $self;
 }
@@ -380,15 +363,10 @@ Returns true, if C<$server> (host:port) is known in cluster.
 sub is_server_known {
     my ( $self, $server ) = @_;
 
-    $self->_error( $ERROR_NO_ERROR )
-        if $self->last_error;
+    $self->_error( $ERROR_MISMATCH_ARGUMENT )
+        unless $self->_is_like_server( $server );
 
-    if ( $self->_is_like_server( $server ) ) {
-        return exists $self->{_IO_cache}->{ $server };
-    }
-    else {
-        return $self->_error( $ERROR_MISMATCH_ARGUMENT, __PACKAGE__.'->is_server_known' );
-    }
+    return exists $self->{_IO_cache}->{ $server };
 }
 
 =head3 C<is_server_alive( $server )>
@@ -399,19 +377,16 @@ Returns true, if successful connection is established with C<$server> (host:port
 sub is_server_alive {
     my ( $self, $server ) = @_;
 
-    $self->_error( $ERROR_NO_ERROR )
-        if $self->last_error;
+    $self->_error( $ERROR_MISMATCH_ARGUMENT )
+        unless $self->_is_like_server( $server );
 
-    if ( $self->_is_like_server( $server ) ) {
-        my $io_cache = $self->{_IO_cache};
-        if ( exists $io_cache->{ $server } && ( my $io = $io_cache->{ $server }->{IO} ) ) {
-            return $io->is_alive;
-        }
+    my $io_cache = $self->{_IO_cache};
+    my $io;
+    unless ( exists( $io_cache->{ $server } ) && ( $io = $io_cache->{ $server }->{IO} ) ) {
+        return;
     }
-    else {
-        return $self->_error( $ERROR_MISMATCH_ARGUMENT, __PACKAGE__.'->is_server_alive' );
-    }
-    return;
+
+    return $io->is_alive;
 }
 
 =head3 C<receive_response_to_request( $request )>
@@ -419,7 +394,7 @@ sub is_server_alive {
 C<$request> is a reference to the hash representing
 the structure of the request.
 
-This method encodes C<$request>, pass it to the leader of cluster, receives reply and returns
+This method encodes C<$request>, passes it to the leader of cluster, receives reply, decodes and returns
 it in a form of hash reference.
 
 WARNING:
@@ -428,11 +403,11 @@ WARNING:
 
 =item *
 
-This method is not designed to be use by the end user.
+This method should be considered private and should not be called by an end user.
 
 =item *
 
-In order to achieve better performance, this method do not perform arguments validation.
+In order to achieve better performance, this method does not perform arguments validation.
 
 =back
 
@@ -445,28 +420,28 @@ sub receive_response_to_request {
 # WARNING: The current version of the module limited to the following:
 # No clear answer to the question, one leader for any combination of topic + partition, or at the same time, there are several different leaders?
 # Therefore supports queries with only one combination of topic + partition (first and only).
-    my ( $topic_data, $topic_name, $partition, $partition_data );
 
-    $topic_data = $request->{topics}->[0];
-    $topic_name = $topic_data->{TopicName};
-    ( $partition = $topic_data->{partitions}->[0]->{Partition} );
+    my $topic_data  = $request->{topics}->[0];
+    my $topic_name  = $topic_data->{TopicName};
+    my $partition   = $topic_data->{partitions}->[0]->{Partition};
 
-    $self->_update_metadata( $topic_name )
-        unless %{ $self->{_metadata} }; # the first request
-    %{ $self->{_metadata} } # hash metadata could be updated
-        or return $self->_error( $ERROR_CANNOT_GET_METADATA, __PACKAGE__.'->receive_response_to_request: '.$self->last_error );
+    unless ( %{ $self->{_metadata} } ) {    # the first request
+        $self->_update_metadata( $topic_name )  # hash metadata could be updated
+            or $self->_error( $ERROR_CANNOT_GET_METADATA );
+    }
     my $encoded_request = $protocol{ $api_key }->{encode}->( $request );
 
     my $CorrelationId = $request->{CorrelationId} // _get_CorrelationId;
 
     my $retries = $self->{SEND_MAX_RETRIES};
+    my $partition_data;
     ATTEMPTS:
     while ( $retries-- ) {
         REQUEST:
         {
             if ( defined( my $leader = $self->{_metadata}->{ $topic_name }->{ $partition }->{Leader} ) ) {   # hash metadata could be updated
                 my $server = $self->{_leaders}->{ $leader }
-                    or return $self->_error( $ERROR_LEADER_NOT_FOUND );
+                    or $self->_error( $ERROR_LEADER_NOT_FOUND );
 
                 # Send a request to the leader
                 last REQUEST unless
@@ -500,11 +475,11 @@ sub receive_response_to_request {
                 }
 
                 $response->{CorrelationId} == $CorrelationId
-                    or return $self->_error( $ERROR_MISMATCH_CORRELATIONID );
+                    or $self->_error( $ERROR_MISMATCH_CORRELATIONID );
                 $topic_data     = $response->{topics}->[0];
                 $partition_data = $topic_data->{ $api_key == $APIKEY_OFFSET ? 'PartitionOffsets' : 'partitions' }->[0];
                 if ( ( my $ErrorCode = $partition_data->{ErrorCode} ) != $ERROR_NO_ERROR ) {
-                    return $self->_error( $ErrorCode, "topic = '".$topic_data->{TopicName}."', partition = ".$partition_data->{Partition} );
+                    $self->_error( $ErrorCode, "topic = '".$topic_data->{TopicName}."', partition = ".$partition_data->{Partition} );
                 }
 
                 return $response;
@@ -512,15 +487,12 @@ sub receive_response_to_request {
         }
 
         sleep $self->{RETRY_BACKOFF} / 1000;
-        $self->_update_metadata( $topic_name );
+        $self->_update_metadata( $topic_name )
+            or $self->_error( $ERROR_CANNOT_GET_METADATA );
     }
 
     # NOTE: it is possible to repeat the operation here
-
-    $self->_error( $ERROR_NO_ERROR )
-        if $self->last_error;
-
-    return;     # IO error and !RaiseError
+    return;
 }
 
 =head3 C<close_connection( $server )>
@@ -531,11 +503,12 @@ Closes connection with C<$server> (defined as host:port).
 sub close_connection {
     my ( $self, $server ) = @_;
 
-    if ( $self->is_server_known( $server ) ) {
-        $self->_closeIO( $server );
-        return 1;
+    unless ( $self->is_server_known( $server ) ) {
+        return;
     }
-    return;
+
+    $self->_closeIO( $server );
+    return 1;
 }
 
 =head3 C<close>
@@ -546,12 +519,32 @@ Closes connection with all known Kafka servers.
 sub close {
     my ( $self ) = @_;
 
-    $self->_error( $ERROR_NO_ERROR )
-        if $self->last_error;
-
     foreach my $server ( $self->get_known_servers ) {
         $self->_closeIO( $server );
     }
+}
+
+=head3 C<cluster_errors>
+
+Returns a reference to a hash.
+
+Each hash key is the identifier of the server (host:port), and the value is the last communication error
+with that server.
+
+An empty hash is returned if there were no communication errors.
+
+=cut
+sub cluster_errors {
+    my ( $self ) = @_;
+
+    my %errors;
+    my $io_cache = $self->{_IO_cache};
+    foreach my $server ( keys %$io_cache ) {
+        if ( my $error = $io_cache->{ $server }->{error} ) {
+            $errors{ $server } = $error;
+        }
+    }
+    return \%errors;
 }
 
 #-- private attributes ---------------------------------------------------------
@@ -624,17 +617,17 @@ sub _update_metadata {
             && ( $encoded_response_ref = $self->_receiveIO( $broker ) );
     }
 
-    unless ( $encoded_response_ref ) {  # IO error and !RaiseError
+    unless ( $encoded_response_ref ) {
         # NOTE: it is possible to repeat the operation here
         return;
     }
 
     my $decoded_response = $protocol{ $APIKEY_METADATA }->{decode}->( $encoded_response_ref );
     $decoded_response->{CorrelationId} == $CorrelationId
-        or return $self->_error( $ERROR_MISMATCH_CORRELATIONID );
+        or $self->_error( $ERROR_MISMATCH_CORRELATIONID );
 
-    return $self->_error( $ERROR_NO_KNOWN_BROKERS )
-        unless _ARRAY( $decoded_response->{Broker} );
+    _ARRAY( $decoded_response->{Broker} )
+        or $self->_error( $ERROR_NO_KNOWN_BROKERS );
 
     my $IO_cache = $self->{_IO_cache};
 
@@ -656,17 +649,18 @@ sub _update_metadata {
     #NOTE: IO cache does not remove server that's missing in metadata
 
     # Collect the received metadata
-    my ( $received_metadata, $leaders ) = ( {}, {} );
+    my $received_metadata   = {};
+    my $leaders             = {};
     foreach my $topic_metadata ( @{ $decoded_response->{TopicMetadata} } ) {
         my $TopicName = $topic_metadata->{TopicName};
         if ( ( my $topic_ErrorCode = $topic_metadata->{ErrorCode} ) != $ERROR_NO_ERROR ) {
-            return $self->_error( $topic_ErrorCode, "topic = '$TopicName'" );
+            $self->_error( $topic_ErrorCode, "topic = '$TopicName'" );
         }
 
         foreach my $partition_metadata ( @{ $topic_metadata->{PartitionMetadata} } ) {
             my $partition = $partition_metadata->{Partition};
             if ( ( my $partition_ErrorCode = $partition_metadata->{ErrorCode} ) != $ERROR_NO_ERROR ) {
-                return $self->_error( $partition_ErrorCode, "topic = '$TopicName', partition = $partition" );
+                $self->_error( $partition_ErrorCode, "topic = '$TopicName', partition = $partition" );
             }
 
             my $received_partition_data = $received_metadata->{ $TopicName }->{ $partition } = {};
@@ -678,12 +672,13 @@ sub _update_metadata {
         }
     }
 
-    return $self->_error( $ERROR_CANNOT_GET_METADATA )
-        unless %$received_metadata;
+    %$received_metadata
+        or $self->_error( $ERROR_CANNOT_GET_METADATA );
 
     # Replace the information in the metadata
     $self->{_metadata}  = $received_metadata;
     $self->{_leaders}   = $leaders;
+
     return 1;
 }
 
@@ -694,6 +689,14 @@ sub _build_server_name {
     return "$host:$port";
 }
 
+# remembers error communicating with the server
+sub _on_io_error {
+    my ( $self, $server_data, $error ) = @_;
+
+    $server_data->{error}   = $error;
+    $server_data->{IO}      = undef;
+}
+
 # connects to a server (host:port)
 sub _connectIO {
     my ( $self, $server ) = @_;
@@ -701,17 +704,19 @@ sub _connectIO {
     my $server_data = $self->{_IO_cache}->{ $server };
     my $io;
     unless ( $server_data && ( $io = $server_data->{IO} ) && $io->is_alive ) {
-        $io = $server_data->{IO} = Kafka::IO->new(
-            host        => $server_data->{host},
-            port        => $server_data->{port},
-            timeout     => $self->{timeout},
-        );
-        if ( $io->last_errorcode != $ERROR_NO_ERROR ) {
+        try {
+            $server_data->{IO} = Kafka::IO->new(
+                host        => $server_data->{host},
+                port        => $server_data->{port},
+                timeout     => $self->{timeout},
+            );
+            $server_data->{error}   = undef;
+        } catch {
             # NOTE: it is possible to repeat the operation here
-            return $self->_io_error( $server );
-        }
+            $self->_on_io_error( $server_data, $_ );
+            return;
+        };
     }
-
     return $server_data->{IO};
 }
 
@@ -719,32 +724,32 @@ sub _connectIO {
 sub _sendIO {
     my ( $self, $server, $encoded_request ) = @_;
 
-    if ( $self->{_IO_cache}->{ $server }->{IO}->send( $encoded_request ) ) {
-        return 1;
-    }
-    else {
+    my $server_data = $self->{_IO_cache}->{ $server };
+    my $sent;
+    try {
+        $sent = $server_data->{IO}->send( $encoded_request );
+    } catch {
         # NOTE: it is possible to repeat the operation here
-        return $self->_io_error( $server );
-    }
+        $self->_on_io_error( $server_data, $_ );
+    };
+    return $sent;
 }
 
 # Receive response from a given server
 sub _receiveIO {
     my ( $self, $server ) = @_;
 
-    my $io = $self->{_IO_cache}->{ $server }->{IO};
-    my ( $response_ref, $tail_ref );
-    if (   ( $response_ref  = $io->receive( 4 ) )                               && $$response_ref
-        && ( $tail_ref      = $io->receive( unpack( 'l>', $$response_ref ) ) )  && $$tail_ref
-        ) {
-
-        $$response_ref .= $$tail_ref;
-        return $response_ref;
-    }
-    else {
+    my $server_data = $self->{_IO_cache}->{ $server };
+    my $response_ref;
+    try {
+        my $io = $server_data->{IO};
+        $response_ref   = $io->receive( 4 );
+        $$response_ref .= ${ $io->receive( unpack( 'l>', $$response_ref ) ) };
+    } catch {
         # NOTE: it is possible to repeat the operation here
-        return $self->_io_error( $server );
-    }
+        $self->_on_io_error( $server_data, $_ );
+    };
+    return $response_ref;
 }
 
 # Close connectino to $server
@@ -754,7 +759,8 @@ sub _closeIO {
     if ( my $server_data = $self->{_IO_cache}->{ $server } ) {
         if ( my $io = $server_data->{IO} ) {
             $io->close;
-            $server_data->{IO} = undef;
+            $server_data->{error}   = undef;
+            $server_data->{IO}      = undef;
         }
     }
 }
@@ -763,8 +769,16 @@ sub _closeIO {
 sub _is_like_server {
     my ( $self, $server ) = @_;
 
-    return $server
-        if defined( $server ) && defined( _STRING( $server ) ) && !utf8::is_utf8( $server ) && $server =~ /^[^:]+:\d+$/;
+    unless (
+           defined( $server )
+        && defined( _STRING( $server ) )
+        && !utf8::is_utf8( $server )
+        && $server =~ /^[^:]+:\d+$/
+        ) {
+        return;
+    }
+
+    return $server;
 }
 
 # transforms localhost because metadata using the 'Host' defined by hostname
@@ -774,26 +788,11 @@ sub _localhost_to_hostname {
     return $host =~ /^(?:localhost|127\.0\.0\.1)$/i ? hostname : $host;
 }
 
-# error handler
-sub _io_error {
-    my ( $self, $server ) = @_;
+# Handler for errors
+sub _error {
+    my $self = shift;
 
-    my $server_data = $self->{_IO_cache}->{ $server };
-    my $io          = $server_data->{IO};
-    my $errorcode   = $io->last_errorcode;
-
-    return if $errorcode == $ERROR_NO_ERROR;
-
-    $self->_set_error( $errorcode, $io->last_error.' ('.$self->_build_server_name( $server_data->{host}, $server_data->{port} ).')' );
-
-    $self->_closeIO( $server );
-
-    return
-        unless $self->RaiseError;
-
-    if    ( $errorcode == $ERROR_MISMATCH_ARGUMENT )    { confess $self->last_error; }
-    elsif ( $errorcode == $ERROR_NO_ERROR )             { return; }
-    else                                                { die $self->last_error; }
+    Kafka::Exception::Connection->throw( throw_args( @_ ) );
 }
 
 #-- Closes and cleans up -------------------------------------------------------
@@ -802,29 +801,14 @@ sub _io_error {
 
 __END__
 
-=head3 C<RaiseError>
-
-This method returns current value showing how errors are handled within Kafka module.
-If set to true, die() is dispatched when error during communication is detected.
-
-C<last_errorcode> and C<last_error> are diagnostic methods and can be used to get detailed
-error codes and messages for various cases: when server or the resource is not available,
-access to the resource was denied, etc.
-
-=head3 C<last_errorcode>
-
-Returns code of the last error.
-
-=head3 C<last_error>
-
-Returns an error message that contains information about the encountered failure.
-
 =head1 DIAGNOSTICS
 
-Review documentation of the L</RaiseError> method for additional information about possible errors.
+When error is detected, an exception, represented by object of C<Kafka::Exception::Connection> class,
+is thrown (see L<Kafka::Exceptions|Kafka::Exceptions>).
 
-It's advised to always check L</last_errorcode> and more descriptive L</last_error> when
-L</RaiseError> is not set.
+L<code|Kafka::Exceptions/code> and a more descriptive L<message|Kafka::Exceptions/message> provide
+information about exception. Consult documentation of the L<Kafka::Exceptions|Kafka::Exceptions>
+for the list of all available methods.
 
 =over 3
 
@@ -834,11 +818,11 @@ Invalid argument was provided to C<new> L<constructor|/CONSTRUCTOR> or to other 
 
 =item C<Can't send>
 
-Message can't be sent to Kafka.
+Request cannot be sent to Kafka.
 
 =item C<Can't recv>
 
-Message can't be received from Kafka.
+Response cannot be received from Kafka.
 
 =item C<Can't bind>
 
@@ -866,9 +850,6 @@ Received meta data is incorrect or missing.
 
 =back
 
-Use L</last_error> method from C<Kafka::Connection> object to obtain detailed
-description of an error.
-
 =head1 SEE ALSO
 
 The basic operation of the Kafka package modules:
@@ -890,9 +871,11 @@ protocol on 32 bit systems.
 L<Kafka::Protocol|Kafka::Protocol> - functions to process messages in the
 Apache Kafka's Protocol.
 
-L<Kafka::IO|Kafka::IO> - low level interface for communication with Kafka server.
+L<Kafka::IO|Kafka::IO> - low-level interface for communication with Kafka server.
 
-L<Kafka::Internals|Kafka::Internals> - Internal constants and functions used
+L<Kafka::Exceptions|Kafka::Exceptions> - module designated to handle Kafka exceptions.
+
+L<Kafka::Internals|Kafka::Internals> - internal constants and functions used
 by several package modules.
 
 A wealth of detail about the Apache Kafka and the Kafka Protocol:
@@ -921,8 +904,7 @@ This package is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself. See I<perlartistic> at
 L<http://dev.perl.org/licenses/artistic.html>.
 
-This program is
-distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
 without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
 PARTICULAR PURPOSE.
 

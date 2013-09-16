@@ -1,4 +1,4 @@
-Kafka package version 0.800_1
+Kafka package version 0.800_4
 =============================
 
 The Kafka package is a set of Perl modules which provides a
@@ -29,17 +29,21 @@ you have the following packages installed before you install
 Kafka:
 
    Const::Fast
+   Exception::Class
    List::MoreUtils
    Params::Util
    Scalar::Util::Numeric
    String::CRC32
    Sys::SigAction
+   Try::Tiny
 
 The Kafka package has the following optional dependencies:
 
    Capture::Tiny
    Config::IniFiles
+   Data::Compare
    Proc::Daemon
+   Proc::ProcessTable
    Sub::Install
    Test::Deep
    Test::Exception
@@ -84,6 +88,7 @@ The basic operation of the Kafka package modules:
    Kafka::Protocol   - functions to process messages in the
                        Apache Kafka's Protocol.
    Kafka::IO         - low-level communications with the Apache Kafka server.
+   Kafka::Exceptions - module designated to handle Kafka exceptions.
    Kafka::Internals  - Internal constants and functions used
                        by several packaged modules.
 

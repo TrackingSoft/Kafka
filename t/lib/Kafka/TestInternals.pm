@@ -6,7 +6,7 @@ Kafka::TestInternals - Constants and functions used in the tests.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::TestInternals> version 0.800_1 .
+This documentation refers to C<Kafka::TestInternals> version 0.800_4 .
 
 =cut
 
@@ -18,7 +18,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_1';
+our $VERSION = '0.800_4';
 
 use Exporter qw(
     import
@@ -71,7 +71,7 @@ functions of this module do not perform arguments validation.
 
 =head2 EXPORT
 
-These variables are the constants and never change their values.
+The following constants are available for export
 
 =cut
 
@@ -439,9 +439,11 @@ protocol on 32 bit systems.
 L<Kafka::Protocol|Kafka::Protocol> - functions to process messages in the
 Apache Kafka's Protocol.
 
-L<Kafka::IO|Kafka::IO> - low level interface for communication with Kafka server.
+L<Kafka::IO|Kafka::IO> - low-level interface for communication with Kafka server.
 
-L<Kafka::Internals|Kafka::Internals> - Internal constants and functions used
+L<Kafka::Exceptions|Kafka::Exceptions> - module designated to handle Kafka exceptions.
+
+L<Kafka::Internals|Kafka::Internals> - internal constants and functions used
 by several package modules.
 
 A wealth of detail about the Apache Kafka and the Kafka Protocol:

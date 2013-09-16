@@ -20,11 +20,13 @@ my %config = (
     MIN_PERL_VERSION            => '5.010',
     PREREQ_PM                   => {            # more to the list $Module::CoreList::version{5.010}
         'Const::Fast'           => '0.014',
+        'Exception::Class'      => 1.37,
         'List::MoreUtils'       => 0.33,
         'Params::Util'          => 1.07,
         'Scalar::Util::Numeric' => 0.22,
         'String::CRC32'         => '1.4',
         'Sys::SigAction'        => 0.15,
+        'Try::Tiny'             => 0.18,
         },
     BUILD_REQUIRES              => {            # more to the list $Module::CoreList::version{5.010}
         'Capture::Tiny'         => 0.22,

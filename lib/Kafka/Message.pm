@@ -6,7 +6,7 @@ Kafka::Message - interface to the Kafka message properties.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Message> version 0.800_1 .
+This documentation refers to C<Kafka::Message> version 0.800_4 .
 
 =cut
 
@@ -18,7 +18,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_1';
+our $VERSION = '0.800_4';
 
 #-- load the modules -----------------------------------------------------------
 
@@ -121,8 +121,7 @@ This module is not intended to be used by the end user.
 
 L<Kafka::Message|Kafka::Message> class implements API for L<Kafka|Kafka> message.
 
-Reference to an array of instances of class C<Kafka::Message> returned by the
-C<fetch> method of the L<Consumer|Kafka::Consumer> client.
+C<fetch> method of the L<Consumer|Kafka::Consumer> client returns reference to an array of objects of this class.
 
 The main features of the C<Kafka::Message> class are:
 
@@ -130,15 +129,8 @@ The main features of the C<Kafka::Message> class are:
 
 =item *
 
-Provides representing the Apache Kafka Message structure (with
-no compression codec attribute now). Description of the structure is available at
-L<https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-Messagesets>
-
-=item *
-
-Support for working with 64 bit elements on 32 bit systems.
-C<offset> and C<next_offset> methods return the
-L<Math::BigInt|Math::BigInt> integer on 32 bit systems.
+Represents Apache Kafka Message structure (no support for compression codec attribute now). Description of the structure
+is available at L<https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-Messagesets>
 
 =back
 
@@ -146,11 +138,9 @@ L<Math::BigInt|Math::BigInt> integer on 32 bit systems.
 
 =head3 C<new ( \%arg )>
 
-Creates a C<Kafka::Message>, which is a newly created message object.
-C<new()> takes an argument, this argument is a HASH reference with the currently
-used L<methods|/METHODS> entries.
-
-Returns the created message as a C<Kafka::Message> object.
+Creates a new C<Kafka::Message> object.
+C<new()> takes an argument - HASH reference with the message attributes corresponding to
+L<accessors|/METHODS>.
 
 =head2 METHODS
 
@@ -165,12 +155,11 @@ The key can be an empty string.
 
 =head3 C<valid>
 
-Indicates whether received message is valid or not.
+Boolean value: indicates whether received message is valid or not.
 
 =head3 C<error>
 
-A description why message is invalid (currently happens only when message
-is compressed).
+A description why message is invalid (currently happens only when message is compressed).
 
 =head3 C<offset>
 
@@ -221,9 +210,11 @@ protocol on 32 bit systems.
 L<Kafka::Protocol|Kafka::Protocol> - functions to process messages in the
 Apache Kafka's Protocol.
 
-L<Kafka::IO|Kafka::IO> - low level interface for communication with Kafka server.
+L<Kafka::IO|Kafka::IO> - low-level interface for communication with Kafka server.
 
-L<Kafka::Internals|Kafka::Internals> - Internal constants and functions used
+L<Kafka::Exceptions|Kafka::Exceptions> - module designated to handle Kafka exceptions.
+
+L<Kafka::Internals|Kafka::Internals> - internal constants and functions used
 by several package modules.
 
 A wealth of detail about the Apache Kafka and the Kafka Protocol:

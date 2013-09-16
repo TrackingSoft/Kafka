@@ -6,7 +6,7 @@ Kafka::IO - interface to network communication with the Apache Kafka server.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::IO> version 0.800_1 .
+This documentation refers to C<Kafka::IO> version 0.800_4 .
 
 =cut
 
@@ -20,10 +20,11 @@ use sigtrap;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_1';
+our $VERSION = '0.800_4';
 
 #-- load the modules -----------------------------------------------------------
 
+use Carp;
 use Errno;
 use Fcntl;
 use Scalar::Util qw(
@@ -36,6 +37,7 @@ use Sys::SigAction qw(
 use Time::HiRes qw(
     alarm
 );
+use Try::Tiny;
 
 use Kafka qw(
     %ERROR
@@ -43,11 +45,11 @@ use Kafka qw(
     $ERROR_CANNOT_RECV
     $ERROR_CANNOT_SEND
     $ERROR_MISMATCH_ARGUMENT
-    $ERROR_NO_ERROR
     $ERROR_NOT_BINARY_STRING
     $KAFKA_SERVER_PORT
     $REQUEST_TIMEOUT
 );
+use Kafka::Exceptions;
 use Kafka::Internals qw(
     $MAX_SOCKET_REQUEST_BYTES
 );
@@ -60,16 +62,32 @@ use Kafka::Internals qw(
     use strict;
     use warnings;
 
+    use Scalar::Util qw(
+        blessed
+    );
+    use Try::Tiny;
+
     use Kafka::IO;
 
-    my $io = Kafka::IO->new( host => 'localhost' );
+    my $io;
+    try {
+        $io = Kafka::IO->new( host => 'localhost' );
+    } catch {
+        if ( blessed( $_ ) && $_->isa( 'Kafka::Exception' ) ) {
+            warn 'Error: (', $_->code, ') ',  $_->message, "\n";
+            exit;
+        } else {
+            die $_;
+        }
+    };
 
     # Closes and cleans up
     $io->close;
+    undef $io;
 
 =head1 DESCRIPTION
 
-This module is not intended to be used by end user.
+This module is private and should not be used directly.
 
 In order to achieve better performance, methods of this module do not
 perform arguments validation.
@@ -84,7 +102,7 @@ Provides an object oriented API for communication with Kafka
 
 =item *
 
-This class allows you to create Kafka 0.8 clients that do not use ZooKeeper.
+This class allows you to create Kafka 0.8 clients.
 
 =back
 
@@ -99,16 +117,9 @@ our $_hdr;
 
 =head3 C<new>
 
-Establishes TCP connection to given host and port, creates
-and returns C<Kafka::IO> IO object.
+Establishes TCP connection to given host and port, creates and returns C<Kafka::IO> IO object.
 
-An error will cause the program to return C<Kafka::IO> object without halt.
-
-You can use the methods of the C<Kafka::IO> class - L</last_errorcode>
-and L</last_error> for getting the information about the error.
-
-C<new()> takes arguments in key-value pairs. The following arguments are currently
-recognized:
+C<new()> takes arguments in key-value pairs. The following arguments are currently recognized:
 
 =over 3
 
@@ -156,15 +167,11 @@ sub new {
 
     $self->{not_accepted} = 0;
     $self->{socket} = undef;
-    local $@;
-    eval { $self->_connect() };
-    if ( $@ ) {
-        $self->_error( $ERROR_CANNOT_BIND, __PACKAGE__."->new - $@" );
-    }
-    else {
-        $self->_error( $ERROR_NO_ERROR )
-            if $self->last_error;
-    }
+    try {
+        $self->_connect();
+    } catch {
+        $self->_error( $ERROR_CANNOT_BIND, "->new - $_" );
+    };
 
     return $self;
 }
@@ -183,18 +190,14 @@ Sends a C<$message> to Kafka.
 
 The argument must be a bytes string.
 
-Returns the number of characters sent. In case of error, returns
-undefined value.
+Returns the number of characters sent.
 
 =cut
 sub send {
     my ( $self, $message ) = @_;
 
     ( my $len = length( $message ) ) <= $MAX_SOCKET_REQUEST_BYTES
-        or return $self->_error( $ERROR_MISMATCH_ARGUMENT, __PACKAGE__.'->send' );
-
-    $self->_error( $ERROR_NO_ERROR )
-        if $self->last_error;
+        or $self->_error( $ERROR_MISMATCH_ARGUMENT, '->send' );
 
     $self->_debug_msg( 'Request to', 'green', $message ) if $DEBUG;
 
@@ -214,7 +217,7 @@ sub send {
     }
 
     ( defined( $sent ) && $sent == $len )
-        or return $self->_error( $ERROR_CANNOT_SEND, __PACKAGE__."->send - $!" );
+        or $self->_error( $ERROR_CANNOT_SEND, "->send - $!" );
 
     return $sent;
 }
@@ -223,16 +226,13 @@ sub send {
 
 Receives a message up to C<$length> size from Kafka.
 
-Returns a reference to the received message. Returns undef in case of error.
-
 C<$length> argument must be a positive number.
+
+Returns a reference to the received message.
 
 =cut
 sub receive {
     my ( $self, $length ) = @_;
-
-    $self->_error( $ERROR_NO_ERROR )
-        if $self->last_error;
 
     my ( $from_recv, $message, $buf, $mask );
     $message = q{};
@@ -246,7 +246,7 @@ sub receive {
     $self->{not_accepted} = ( $length - length( $message ) ) * ( $self->{not_accepted} >= 0 );
 
     ( defined( $from_recv ) && !$self->{not_accepted} )
-        or return $self->_error( $ERROR_CANNOT_RECV, __PACKAGE__."->receive - $!" );
+        or $self->_error( $ERROR_CANNOT_RECV, "->receive - $!" );
 
     $self->_debug_msg( 'Response from', 'yellow', $message ) if $DEBUG;
     return \$message;
@@ -276,42 +276,16 @@ sub is_alive {
     my ( $self ) = @_;
 
     return unless $self->{socket};
+    return unless defined( my $packed = getsockopt( $self->{socket}, SOL_SOCKET, SO_ERROR ) );
 
-    if ( defined( my $packed = getsockopt( $self->{socket}, SOL_SOCKET, SO_ERROR ) ) ) {
-        return !unpack( q{L}, $packed );
-    }
-
-    return;
-}
-
-=head3 C<last_errorcode>
-
-Returns code of the last error.
-
-=cut
-sub last_errorcode {
-    my ( $self ) = @_;
-
-    return ( $self->{error} // 0 ) + 0;
-}
-
-
-=head3 C<last_error>
-
-Returns description of the last error.
-
-=cut
-sub last_error {
-    my ( $self ) = @_;
-
-    return ( $self->{error} // q{} ).q{};
+    return !unpack( q{L}, $packed );
 }
 
 #-- private attributes ---------------------------------------------------------
 
 #-- private methods ------------------------------------------------------------
 
-# You need to have access to Kafka instance and be able to connect through TCP
+# You need to have access to Kafka instance and be able to connect through TCP.
 # uses http://devpit.org/wiki/Connect%28%29_with_timeout_%28in_Perl%29
 sub _connect {
     my ( $self ) = @_;
@@ -323,7 +297,7 @@ sub _connect {
     my $timeout = $self->{timeout};
 
     my $ip;
-    if( $name =~ qr~[a-zA-Z]~s ) {
+    if( $name =~ /[a-zA-Z]/s ) {
         # DNS lookup.
         local $@;
         my $h = set_sig_handler( 'ALRM', sub { die 'alarm clock restarted' } );
@@ -398,15 +372,6 @@ sub _connect {
     return $connection;
 }
 
-# Sets error code/description according to the received value
-sub _error {
-    my ( $self, $error_code, $description ) = @_;
-
-    $self->{error} = dualvar $error_code, $ERROR{ $error_code }.( $description ? ': '.$description : q{} );
-
-    return;
-}
-
 # Show additional debugging information
 sub _debug_msg {
     my ( $self, $header, $colour, $message ) = @_;
@@ -436,8 +401,8 @@ sub _debug_msg {
         );
     }
 
-    say STDERR
-        "# $header $self->{host}:$self->{port}\n",
+    warn
+        "# $header ", $self->{host}, ':', $self->{port}, "\n",
         '# Hex Stream: ', unpack( q{H*}, $message ), "\n",
         $_hdr->dump(
             [
@@ -445,6 +410,13 @@ sub _debug_msg {
             ],
             $message
         );
+}
+
+# Handler for errors
+sub _error {
+    my $self = shift;
+
+    Kafka::Exception::IO->throw( throw_args( @_ ) );
 }
 
 #-- Closes and cleans up -------------------------------------------------------
@@ -461,7 +433,15 @@ __END__
 
 =head1 DIAGNOSTICS
 
-Use L</last_errorcode> and L</last_error> to get last error code & description.
+When error is detected, an exception, represented by object of C<Kafka::Exception::Producer> class,
+is thrown (see L<Kafka::Exceptions|Kafka::Exceptions>).
+
+L<code|Kafka::Exceptions/code> and a more descriptive L<message|Kafka::Exceptions/message> provide
+information about thrown exception. Consult documentation of the L<Kafka::Exceptions|Kafka::Exceptions>
+for the list of all available methods.
+
+Authors suggest using of L<Try::Tiny|Try::Tiny>'s C<try> and C<catch> to handle exceptions while
+working with Kafka module.
 
 =over 3
 
@@ -504,9 +484,11 @@ protocol on 32 bit systems.
 L<Kafka::Protocol|Kafka::Protocol> - functions to process messages in the
 Apache Kafka's Protocol.
 
-L<Kafka::IO|Kafka::IO> - low level interface for communication with Kafka server.
+L<Kafka::IO|Kafka::IO> - low-level interface for communication with Kafka server.
 
-L<Kafka::Internals|Kafka::Internals> - Internal constants and functions used
+L<Kafka::Exceptions|Kafka::Exceptions> - module designated to handle Kafka exceptions.
+
+L<Kafka::Internals|Kafka::Internals> - internal constants and functions used
 by several package modules.
 
 A wealth of detail about the Apache Kafka and the Kafka Protocol:

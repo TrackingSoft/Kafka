@@ -6,7 +6,7 @@ Kafka::Cluster - object interface to manage a test kafka cluster.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Cluster> version 0.800_1 .
+This documentation refers to C<Kafka::Cluster> version 0.800_4 .
 
 =cut
 
@@ -18,7 +18,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_1';
+our $VERSION = '0.800_4';
 
 use Exporter qw(
     import
@@ -62,6 +62,7 @@ use Params::Util qw(
     _STRING
 );
 use Proc::Daemon;
+use Try::Tiny;
 
 use Kafka::IO;
 
@@ -112,7 +113,7 @@ The ability to perform a query to necessary server cluster.
 
 =head2 EXPORT
 
-These variables are the constants and never change their values.
+The following constants are available for export
 
 =cut
 
@@ -151,7 +152,6 @@ my $start_dir;
 
 # protection against re-create the cluster object
 our $_used = 0;
-
 
 =head2 CONSTRUCTOR
 
@@ -257,10 +257,10 @@ sub new {
 
     opendir( my $dh, $kafka_data_dir )
         or confess "can't opendir $kafka_data_dir: $!";
-    while ( readdir( $dh ) ) {
-        next unless /^$KAFKA_LOGS_DIR_MASK/;
+    foreach my $file ( readdir( $dh ) ) {
+        next if $file !~ /^$KAFKA_LOGS_DIR_MASK/;
         ++$cluster_factor;
-        if ( !$cfg && -e ( $inifile = catfile( $kafka_data_dir, $_, $KAFKA_PROPERTIES_FILE ) ) ) {
+        if ( !$cfg && -e ( $inifile = catfile( $kafka_data_dir, $file, $KAFKA_PROPERTIES_FILE ) ) ) {
             if ( !( $cfg = Config::IniFiles->new(
                     -file       => $inifile,
                     -fallback   => $INI_SECTION,
@@ -541,12 +541,11 @@ sub start {
     # Try sending request to make sure that Kafka server is really, really working now
     my $attempts = $MAX_ATTEMPT * 2;
     while( $attempts-- ) {
-        eval {
-
+        my $error;
+        try {
             my $io = Kafka::IO->new(
                 host       => 'localhost',
                 port       => $port,
-                RaiseError => 1,
             );
 
 # ***** A MetadataRequest example:
@@ -572,19 +571,18 @@ sub start {
 #     6E:6F:74:5F:72:65:70:6C:69:63:  #   content = 'not_replicable_topic'
 #     61:62:6C:65:5F:74:6F:70:69:63
 #     ] the end of the first element of 'topics' the array
-
             $io->send( pack( 'H*', '000000300003000000000000000C746573742D726571756573740000000100146E6F745F7265706C696361626C655F746F706963' ) );
+
             my $response = $io->receive( 4 );
             my $tail = $io->receive( unpack( "N", $$response ) );
             $$response .= $$tail;
             $io->close;
+        } catch {
+#            confess "Could not send control message: $_\n" unless $attempts;
+            ++$error;
         };
-        if( my $error = $@ ) {
-            confess "Could not send control message: $error\n" unless $attempts;
-        }
-        else {
-            last;
-        }
+
+#        last unless $error;
         sleep 1;
     }
 }
@@ -621,7 +619,6 @@ sub request {
     my $io = Kafka::IO->new(
         host       => 'localhost',
         port       => $port,
-        RaiseError => 1,
     );
 
     $io->send( pack( q{H*}, $bin_stream ) );
@@ -1119,9 +1116,11 @@ protocol on 32 bit systems.
 L<Kafka::Protocol|Kafka::Protocol> - functions to process messages in the
 Apache Kafka's Protocol.
 
-L<Kafka::IO|Kafka::IO> - low level interface for communication with Kafka server.
+L<Kafka::IO|Kafka::IO> - low-level interface for communication with Kafka server.
 
-L<Kafka::Internals|Kafka::Internals> - Internal constants and functions used
+L<Kafka::Exceptions|Kafka::Exceptions> - module designated to handle Kafka exceptions.
+
+L<Kafka::Internals|Kafka::Internals> - internal constants and functions used
 by several package modules.
 
 A wealth of detail about the Apache Kafka and the Kafka Protocol:

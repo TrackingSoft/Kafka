@@ -113,7 +113,7 @@ unless ( $connect = Kafka::Connection->new(
     host    => 'localhost',
     port    => $port,
     ) ) {
-    BAIL_OUT '('.Kafka::Connection::last_errorcode.') '.Kafka::Connection::last_error;
+    BAIL_OUT 'connection is not created';
 }
 isa_ok( $connect, 'Kafka::Connection');
 
@@ -122,18 +122,15 @@ unless ( $producer = Kafka::Producer->new(
         RequiredAcks    => $NOT_SEND_ANY_RESPONSE,
 #        RequiredAcks    => $WAIT_WRITTEN_TO_LOCAL_LOG,
 #        RequiredAcks    => $BLOCK_UNTIL_IS_COMMITTED,
-
-        RaiseError      => 0                        # Optional, default = 0
     ) ) {
-    BAIL_OUT '('.Kafka::Producer::last_errorcode.') '.Kafka::Producer::last_error;
+    BAIL_OUT 'producer is not created';
 }
 isa_ok( $producer, 'Kafka::Producer');
 
 unless ( $consumer = Kafka::Consumer->new(
     Connection  => $connect,
-    RaiseError  => 0                                # Optional, default = 0
 ) ) {
-    BAIL_OUT '('.Kafka::Consumer::last_errorcode.') '.Kafka::Consumer::last_error;
+    BAIL_OUT 'consumer is not created';
 }
 isa_ok( $consumer, 'Kafka::Consumer');
 
@@ -152,8 +149,8 @@ sub next_offset {
         ok( _ARRAY0( $offsets ), 'offsets are obtained' ) if $is_package;
         return $offsets->[0];
     }
-    if ( !$offsets || $consumer->last_error ) {
-        fail '('.$consumer->last_errorcode.') '.$consumer->last_error;
+    if ( !$offsets ) {
+        fail 'offsets are not received';
         return;
     }
 }
@@ -170,7 +167,7 @@ sub send_messages {
         return $time_after - $time_before;
     }
     else {
-        fail '('.$producer->last_errorcode.') '.$producer->last_error;
+        fail 'response is not received';
         return;
     }
 }
@@ -198,8 +195,8 @@ sub fetch_messages {
         }
         return ( \@fetch, $time_after - $time_before );
     }
-    if ( !$messages || $consumer->last_error ) {
-        fail '('.$consumer->last_errorcode.') '.$consumer->last_error;
+    if ( !$messages ) {
+        fail 'messages are not received';
         return;
     }
 }
@@ -446,5 +443,3 @@ $connect->close;
 
 # Statistics
 report();
-
-__DATA__

@@ -27,7 +27,38 @@ plan 'no_plan';
 
 #-- load the modules -----------------------------------------------------------
 
+use Kafka qw (
+    $BITS64
+);
+
 #-- setting up facilities ------------------------------------------------------
+
+our %ordinary;
+
+BEGIN {
+
+    unless ( $BITS64 ) {
+        our ( $constants_Kafka_Int64, $functions_Kafka_Int64 );
+        $ordinary{ 'Kafka::Int64' } = [ $constants_Kafka_Int64, $functions_Kafka_Int64 ];
+
+        # Kafka::Int64
+
+        $constants_Kafka_Int64 = [ qw(
+        ) ];
+
+        $functions_Kafka_Int64 = [ qw(
+            intsum
+            packq
+            unpackq
+        ) ];
+
+        use_ok 'Kafka::Int64',
+            @$constants_Kafka_Int64,
+            @$functions_Kafka_Int64,
+        ;
+    }
+}
+
 
 #-- declarations ---------------------------------------------------------------
 
@@ -37,7 +68,6 @@ our (
     $constants_Kafka,               $functions_Kafka,
     $constants_Kafka_Internals,     $functions_Kafka_Internals,
     $constants_Kafka_TestInternals, $functions_Kafka_TestInternals,
-    $constants_Kafka_Int64,         $functions_Kafka_Int64,
     $constants_Kafka_Protocol,      $functions_Kafka_Protocol,
     $constants_Kafka_MockProtocol,  $functions_Kafka_MockProtocol,
 
@@ -50,14 +80,11 @@ our (
     $ours_Kafka_Cluster,            $methods_Kafka_Cluster,
 );
 
-my %ordinary = (
-    'Kafka'                 => [ $constants_Kafka,                  $functions_Kafka ],
-    'Kafka::Internals'      => [ $constants_Kafka_Internals,        $functions_Kafka_Internals ],
-    'Kafka::TestInternals'  => [ $constants_Kafka_TestInternals,    $functions_Kafka_TestInternals ],
-    'Kafka::Int64'          => [ $constants_Kafka_Int64,            $functions_Kafka_Int64 ],
-    'Kafka::Protocol'       => [ $constants_Kafka_Protocol,         $functions_Kafka_Protocol ],
-    'Kafka::MockProtokol'   => [ $constants_Kafka_MockProtocol,     $functions_Kafka_MockProtocol ],
-);
+$ordinary{ 'Kafka' }                = [ $constants_Kafka,               $functions_Kafka ];
+$ordinary{ 'Kafka::Internals' }     = [ $constants_Kafka_Internals,     $functions_Kafka_Internals ];
+$ordinary{ 'Kafka::TestInternals' } = [ $constants_Kafka_TestInternals, $functions_Kafka_TestInternals ];
+$ordinary{ 'Kafka::Protocol' }      = [ $constants_Kafka_Protocol,      $functions_Kafka_Protocol ];
+$ordinary{ 'Kafka::MockProtokol' }  = [ $constants_Kafka_MockProtocol,  $functions_Kafka_MockProtocol ];
 
 my %OO = (
     'Kafka::IO'             => [ $ours_Kafka_IO,                    $methods_Kafka_IO ],
@@ -146,13 +173,7 @@ BEGIN {
 
     $functions_Kafka_Internals = [ qw(
         _get_CorrelationId
-        last_error
-        last_errorcode
-        RaiseError
-        _fulfill_request
-        _error
-        _connection_error
-        _set_error
+        _isbig
     ) ];
 
     use_ok 'Kafka::Internals',
@@ -189,24 +210,6 @@ BEGIN {
     use_ok 'Kafka::TestInternals',
         @$constants_Kafka_TestInternals,
         @$functions_Kafka_TestInternals,
-    ;
-}
-
-# Kafka::Int64
-
-BEGIN {
-    $constants_Kafka_Int64 = [ qw(
-    ) ];
-
-    $functions_Kafka_Int64 = [ qw(
-        intsum
-        packq
-        unpackq
-    ) ];
-
-    use_ok 'Kafka::Int64',
-        @$constants_Kafka_Int64,
-        @$functions_Kafka_Int64,
     ;
 }
 
@@ -279,8 +282,6 @@ BEGIN {
     $methods_Kafka_IO = [ qw(
         close
         is_alive
-        last_error
-        last_errorcode
         new
         receive
         send
@@ -327,10 +328,7 @@ BEGIN {
         get_known_servers
         is_server_alive
         is_server_known
-        last_error
-        last_errorcode
         new
-        RaiseError
         receive_response_to_request
     ) ];
 
@@ -367,11 +365,8 @@ BEGIN {
 
     $methods_Kafka_Consumer = [ qw(
         fetch
-        last_error
-        last_errorcode
         new
         offsets
-        RaiseError
     ) ];
 
     use_ok 'Kafka::Consumer';
@@ -384,10 +379,7 @@ BEGIN {
     ) ];
 
     $methods_Kafka_Producer = [ qw(
-        last_error
-        last_errorcode
         new
-        RaiseError
         send
     ) ];
 

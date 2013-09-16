@@ -1,5 +1,20 @@
 Revision history for Kafka package
 
+0.800_4 Fri Sep  27 2013
+    CHANGES:
+    - Refactored error handling. See documentation for module Kafka::Exceptions.
+      Retired methods RaiseError, last_error last_errorcode.
+    - Added method Kafka::Connection->cluster_errors.
+
+0.800_3 Tue Sep  17 2013
+    CHANGES:
+    - Use Try::Tiny for proper preservation of $@ .
+
+0.800_2 Mon Sep  16 2013
+
+    BUGFIXES:
+    - Fixed to make it working on Perl 5.10 and over.
+
 0.800_1 Fri Sep  06 2013
 
     !!! This is a major upgrade that changes API. It's strongly advised to study
@@ -8,7 +23,7 @@ Revision history for Kafka package
     CHANGES:
     - Implement Kafka API ver 0.8. For communication with earlier versions of Kafka
       use Kafka module versions before 0.8.
-    - added Kafka::Connection, Kafka::Internals.
+    - Added Kafka::Connection, Kafka::Internals.
     - Kafka::Mock renamed to Kafka::MockIO and moved to t/lib.
     - Additional testing units (in t/lib) for the following modules:
       Kafka::Cluster, Kafka::MockProtocol, Kafka::TestInternals.

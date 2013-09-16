@@ -18,9 +18,13 @@ use lib qw(
 #-- load the modules -----------------------------------------------------------
 
 use Getopt::Long;
+use Scalar::Util qw(
+    blessed
+);
 use Time::HiRes qw(
     gettimeofday
 );
+use Try::Tiny;
 
 use Kafka::Connection;
 use Kafka::Producer;
@@ -78,8 +82,14 @@ HELP
 my ( $connect, $producer, $messages, $messages_sent, $dispatch_time, $mbs );
 
 sub exit_on_error {
-    my ( $message ) = @_;
+    my ( $error ) = @_;
 
+    my $message;
+    if ( !blessed( $error ) || !$_->isa( 'Kafka::Exception' ) ) {
+        $message = $error;
+    } else {
+        $message = $_->message;
+    }
     say STDERR $message;
     exit 1;
 }
@@ -102,18 +112,24 @@ sub send_message {
 
     my ( $ret, $time_before, $time_after );
     $time_before = gettimeofday();
-    $ret = $producer->send( $topic, $partition, $message );
+    try {
+        $ret = $producer->send( $topic, $partition, $message );
+    } catch {
+        exit_on_error( $_ );
+    };
     $time_after = gettimeofday();
-    exit_on_error( 'send: ('.$producer->last_errorcode.') '.$producer->last_error )
-        unless $ret;
 
     return $time_after - $time_before;
 }
 
 #-- Global data ----------------------------------------------------------------
 
-!( $connect  = Kafka::Connection->new( host => $host, port => $port ) )->last_errorcode || exit_on_error( 'Kafka::Connect->new: ('.$connect->last_errorcode.') '.$connect->last_error );
-!( $producer = Kafka::Producer->new( Connection => $connect ) )->last_errorcode || exit_on_error( 'Kafka::Producer->new: ('.$producer->last_errorcode.') '.$producer->last_error );
+try {
+    $connect  = Kafka::Connection->new( host => $host, port => $port );
+    $producer = Kafka::Producer->new( Connection => $connect );
+} catch {
+    exit_on_error( $_ );
+};
 
 # INSTRUCTIONS -----------------------------------------------------------------
 

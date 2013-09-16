@@ -36,13 +36,16 @@ use Const::Fast;
 #use File::HomeDir;
 use Params::Util qw(
     _HASH
+    _INSTANCE
 );
+use Sub::Install;
 
 use Kafka qw(
     $BLOCK_UNTIL_IS_COMMITTED
     $DEFAULT_MAX_NUMBER_OF_OFFSETS
     $DEFAULT_MAX_BYTES
     $DEFAULT_MAX_WAIT_TIME
+    $ERROR_MISMATCH_ARGUMENT
     $KAFKA_SERVER_PORT
     $MIN_BYTES_RESPOND_IMMEDIATELY
     $MIN_BYTES_RESPOND_HAS_DATA
@@ -89,43 +92,32 @@ my ( $port, $connect, $server, $request, $response, $tmp );
 sub new_ERROR_MISMATCH_ARGUMENT {
     my ( $field, @bad_values ) = @_;
 
-    foreach my $RaiseError ( 0, 1 ) {
-        foreach my $bad_value ( @bad_values ) {
-            undef $connect;
-            $@ = undef;
-            $connect = eval { Kafka::Connection->new(
+    foreach my $bad_value ( @bad_values ) {
+        undef $connect;
+        throws_ok {
+            $connect = Kafka::Connection->new(
                 host                => 'localhost',
                 port                => $port,
-                RaiseError          => $RaiseError,
                 CorrelationId       => undef,
                 SEND_MAX_RETRIES    => $SEND_MAX_RETRIES,
                 RETRY_BACKOFF       => $RETRY_BACKOFF,
                 $field              => $bad_value,
-            ) };
-            ok $@, "\$@ changed";
-            ok !defined( $connect ), 'connection object is not created';
-        }
+            );
+        } 'Kafka::Exception::Connection', 'error thrown';
+        ok !defined( $connect ), 'connection object is not created';
     }
 }
 
 sub is_ERROR_MISMATCH_ARGUMENT {
     my ( $function ) = @_;
 
-    foreach my $RaiseError ( 0, 1 ) {
-        foreach my $bad_value ( @not_is_like_server_list ) {
-            $@ = undef;
-            $connect = Kafka::Connection->new(
-                host        => 'localhost',
-                port        => $port,
-                RaiseError  => $RaiseError,
-            );
+    foreach my $bad_value ( @not_is_like_server_list ) {
+        $connect = Kafka::Connection->new(
+            host        => 'localhost',
+            port        => $port,
+        );
 
-            ok !$@, "\$@ not established";
-            eval { $connect->$function( $bad_value->[0] ) };
-            ok $@, "\$@ changed: bad server name";
-            ok $connect->last_errorcode(), 'an error is detected';
-            ok $connect->last_error(), 'expected error';
-        }
+        throws_ok { $connect->$function( $bad_value->[0] ) } 'Kafka::Exception::Connection', 'error thrown';
     }
 }
 
@@ -135,6 +127,8 @@ sub is_ERROR_MISMATCH_ARGUMENT {
 
 testing();
 testing( $KAFKA_BASE_DIR ) if $KAFKA_BASE_DIR;
+
+communication_error();
 
 sub testing {
     my ( $kafka_base_dir ) = @_;
@@ -156,8 +150,6 @@ sub testing {
     );
     isa_ok( $connect, 'Kafka::Connection' );
 
-    ok !$connect->last_errorcode, 'No errorcode';
-    ok !$connect->last_error, 'No error';
 #-- get_known_servers
     is scalar( $connect->get_known_servers() ), 1, 'Known only one server';
     ( $server ) = $connect->get_known_servers();
@@ -169,9 +161,6 @@ sub testing {
     ok !$connect, 'connection object is destroyed';
 
 #-- new
-
-# RaiseError ($DEFAULT_RAISE_ERROR => 0;)
-    new_ERROR_MISMATCH_ARGUMENT( 'RaiseError', @not_nonnegint );
 
 # host
     new_ERROR_MISMATCH_ARGUMENT( 'host', @not_string );
@@ -196,55 +185,6 @@ sub testing {
     new_ERROR_MISMATCH_ARGUMENT( 'RETRY_BACKOFF', @not_posint );
 
 #-- receive_response_to_request
-
-# NOTE: We presume that the verification of the correctness of the arguments made by the user.
-
-#    foreach my $RaiseError ( 0, 1 ) {
-## right example:
-##{
-##    ApiKey  => 0,
-##    topics  => [
-##        {
-##            TopicName   => 'mytopic',
-##            partitions  => [
-##                {
-##                    Partition   => 0,
-##                },
-##            ],
-##        },
-##    ],
-##},
-#        foreach my $bad_request (
-#                @not_hash,
-#                { foo       => 'bar' }, # no ApiKey
-#                { ApiKey    => 999 },   # bad ApiKey
-#                @not_topics_array,
-#            ) {
-#            $connect = Kafka::Connection->new(
-#                host        => 'localhost',
-#                port        => $port,
-#                RaiseError  => $RaiseError,
-#            );
-#
-#            $response = $@ = undef;
-##-- last_errorcode, last_error
-#            ok !$connect->last_errorcode(), 'no error';
-##use Data::Dumper;
-##say Data::Dumper->Dump( [ $bad_request ], [ 'bad_request' ] );
-#            $response = eval { $connect->receive_response_to_request( $bad_request ); };
-#            ok !defined( $response ), 'no response';
-#            if ( !$RaiseError && _HASH( $bad_request ) && exists( $bad_request->{ApiKey} ) ) {
-#                ok !$@, "\$@ not changed";
-#            }
-#            else {
-#                ok $@, "\$@ changed";
-#            }
-#            ok defined( $connect ), 'connection object is alive';
-##-- last_errorcode, last_error
-#            ok $connect->last_errorcode(), 'an error is detected';
-#            ok $connect->last_error(), 'expected error';
-#        }
-#    }
 
 #-- ProduceRequest
 
@@ -396,6 +336,47 @@ sub testing {
 #-- finish
     Kafka::MockIO::restore()
         unless $kafka_base_dir;
+}
+
+sub communication_error {
+
+    $port = $Kafka::MockIO::KAFKA_MOCK_SERVER_PORT;
+    Kafka::MockIO::override();
+    my $method = \&Kafka::IO::send;
+
+    our $_attempt;
+    Sub::Install::reinstall_sub( {
+        code    => sub {
+            my ( $self ) = @_;
+            if ( $main::_attempt++ ) {
+                $self->_error( $ERROR_MISMATCH_ARGUMENT );
+            } else {
+                return &$method( @_ );
+            }
+        },
+        into    => 'Kafka::IO',
+        as      => 'send',
+    } );
+
+    $connect = Kafka::Connection->new(
+        host        => 'localhost',
+        port        => $port,
+    );
+
+    my $errors = $connect->cluster_errors;
+    ok !%$errors, 'no errors';
+    eval { $response = $connect->receive_response_to_request( $request ); };
+    isa_ok( $@, 'Kafka::Exception' );
+    $errors = $connect->cluster_errors;
+    is scalar( keys %$errors ), scalar( $connect->get_known_servers ), 'communication errors';
+
+    Sub::Install::reinstall_sub( {
+        code    => $method,
+        into    => 'Kafka::IO',
+        as      => 'send',
+    } );
+
+    Kafka::MockIO::restore();
 }
 
 # POSTCONDITIONS ---------------------------------------------------------------

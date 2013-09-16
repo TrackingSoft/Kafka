@@ -18,9 +18,13 @@ use lib qw(
 #-- load the modules -----------------------------------------------------------
 
 use Getopt::Long;
+use Scalar::Util qw(
+    blessed
+);
 use Time::HiRes qw(
     gettimeofday
 );
+use Try::Tiny;
 
 use Kafka qw(
     $MESSAGE_SIZE_OVERHEAD
@@ -99,8 +103,14 @@ sub tsk {
 my ( $connect, $consumer, $desired_size, $first_offset, $fetch, $dispatch_time, $messages_recv, $mbs );
 
 sub exit_on_error {
-    my ( $message ) = @_;
+    my ( $error ) = @_;
 
+    my $message;
+    if ( !blessed( $error ) || !$_->isa( 'Kafka::Exception' ) ) {
+        $message = $error;
+    } else {
+        $message = $_->message;
+    }
     say STDERR $message;
     exit 1;
 }
@@ -110,10 +120,12 @@ sub fetch_messages {
 
     my ( $messages, $time_before, $time_after );
     $time_before = gettimeofday();
-    $messages = $consumer->fetch( $topic, $partition, $offset, $max_size );
+    try {
+        $messages = $consumer->fetch( $topic, $partition, $offset, $max_size );
+    } catch {
+        exit_on_error( $_ );
+    };
     $time_after = gettimeofday();
-    exit_on_error( 'fetch: ('.$consumer->last_errorcode.') '.$consumer->last_error )
-        unless $messages;
 
     my $cnt = 0;
     foreach my $m ( @$messages ) {
@@ -131,8 +143,12 @@ sub fetch_messages {
 
 #-- Global data ----------------------------------------------------------------
 
-!( $connect  = Kafka::Connection->new( host => $host, port => $port ) )->last_errorcode || exit_on_error( 'Kafka::Connect->new: ('.$connect->last_errorcode.') '.$connect->last_error );
-!( $consumer = Kafka::Consumer->new( Connection => $connect ) )->last_errorcode || exit_on_error( 'Kafka::Consumer->new: ('.$consumer->last_errorcode.') '.$consumer->last_error );
+try {
+    $connect  = Kafka::Connection->new( host => $host, port => $port );
+    $consumer = Kafka::Consumer->new( Connection => $connect );
+} catch {
+    exit_on_error( $_ );
+};
 
 $desired_size = ( $MESSAGE_SIZE_OVERHEAD + $msg_len ) * $number_of_messages;
 

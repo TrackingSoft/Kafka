@@ -9,7 +9,7 @@ Kafka - Apache Kafka interface for Perl
 
 =head1 VERSION
 
-This documentation refers to C<Kafka> package version 0.800_1 .
+This documentation refers to C<Kafka> package version 0.800_4 .
 
 =cut
 
@@ -21,7 +21,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_1';
+our $VERSION = '0.800_4';
 
 use Exporter qw(
     import
@@ -88,27 +88,48 @@ use Const::Fast;
     use strict;
     use warnings;
 
+    use Scalar::Util qw(
+        blessed
+    );
+    use Try::Tiny;
+
     use Kafka qw(
         $BITS64
     );
+    use Kafka::Connection;
 
-    # A simple example of Kafka usage:
+    # A simple example of Kafka usage
 
     # common information
     say 'This is Kafka package ', $Kafka::VERSION;
     say 'You have a ', $BITS64 ? '64' : '32', ' bit system';
 
-    use Kafka::Connection;
+    my ( $connection, $producer, $consumer );
+    try {
 
-    # connect to local cluster with the defaults
-    my $connect = Kafka::Connection->new( host => 'localhost' );
+        #-- Connect to local cluster
+        $connection = Kafka::Connection->new( host => 'localhost' );
+        #-- Producer
+        $producer = Kafka::Producer->new( Connection => $connection );
+        #-- Consumer
+        $consumer = Kafka::Consumer->new( Connection  => $connection );
 
-    # decoding of the error
-    say STDERR 'last error: ', $connect->last_error
-        unless $connect->last_errorcode;
+    } catch {
+        if ( blessed( $_ ) && $_->isa( 'Kafka::Exception' ) ) {
+            warn 'Error: (', $_->code, ') ',  $_->message, "\n";
+            exit;
+        } else {
+            die $_;
+        }
+    };
 
-    # To see a brief but working code example of the Kafka package usage
-    # look at the "An Example" section.
+    # cleaning up
+    undef $consumer;
+    undef $producer;
+    undef $connection;
+
+    # another brief code example of the Kafka package
+    # is provided in the "An Example" section.
 
 =head1 ABSTRACT
 
@@ -243,9 +264,9 @@ disconnection occurs and internal exception is thrown.
 
 =head2 The IO Object
 
-The L<Kafka::Consumer|Kafka::Consumer> objects use internal class L<Kafka::IO|Kafka::IO>
+The L<Kafka::Connection|Kafka::Connection> object use internal class L<Kafka::IO|Kafka::IO>
 to maintain communication with the particular server of Kafka cluster
-The IO object is an interface layer between L<Kafka::Consumer|Kafka::Consumer> object and
+The IO object is an interface layer between L<Kafka::Connection|Kafka::Connection> object and
 the network.
 
 Kafka IO API is implemented by L<Kafka::IO|Kafka::IO> class. Note that end user
@@ -342,30 +363,29 @@ L<Kafka::Message|Kafka::Message> objects.
     );
 
     # Get a list of valid offsets up to max_number before the given time
-    if ( my $offsets = $consumer->offsets(
-        'mytopic'                       # topic
+    my $offsets = $consumer->offsets(
+        'mytopic',                      # topic
         0,                              # partition
-        $RECEIVE_EARLIEST_OFFSETS,      # specifies time of the first offset we want to retreive
-        $DEFAULT_MAX_NUMBER_OF_OFFSETS  # max number of offsets to return
-        ) ) {
-        foreach my $offset ( @$offsets ) {
-            say "Received offset: $offset";
-        }
-    }
+        $RECEIVE_EARLIEST_OFFSETS,      # time
+        $DEFAULT_MAX_NUMBER_OF_OFFSETS  # max_number
+    );
+    say "Received offset: $_" foreach @$offsets;
 
     # Consuming messages
-    if ( my $messages = $consumer->fetch(
-        'mytopic',          # topic
-        0,                  # partition
-        $offsets->[0],      # message offset
-        $DEFAULT_MAX_BYTES  # limit max amount of data we request
-        ) ) {
-        foreach my $message ( @$messages ) {
-            if( $message->valid ) {
-                say 'payload    : ', $message->payload;
-                say 'offset     : ', $message->offset;
-                say 'next_offset: ', $message->next_offset;
-            }
+    my $messages = $consumer->fetch(
+        'mytopic',                      # topic
+        0,                              # partition
+        0,                              # offset
+        $DEFAULT_MAX_BYTES              # Maximum size of MESSAGE(s) to receive
+    );
+    foreach my $message ( @$messages ) {
+        if( $message->valid ) {
+            say 'payload    : ', $message->payload;
+            say 'key        : ', $message->key;
+            say 'offset     : ', $message->offset;
+            say 'next_offset: ', $message->next_offset;
+        } else {
+            say 'error      : ', $message->error;
         }
     }
 
@@ -378,6 +398,7 @@ Kafka message API is implemented by L<Kafka::Message|Kafka::Message> class.
 
     if( $message->valid ) {
         say 'payload    : ', $message->payload;
+        say 'key        : ', $message->key;
         say 'offset     : ', $message->offset;
         say 'next_offset: ', $message->next_offset;
     }
@@ -392,6 +413,10 @@ Methods available for L<Kafka::Message|Kafka::Message> object :
 =item *
 
 C<payload> A simple message received from the Apache Kafka server.
+
+=item *
+
+C<key> An optional message key that was used for partition assignment.
 
 =item *
 
@@ -413,26 +438,24 @@ server.
 
 =back
 
-=head2 Common
+=head2 The Exception Object
 
-L<Kafka::Connection|Kafka::Connection>, L<Kafka::Producer|Kafka::Producer>,
-and L<Kafka::Consumer|Kafka::Consumer> objects described above also have
-the following common methods:
+A designated class C<Kafka::Exception> is used to provide a more detailed and
+structured information when error is detected.
 
-=over 3
+The following attributes are declared within C<Kafka::Exception>:
+L<code|Kafka::Exceptions/code>, L<message|Kafka::Exceptions/message>.
 
-=item *
+Additional subclasses of C<Kafka::Exception> designed to report errors in respective
+Kafka classes:
+C<Kafka::Exception::Connection>,
+C<Kafka::Exception::Consumer>,
+C<Kafka::Exception::IO>,
+C<Kafka::Exception::Int64>,
+C<Kafka::Exception::Producer>.
 
-C<RaiseError> - when set to true, this method instructs Kafka to die when error
-during communication is detected.
-
-=item *
-
-C<last_errorcode> and C<last_error> are diagnostic methods. They provide detailed
-error codes and messages for various cases: when server or the resource is not available,
-access to the resource was denied, etc.
-
-=back
+Authors suggest using of L<Try::Tiny|Try::Tiny>'s C<try> and C<catch> to handle exceptions while
+working with Kafka module.
 
 =cut
 
@@ -443,9 +466,11 @@ None by default.
 Additional constants are available for import, which can be used to define some
 type of parameters, and to identify various error cases.
 
-=over
-
 =cut
+
+=pod
+
+=over
 
 =item C<$KAFKA_SERVER_PORT>
 
@@ -460,9 +485,7 @@ const our $KAFKA_SERVER_PORT                    => 9092;
 C<send> calls (could be any integer or floating-point type).
 
 =cut
-const our $REQUEST_TIMEOUT                      => 1.5;                 # The timeout in secs, for gethostbyname, connect, blocking receive and send calls (could be any integer or floating-point type)
-                                                                        # The ack timeout of the producer requests.
-                                                                        # Value must be non-negative and non-zero
+const our $REQUEST_TIMEOUT                      => 1.5;
 
 # Important configuration properties
 
@@ -471,7 +494,7 @@ const our $REQUEST_TIMEOUT                      => 1.5;                 # The ti
 1MB - maximum size of message(s) to receive.
 
 =cut
-const our $DEFAULT_MAX_BYTES                    => 1_000_000;           # The maximum bytes to include in the message set for the partition
+const our $DEFAULT_MAX_BYTES                    => 1_000_000;
 
 =item C<$SEND_MAX_RETRIES>
 
@@ -479,9 +502,7 @@ const our $DEFAULT_MAX_BYTES                    => 1_000_000;           # The ma
 This property specifies the number of retries when such failures occur.
 
 =cut
-const our $SEND_MAX_RETRIES                     => 3;                   # The leader may be unavailable transiently,
-                                                                        # which can fail the sending of a message.
-                                                                        # This property specifies the number of retries when such failures occur.
+const our $SEND_MAX_RETRIES                     => 3;
 
 =item C<$RETRY_BACKOFF>
 
@@ -490,10 +511,7 @@ Since leader election takes a bit of time, this property specifies the amount of
 that the producer waits before refreshing the metadata.
 
 =cut
-const our $RETRY_BACKOFF                        => 100;                 # (ms) Before each retry, the producer refreshes the metadata of relevant topics.
-                                                                        # Since leader election takes a bit of time,
-                                                                        # this property specifies the amount of time
-                                                                        # that the producer waits before refreshing the metadata.
+const our $RETRY_BACKOFF                        => 100;
 
 # Used to ask for all messages before a certain time (ms). There are two special values.
 
@@ -509,16 +527,14 @@ const our $RECEIVE_LATEST_OFFSET                => -1;  # to receive the latest 
 -2 : special value that denotes earliest available offset.
 
 =cut
-const our $RECEIVE_EARLIEST_OFFSETS             => -2;  # to receive the earliest available offsets.
+const our $RECEIVE_EARLIEST_OFFSETS             => -2;
 
 =item C<$DEFAULT_MAX_NUMBER_OF_OFFSETS>
 
 100 - maximum number of offsets to retrieve.
 
 =cut
-const our $DEFAULT_MAX_NUMBER_OF_OFFSETS        => 100; # Kafka returns up to 'MaxNumberOfOffsets' of offsets
-
-# The minimum number of bytes of messages that must be available to give a response.
+const our $DEFAULT_MAX_NUMBER_OF_OFFSETS        => 100;
 
 =item C<$MIN_BYTES_RESPOND_IMMEDIATELY>
 
@@ -527,7 +543,7 @@ The minimum number of bytes of messages that must be available to give a respons
 0 - the server will always respond immediately.
 
 =cut
-const our $MIN_BYTES_RESPOND_IMMEDIATELY        => 0;   # the server will always respond immediately.
+const our $MIN_BYTES_RESPOND_IMMEDIATELY        => 0;
 
 =item C<$MIN_BYTES_RESPOND_HAS_DATA>
 
@@ -537,9 +553,7 @@ The minimum number of bytes of messages that must be available to give a respons
 or the specified timeout occurs.
 
 =cut
-const our $MIN_BYTES_RESPOND_HAS_DATA           => 1;   # the server will respond as soon as at least one partition has at least 1 byte of data or the specified timeout occurs.
-
-# Indicates how many acknowledgements the servers should receive before responding to the request.
+const our $MIN_BYTES_RESPOND_HAS_DATA           => 1;
 
 =item C<$NOT_SEND_ANY_RESPONSE>
 
@@ -548,7 +562,7 @@ Indicates how many acknowledgements the servers should receive before responding
 0 - the server does not send any response.
 
 =cut
-const our $NOT_SEND_ANY_RESPONSE                => 0;   # the server does not send any response.
+const our $NOT_SEND_ANY_RESPONSE                => 0;
 
 =item C<$WAIT_WRITTEN_TO_LOCAL_LOG>
 
@@ -557,7 +571,7 @@ Indicates how long the servers should wait for the data to be written to the loc
 1 - the server will wait the data is written to the local log before sending a response.
 
 =cut
-const our $WAIT_WRITTEN_TO_LOCAL_LOG            => 1;   # the server will wait the data is written to the local log before sending a response.
+const our $WAIT_WRITTEN_TO_LOCAL_LOG            => 1;
 
 =item C<$BLOCK_UNTIL_IS_COMMITTED>
 
@@ -566,7 +580,7 @@ Wait for message to be committed by all sync replicas.
 -1 - the server will block until the message is committed by all in sync replicas before sending a response.
 
 =cut
-const our $BLOCK_UNTIL_IS_COMMITTED              => -1;  # the server will block until the message is committed by all in sync replicas before sending a response.
+const our $BLOCK_UNTIL_IS_COMMITTED              => -1;
 
 =item C<$DEFAULT_MAX_WAIT_TIME>
 
@@ -594,12 +608,11 @@ const our $DEFAULT_MAX_WAIT_TIME                => 100;
 #   00:                             # Attributes => int8 (the last 3 bits - Compression None)
 #   ff:ff:ff:ff:                    # Key => bytes (a length -1 = null bytes)
 #   00:00:00:06:                    # Value => bytes (a length 0x6 = 6 bytes)
-const our $MESSAGE_SIZE_OVERHEAD                => 26;  # size of protocol overhead (data added by protocol) for each message
+const our $MESSAGE_SIZE_OVERHEAD                => 26;
 
 =back
 
-Possible error codes returned by C<last_errorcode> method
-(complies with a hash of descriptions C<$ERROR>):
+Possible error codes (complies with a hash of descriptions C<$ERROR>):
 
 =over
 
@@ -661,7 +674,7 @@ const our $ERROR_CANNOT_GET_METADATA            => -1006;
 -1007 - Leader not found
 
 =cut
-const our $ERROR_LEADER_NOT_FOUND   => -1007;
+const our $ERROR_LEADER_NOT_FOUND               => -1007;
 
 =item C<$ERROR_MISMATCH_CORRELATIONID>
 
@@ -838,8 +851,7 @@ const our $ERROR_OFFSET_METADATA_TOO_LARGE_CODE => 12;
 
 =item C<%ERROR>
 
-Contain the descriptions for possible error codes returned by
-C<last_error> methods and functions of the package modules.
+Contains the descriptions for possible error codes.
 
 =back
 
@@ -879,11 +891,6 @@ our %ERROR = (
     $ERROR_OFFSET_METADATA_TOO_LARGE_CODE   => q{Specified metadata offset is too big},
 );
 
-=pod
-
-Support for working with 64 bit elements of the Kafka Wire Format protocol
-on 32 bit systems:
-
 =over
 
 =item C<BITS64>
@@ -893,7 +900,7 @@ Know you are working on 64 or 32 bit system
 =back
 
 =cut
-const our $BITS64                           => ( defined( $Config{use64bitint} ) and $Config{use64bitint} eq 'define' ) || $Config{longsize} >= 8;
+const our $BITS64   => ( defined( $Config{use64bitint} ) and $Config{use64bitint} eq 'define' ) || $Config{longsize} >= 8;
 
 #-- public functions -----------------------------------------------------------
 
@@ -909,6 +916,11 @@ __END__
     use strict;
     use warnings;
 
+    use Scalar::Util qw(
+        blessed
+    );
+    use Try::Tiny;
+
     use Kafka qw(
         $KAFKA_SERVER_PORT
         $REQUEST_TIMEOUT
@@ -920,72 +932,83 @@ __END__
     use Kafka::Producer;
     use Kafka::Consumer;
 
-    #-- Connection
-    my $connection = Kafka::IO->new( host => 'localhost' );
+    my ( $connection, $producer, $consumer );
+    try {
 
-    #-- Producer
-    my $producer = Kafka::Producer->new( Connection => $connection );
+        #-- Connection
+        $connection = Kafka::IO->new( host => 'localhost' );
 
-    # Sending a single message
-    $producer->send(
-        'mytopic',                      # topic
-        0,                              # partition
-        'Single message'                # message
-    );
+        #-- Producer
+        $producer = Kafka::Producer->new( Connection => $connection );
 
-    # Sending a series of messages
-    $producer->send(
-        'mytopic',                      # topic
-        0,                              # partition
-        [                               # messages
-            'The first message',
-            'The second message',
-            'The third message',
-        ]
-    );
+        # Sending a single message
+        $producer->send(
+            'mytopic',                      # topic
+            0,                              # partition
+            'Single message'                # message
+        );
 
-    undef $producer;
+        # Sending a series of messages
+        $producer->send(
+            'mytopic',                      # topic
+            0,                              # partition
+            [                               # messages
+                'The first message',
+                'The second message',
+                'The third message',
+            ]
+        );
 
-    #-- Consumer
-    my $consumer = Kafka::Consumer->new( Connection => $connection );
+        #-- Consumer
+        $consumer = Kafka::Consumer->new( Connection => $connection );
 
-    # Get a list of valid offsets up max_number before the given time
-    my $offsets;
-    if ( $offsets = $consumer->offsets(
-        'mytopic',                      # topic
-        0,                              # partition
-        $RECEIVE_EARLIEST_OFFSETS,      # time
-        $DEFAULT_MAX_NUMBER_OF_OFFSETS, # max_number
-        ) ) {
-        foreach my $offset ( @$offsets ) {
-            say "Received offset: $offset";
+        # Get a list of valid offsets up max_number before the given time
+        my $offsets = $consumer->offsets(
+            'mytopic',                      # topic
+            0,                              # partition
+            $RECEIVE_EARLIEST_OFFSETS,      # time
+            $DEFAULT_MAX_NUMBER_OF_OFFSETS  # max_number
+        );
+
+        if( @$offsets ) {
+            say "Received offset: $_" foreach @$offsets;
+        } else {
+            warn "Error: Offsets are not received\n";
         }
-    }
-    if ( !$offsets or $consumer->last_error ) {
-        say '(', $consumer->last_errorcode, ') ', $consumer->last_error;
-    }
 
-    # Consuming messages
-    if ( my $messages = $consumer->fetch(
-        'mytopic',                      # topic
-        0,                              # partition
-        $offsets->[0],                  # offset
-        $DEFAULT_MAX_BYTES              # Maximum size of MESSAGE(s) to receive
-        ) ) {
-        foreach my $message ( @$messages ) {
-            if( $message->valid ) {
-                say 'payload    : ', $message->payload;
-                say 'offset     : ', $message->offset;
-                say 'next_offset: ', $message->next_offset;
-            }
-            else {
-                say 'error      : ', $message->error;
+        # Consuming messages
+        my $messages = $consumer->fetch(
+            'mytopic',                      # topic
+            0,                              # partition
+            0,                              # offset
+            $DEFAULT_MAX_BYTES              # Maximum size of MESSAGE(s) to receive
+        );
+
+        if ( $messages ) {
+            foreach my $message ( @$messages ) {
+                if( $message->valid ) {
+                    say 'payload    : ', $message->payload;
+                    say 'key        : ', $message->key;
+                    say 'offset     : ', $message->offset;
+                    say 'next_offset: ', $message->next_offset;
+                } else {
+                    say 'error      : ', $message->error;
+                }
             }
         }
-    }
 
+    } catch {
+        if ( blessed( $_ ) && $_->isa( 'Kafka::Exception' ) ) {
+            warn 'Error: (', $_->code, ') ',  $_->message, "\n";
+            exit;
+        } else {
+            die $_;
+        }
+    };
+
+    # Closes the consumer and cleans up
     undef $consumer;
-
+    undef $producer;
     undef $connection;
 
 =head1 DEPENDENCIES
@@ -997,17 +1020,21 @@ you have the following packages installed before you install
 Kafka:
 
     Const::Fast
+    Exception::Class
     List::MoreUtils
     Params::Util
     Scalar::Util::Numeric
     String::CRC32
     Sys::SigAction
+    Try::Tiny
 
 Kafka package has the following optional dependencies:
 
     Capture::Tiny
     Config::IniFiles
+    Data::Compare
     Proc::Daemon
+    Proc::ProcessTable
     Sub::Install
     Test::Deep
     Test::Exception
@@ -1026,7 +1053,7 @@ L<Producer|Kafka::Producer>'s, L<Consumer|Kafka::Consumer>'s, L<Connection|Kafka
 string arguments must be binary strings.
 Using Unicode strings may cause an error or data corruption.
 
-This module does not support Kafka protocol versions earlier 0.8.
+This module does not support Kafka protocol versions earlier than 0.8.
 
 The Kafka package was written, tested, and found working on recent Linux
 distributions.
@@ -1062,9 +1089,11 @@ protocol on 32 bit systems.
 L<Kafka::Protocol|Kafka::Protocol> - functions to process messages in the
 Apache Kafka's Protocol.
 
-L<Kafka::IO|Kafka::IO> - low level interface for communication with Kafka server.
+L<Kafka::IO|Kafka::IO> - low-level interface for communication with Kafka server.
 
-L<Kafka::Internals|Kafka::Internals> - Internal constants and functions used
+L<Kafka::Exceptions|Kafka::Exceptions> - module designated to handle Kafka exceptions.
+
+L<Kafka::Internals|Kafka::Internals> - internal constants and functions used
 by several package modules.
 
 A wealth of detail about the Apache Kafka and the Kafka Protocol:

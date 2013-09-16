@@ -28,6 +28,10 @@ use File::Spec::Functions qw(
     catdir
 );
 use Getopt::Long;
+use Scalar::Util qw(
+    blessed
+);
+use Try::Tiny;
 
 use Kafka qw (
     $MESSAGE_SIZE_OVERHEAD
@@ -93,8 +97,14 @@ HELP
 my ( $port, $connect, $producer, $consumer, $offsets, $messages, $strings );
 
 sub exit_on_error {
-    my ( $message ) = @_;
+    my ( $error ) = @_;
 
+    my $message;
+    if ( !blessed( $error ) || !$_->isa( 'Kafka::Exception' ) ) {
+        $message = $error;
+    } else {
+        $message = $_->message;
+    }
     say STDERR $message;
     exit 1;
 }
@@ -120,35 +130,38 @@ foreach my $t_dir ( @T_DIRS ) {
         my $cwd = getcwd();
         chdir $t_dir;
 #-- the Kafka server port (for example for node_id = 0)
-        ( $port ) =  eval {
-            Kafka::Cluster->new(
+        try {
+            ( $port ) = Kafka::Cluster->new(
                 kafka_dir       => $base_dir,
                 does_not_start  => 1,
                 t_dir           => $t_dir,
             )->servers;
+        } catch {
+            exit_on_error( "Running Kafka server not found: $_" );
         };
         chdir $cwd;
-
-        $port or exit_on_error( 'Running Kafka server not found' );
-
         last;
     }
 }
 
-!( $connect = Kafka::Connection->new(
-    host    => 'localhost',
-    port    => $port,
-) )->last_errorcode || exit_on_error( $connect->last_error );
-!( $producer = Kafka::Producer->new(
-    Connection  => $connect,
-) )->last_errorcode || exit_on_error( $producer->last_error );
-!( $consumer = Kafka::Consumer->new(
-    Connection  => $connect,
-) )->last_errorcode || exit_on_error( $consumer->last_error );
+try {
+    $connect  = Kafka::Connection->new(
+        host    => 'localhost',
+        port    => $port,
+    );
+    $producer = Kafka::Producer->new( Connection => $connect );
+    $consumer = Kafka::Consumer->new( Connection => $connect );
+} catch {
+    exit_on_error( $_ );
+};
 
 # INSTRUCTIONS -----------------------------------------------------------------
 
-( $offsets = $consumer->offsets( $topic, $partition, $RECEIVE_LATEST_OFFSET ) ) or exit_on_error( $consumer->last_error );
+try {
+    $offsets = $consumer->offsets( $topic, $partition, $RECEIVE_LATEST_OFFSET );
+} catch {
+    exit_on_error( $_ );
+};
 my $start_offset = $offsets->[0];
 
 say STDERR 'generation of messages can take a while ...';
@@ -157,7 +170,11 @@ say STDERR 'generation of messages can take a while ...';
 say STDERR 'send messages (one by one):';
 foreach my $num ( 1..$number_of_messages )
 {
-    $producer->send( $topic, $partition, $strings->[ $num - 1 ] ) or exit_on_error( $producer->last_error );
+    try {
+        $producer->send( $topic, $partition, $strings->[ $num - 1 ] );
+    } catch {
+        exit_on_error( $_ );
+    };
     print STDERR '.' unless $num % 1000;
 }
 print STDERR "\n";
@@ -165,7 +182,11 @@ print STDERR "\n";
 say STDERR 'consume offsets (for a set of statistics):';
 foreach my $num ( 1..$number_of_messages )
 {
-    ( $offsets = $consumer->offsets( $topic, $partition, $TEST_OFFSETS[ int( rand 2 ) ] ) ) or exit_on_error( $consumer->last_error );
+    try {
+        $offsets = $consumer->offsets( $topic, $partition, $TEST_OFFSETS[ int( rand 2 ) ] );
+    } catch {
+        exit_on_error( $_ );
+    };
     scalar( @$offsets ) or exit_on_error( 'no offsets' );
     print STDERR '.' unless $num % 1000;
 }
@@ -174,7 +195,11 @@ print STDERR "\n";
 say STDERR 'fetch messages (one by one):';
 foreach my $num ( 1..$number_of_messages )
 {
-    ( $messages = $consumer->fetch( $topic, $partition, $start_offset + $num - 1, $msg_len + $MESSAGE_SIZE_OVERHEAD ) ) or exit_on_error( $consumer->last_error );
+    try {
+        $messages = $consumer->fetch( $topic, $partition, $start_offset + $num - 1, $msg_len + $MESSAGE_SIZE_OVERHEAD );
+    } catch {
+        exit_on_error( $_ );
+    };
     $messages->[0]->payload eq $strings->[ $num - 1 ] or exit_on_error( 'the received message does not match the original' );
     print STDERR '.' unless $num % 1000;
 }

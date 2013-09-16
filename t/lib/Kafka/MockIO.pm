@@ -7,7 +7,7 @@ the Apache Kafka server.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::MockIO> version 0.800_1 .
+This documentation refers to C<Kafka::MockIO> version 0.800_4 .
 
 =cut
 
@@ -19,7 +19,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_1';
+our $VERSION = '0.800_4';
 
 #-- load the modules -----------------------------------------------------------
 
@@ -100,9 +100,9 @@ const my $MOCKED_PACKAGE            => 'Kafka::IO';
 
 =head2 EXPORT
 
-These variables are the constants and never change their values.
+Use Kafka::MockIO only with the following information.
 
-Use Kafka::MockIO only with the following information:
+The following constants are available for export
 
 =cut
 
@@ -400,7 +400,6 @@ sub new {
     elsif ( !_POSINT( $self->{port} ) )                                 { Kafka::IO::_error( $self, $ERROR_MISMATCH_ARGUMENT, 'Kafka::IO->new - port' ); }
     elsif ( !( _NUMBER( $self->{timeout} ) && $self->{timeout} > 0 ) )  { Kafka::IO::_error( $self, $ERROR_MISMATCH_ARGUMENT, 'Kafka::IO->new - timeout' ); }
     else  {
-        Kafka::IO::_error( $self, $ERROR_NO_ERROR );
         $self->{socket} = 'fake true value';
     }
 
@@ -427,14 +426,11 @@ sub send {
 
     my $description = 'Kafka::IO->send';
     defined( _STRING( $message ) )
-        || return Kafka::IO::_error( $self, $ERROR_MISMATCH_ARGUMENT, $description );
-    !utf8::is_utf8( $message )
-        || return Kafka::IO::_error( $self, $ERROR_NOT_BINARY_STRING, $description );
+        or Kafka::IO::_error( $self, $ERROR_MISMATCH_ARGUMENT, $description );
+    utf8::is_utf8( $message )
+        and Kafka::IO::_error( $self, $ERROR_NOT_BINARY_STRING, $description );
     ( my $len = length( $message .= q{} ) ) <= $MAX_SOCKET_REQUEST_BYTES
-        || return Kafka::IO::_error( $self, $ERROR_MISMATCH_ARGUMENT, $description );
-
-    $self->_error( $ERROR_NO_ERROR )
-        if $self->last_error;
+        or Kafka::IO::_error( $self, $ERROR_MISMATCH_ARGUMENT, $description );
 
     Kafka::IO::_debug_msg( $self, 'Request to', 'green', $message ) if $Kafka::IO::DEBUG;
 
@@ -452,7 +448,7 @@ sub send {
 
     if ( $ApiKey == $APIKEY_PRODUCE ) {
         my $decoded_produce_request = decode_produce_request( \$message )
-            or return Kafka::IO::_error( $self, $ERROR_MISMATCH_ARGUMENT, $description );
+            or Kafka::IO::_error( $self, $ERROR_MISMATCH_ARGUMENT, $description );
         my ( $topic, $partition ) = $self->_decoded_topic_partition( $decoded_produce_request, $decoded_produce_response );
         $partition // return;
 
@@ -473,12 +469,12 @@ sub send {
         }
 
         $encoded_response = encode_produce_response( $decoded_produce_response )
-            or return Kafka::IO::_error( $self, $ERROR_MISMATCH_ARGUMENT, $description );
+            or Kafka::IO::_error( $self, $ERROR_MISMATCH_ARGUMENT, $description );
     }
 
     elsif ( $ApiKey == $APIKEY_FETCH ) {
         my $decoded_fetch_request = decode_fetch_request( \$message )
-            or return Kafka::IO::_error( $self, $ERROR_MISMATCH_ARGUMENT, $description );
+            or Kafka::IO::_error( $self, $ERROR_MISMATCH_ARGUMENT, $description );
         my ( $topic, $partition ) = $self->_decoded_topic_partition( $decoded_fetch_request, $decoded_fetch_response );
         $partition // return;
 
@@ -536,13 +532,13 @@ sub send {
             + 4                         # [l]   MessageSetSize
             ;
         $encoded_response = encode_fetch_response( $decoded_fetch_response )
-            or return Kafka::IO::_error( $self, $ERROR_MISMATCH_ARGUMENT, $description );
+            or Kafka::IO::_error( $self, $ERROR_MISMATCH_ARGUMENT, $description );
         $encoded_response = substr( $encoded_response, 0, $max_response_length );
     }
 
     elsif ( $ApiKey == $APIKEY_OFFSET ) {
         my $decoded_offset_request = decode_offset_request( \$message )
-            or return Kafka::IO::_error( $self, $ERROR_MISMATCH_ARGUMENT, $description );
+            or Kafka::IO::_error( $self, $ERROR_MISMATCH_ARGUMENT, $description );
         my ( $topic, $partition ) = $self->_decoded_topic_partition( $decoded_offset_request, $decoded_offset_response );
         $partition // return;
 
@@ -571,12 +567,12 @@ sub send {
         }
 
         $encoded_response = encode_offset_response( $decoded_offset_response )
-            or return Kafka::IO::_error( $self, $ERROR_MISMATCH_ARGUMENT, $description );
+            or Kafka::IO::_error( $self, $ERROR_MISMATCH_ARGUMENT, $description );
     }
 
     elsif ( $ApiKey == $APIKEY_METADATA ) {
         my $decoded_metadata_request = decode_metadata_request( \$message )
-            or return Kafka::IO::_error( $self, $ERROR_MISMATCH_ARGUMENT, $description );
+            or Kafka::IO::_error( $self, $ERROR_MISMATCH_ARGUMENT, $description );
         my $TopicName = $decoded_metadata_request->{topics}->[0];
         $self->_verify_string( $TopicName, "$description (TopicName)" )
             or return;
@@ -584,7 +580,7 @@ sub send {
         $decoded_metadata_response->{CorrelationId} = $decoded_metadata_request->{CorrelationId};
 
         $encoded_response = encode_metadata_response( $decoded_metadata_response )
-            or return Kafka::IO::_error( $self, $ERROR_MISMATCH_ARGUMENT, $description );
+            or Kafka::IO::_error( $self, $ERROR_MISMATCH_ARGUMENT, $description );
     }
 
     return $len;
@@ -599,10 +595,7 @@ sub receive {
     my ( $self, $length ) = @_;
 
     _POSINT( $length )
-        or return Kafka::IO::_error( $self, $ERROR_MISMATCH_ARGUMENT, 'Kafka::IO->receive' );
-
-    $self->_error( $ERROR_NO_ERROR )
-        if $self->last_error;
+        or Kafka::IO::_error( $self, $ERROR_MISMATCH_ARGUMENT, 'Kafka::IO->receive' );
 
     my $message = substr( $encoded_response, 0, $length, q{} );
 
@@ -648,7 +641,7 @@ sub _decoded_topic_partition {
 
     my $partition = $topic_data->{partitions}->[0]->{Partition};
     $partition == $PARTITION
-        or return Kafka::IO::_error( $self, $ERROR_MISMATCH_ARGUMENT, "Use Kafka::MockIO only with partition = $PARTITION" );
+        or Kafka::IO::_error( $self, $ERROR_MISMATCH_ARGUMENT, "Use Kafka::MockIO only with partition = $PARTITION" );
 
     $topic_data = $decoded_response->{topics}->[0];
     $topic_data->{TopicName} = $topic;
@@ -671,9 +664,9 @@ sub _verify_string {
     return 1
         if defined( $string ) && $string eq q{};
     defined( _STRING( $string ) )
-        or return Kafka::IO::_error( $self, $ERROR_MISMATCH_ARGUMENT, $description );
+        or Kafka::IO::_error( $self, $ERROR_MISMATCH_ARGUMENT, $description );
     utf8::is_utf8( $string )
-        and return Kafka::IO::_error( $self, $ERROR_NOT_BINARY_STRING, $description );
+        and Kafka::IO::_error( $self, $ERROR_NOT_BINARY_STRING, $description );
 
     return 1;
 }
@@ -709,9 +702,11 @@ protocol on 32 bit systems.
 L<Kafka::Protocol|Kafka::Protocol> - functions to process messages in the
 Apache Kafka's Protocol.
 
-L<Kafka::IO|Kafka::IO> - low level interface for communication with Kafka server.
+L<Kafka::IO|Kafka::IO> - low-level interface for communication with Kafka server.
 
-L<Kafka::Internals|Kafka::Internals> - Internal constants and functions used
+L<Kafka::Exceptions|Kafka::Exceptions> - module designated to handle Kafka exceptions.
+
+L<Kafka::Internals|Kafka::Internals> - internal constants and functions used
 by several package modules.
 
 A wealth of detail about the Apache Kafka and the Kafka Protocol:

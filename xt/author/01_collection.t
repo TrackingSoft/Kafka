@@ -217,8 +217,12 @@ perlartistic
 prereq
 ReplicaId
 RequiredAcks
+RTFM
+sec
 Sergey
+Simplistically
 Solovey
+subclasses
 TCP
 timestamp
 TopicName

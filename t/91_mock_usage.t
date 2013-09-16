@@ -78,9 +78,7 @@ dies_ok { $connect = Kafka::Connection->new(
     host        => 'localhost',
     port        => $port,
     timeout     => 'nothing',
-    RaiseError  => 1,
 ) } 'expecting to die';
-ok( Kafka::Connection->last_errorcode, 'error: ('.Kafka::Connection->last_errorcode.') '.Kafka::Connection->last_error );
 
 $connect = Kafka::Connection->new(
     host    => 'localhost',
@@ -92,17 +90,14 @@ isa_ok( $connect, 'Kafka::Connection');
 
 dies_ok { $producer = Kafka::Producer->new(
     Connection  => "nothing",
-    RaiseError  => 1,
 ) } 'expecting to die';
-ok( Kafka::Producer->last_errorcode, 'error: ('.Kafka::Producer->last_errorcode.') '.Kafka::Producer->last_error );
 
 undef $producer;
 lives_ok { $producer = Kafka::Producer->new(
     Connection  => $connect,
-    RaiseError  => 0,           # Optional, default = 0
 ) } 'expecting to live';
 unless ( $producer ) {
-    BAIL_OUT '('.Kafka::Producer->last_errorcode.') '.Kafka::Producer->last_error;
+    BAIL_OUT 'producer is not created';
 }
 isa_ok( $producer, 'Kafka::Producer');
 
@@ -112,7 +107,7 @@ if ( !( $response = $producer->send(
     $partition,                 # partition
     'Single message',           # message
     ) ) ) {
-    BAIL_OUT '('.$producer->last_errorcode.') '.$producer->last_error;
+    BAIL_OUT 'response is not received';
 }
 else {
     pass 'message is sent';
@@ -128,7 +123,7 @@ if ( !( $response = $producer->send(
         "The third message",
     ],
     ) ) ) {
-    BAIL_OUT '('.$producer->last_errorcode.') '.$producer->last_error;
+    BAIL_OUT 'producer is not created';
 }
 else {
     pass 'messages sent';
@@ -146,21 +141,18 @@ unless ( $connect = Kafka::Connection->new(
     host    => 'localhost',
     port    => $port,
     ) ) {
-    BAIL_OUT '('.Kafka::Connection->last_errorcode.') '.Kafka::Connection->last_error;
+    BAIL_OUT 'connection is not created';
 }
 
 dies_ok { $consumer = Kafka::Consumer->new(
     Connection  => "nothing",
-    RaiseError  => 1,
     ) } 'expecting to die';
-ok( Kafka::Consumer->last_errorcode, 'error: ('.Kafka::Consumer->last_errorcode.') '.Kafka::Consumer->last_error );
 
 lives_ok { $consumer = Kafka::Consumer->new(
     Connection  => $connect,
-    RaiseError  => 0,           # Optional, default = 0
 ) } 'expecting to live';
 unless ( $consumer ) {
-    BAIL_OUT '('.Kafka::Consumer->last_errorcode.') '.Kafka::Consumer->last_error;
+    BAIL_OUT 'consumer is not created';
 }
 isa_ok( $consumer, 'Kafka::Consumer');
 
@@ -181,8 +173,8 @@ if( $offsets ) {
     }
 }
 # may be both physical and logical errors
-if ( !$offsets || $consumer->last_error ) {
-    fail '('.$consumer->last_errorcode.') '.$consumer->last_error;
+if ( !$offsets ) {
+    fail 'offsets are not received';
 }
 
 # Consuming messages one by one
@@ -212,8 +204,8 @@ if ( $messages ) {
     }
 }
 # may be both physical and logical errors
-if ( !$messages || $consumer->last_error ) {
-    fail '('.$consumer->last_errorcode.') '.$consumer->last_error;
+if ( !$messages ) {
+    fail 'messages are not received';
 }
 
 # Closes the consumer and cleans up
