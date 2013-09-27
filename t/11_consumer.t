@@ -303,7 +303,7 @@ sub testing {
 
 #-- OffsetRequest
 
-# RTFM:
+# According to Apache Kafka documentation:
 # The Offset API describes the valid offset range available for a set of topic-partitions.
 # The response contains the starting offset of each segment for the requested partition
 # as well as the "log end offset" i.e. the offset of the next message that would be appended to the given partition.
@@ -312,7 +312,8 @@ sub testing {
     $offsets = $consumer->offsets(
         $topic,
         $partition,
-# RTFM: There are two special values.
+# According to Apache Kafka documentation:
+# There are two special values.
 # Specify -1 ($RECEIVE_LATEST_OFFSET) to receive the latest offset (this will only ever return one offset).
 # Specify -2 ($RECEIVE_EARLIEST_OFFSETS) to receive the earliest available offsets.
 #        $RECEIVE_EARLIEST_OFFSETS,      # time

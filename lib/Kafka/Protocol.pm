@@ -335,15 +335,16 @@ The following constants are available for export
 
 =head3 C<$APIVERSION>
 
-RTFM: This is a numeric version number for this api.
-Currently the supported version for all APIs is 0 .
+According to Apache Kafka documentation: 'This is a numeric version number for this api.
+Currently the supported version for all APIs is 0 .'
 
 =cut
 const our $APIVERSION                   => 0;
 
 # Attributes
 
-# RTFM: Attributes - Metadata attributes about the message.
+# According to Apache Kafka documentation:
+# Attributes - Metadata attributes about the message.
 # In particular the last 3 bits contain the compression codec used for the message.
 const our $COMPRESSION_CODEC_MASK       => 0b111;   # Not used now
 
@@ -351,8 +352,8 @@ const our $COMPRESSION_CODEC_MASK       => 0b111;   # Not used now
 
 =head3 C<$COMPRESSION_NONE>
 
-RTFM: Kafka currently supports two compression codecs for message sets with the following codec numbers:
-None = 0, ...
+According to Apache Kafka documentation: 'Kafka currently supports two compression codecs for message sets with the following codec numbers:
+None = 0, ...'
 
 =cut
 const our $COMPRESSION_NONE             => 0;
@@ -363,22 +364,22 @@ const our $COMPRESSION_SNAPPY           => 2;       # Not used now
 
 =head3 C<$CONSUMERS_REPLICAID>
 
-RTFM: ReplicaId - Normal client consumers should always specify this as -1 as they have no node id.
+According to Apache Kafka documentation: 'ReplicaId - Normal client consumers should always specify this as -1 as they have no node id.'
 
 =cut
 const our $CONSUMERS_REPLICAID          => -1;
 
 =head3 C<$NULL_BYTES_LENGTH>
 
-RTFM: Protocol Primitive Types: ... bytes, string - A length of -1 indicates null.
+According to Apache Kafka documentation: 'Protocol Primitive Types: ... bytes, string - A length of -1 indicates null.'
 
 =cut
 const our $NULL_BYTES_LENGTH            => -1;
 
 =head3 C<$BAD_OFFSET>
 
-RTFM: Offset - When the producer is sending messages it doesn't actually know the offset
-and can fill in any value here it likes.
+According to Apache Kafka documentation: 'Offset - When the producer is sending messages it doesn't actually know the offset
+and can fill in any value here it likes.'
 
 =cut
 const our $BAD_OFFSET                   => -1;
@@ -691,7 +692,8 @@ must be a non-empty binary string.
 sub decode_fetch_response {
     my ( $bin_stream_ref ) = @_;
 
-# RTFM: As an optimization the server is allowed to return a partial message at the end of the message set.
+# According to Apache Kafka documentation:
+# As an optimization the server is allowed to return a partial message at the end of the message set.
 # Clients should handle this case.
 # NOTE: look inside _decode_MessageSet_template and _decode_MessageSet_array
 
@@ -1212,7 +1214,8 @@ sub _encode_MessageSet_array {
                 .( $value_length ? qq{a[$value_length]} : q{} ) # Value
             ,
             0,
-            $COMPRESSION_NONE,  # RTFM: last 3 bits contain the compression codec
+            $COMPRESSION_NONE,  # According to Apache Kafka documentation:
+                                # last 3 bits contain the compression codec
                                 # The other bits are not described in the documentation
             $key_length     ? ( $key_length,    $Key )    : ( -1 ),
             $value_length   ? ( $value_length,  $Value )  : ( -1 ),

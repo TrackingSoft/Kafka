@@ -163,7 +163,8 @@ $request->{topics}->[0]->{partitions}->[0]->{MessageSet}->[0]->{Value} = q{};
 
 #-- decode_fetch_response (_decode_MessageSet_template)
 
-# RTFM: As an optimization the server is allowed to return a partial message at the end of the message set.
+# According to Apache Kafka documentation:
+# As an optimization the server is allowed to return a partial message at the end of the message set.
 # Clients should handle this case.
 
 # description of responses, see t/??_decode_encode.t

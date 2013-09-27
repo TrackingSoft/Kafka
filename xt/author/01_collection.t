@@ -217,7 +217,6 @@ perlartistic
 prereq
 ReplicaId
 RequiredAcks
-RTFM
 sec
 Sergey
 Simplistically
