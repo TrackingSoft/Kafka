@@ -169,7 +169,7 @@ which is the default base class for all exception objects created by this module
 
 =head2 FUNCTIONS
 
-The following functions are exported by C<Kafka::Exception> module:
+The following functions are exported by C<Kafka::Exceptions> module:
 
 =cut
 
