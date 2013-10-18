@@ -2,11 +2,11 @@ package Kafka::Message;
 
 =head1 NAME
 
-Kafka::Message - interface to the Kafka message properties.
+Kafka::Message - Interface to the Kafka message properties.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Message> version 0.800_4 .
+This documentation refers to C<Kafka::Message> version 0.800_5 .
 
 =cut
 
@@ -18,7 +18,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_4';
+our $VERSION = '0.800_5';
 
 #-- load the modules -----------------------------------------------------------
 
@@ -86,10 +86,10 @@ __END__
     use Kafka::Consumer;
 
     #-- Connection
-    my $connect = Kafka::Connection->new( host => 'localhost' );
+    my $connection = Kafka::Connection->new( host => 'localhost' );
 
     #-- Consumer
-    my $consumer = Kafka::Consumer->new( Connection  => $connect );
+    my $consumer = Kafka::Consumer->new( Connection  => $connection );
 
     # The Kafka consumer response has an ARRAY reference type.
     # For the fetch response array has the class name Kafka::Message elements.
@@ -108,12 +108,15 @@ __END__
                 say 'payload    : ', $message->payload;
                 say 'offset     : ', $message->offset;
                 say 'next_offset: ', $message->next_offset;
-            }
-            else {
+            } else {
                 say 'error      : ', $message->error;
             }
         }
     }
+
+    # Closes and cleans up
+    undef $consumer;
+    undef $connection;
 
 =head1 DESCRIPTION
 

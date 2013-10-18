@@ -2,11 +2,11 @@ package Kafka::Consumer;
 
 =head1 NAME
 
-Kafka::Consumer - Perl interface for Kafka consumer client
+Kafka::Consumer - Perl interface for Kafka consumer client.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Consumer> version 0.800_4 .
+This documentation refers to C<Kafka::Consumer> version 0.800_5 .
 
 =cut
 
@@ -18,7 +18,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_4';
+our $VERSION = '0.800_5';
 
 #-- load the modules -----------------------------------------------------------
 

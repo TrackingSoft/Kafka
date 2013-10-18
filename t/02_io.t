@@ -38,6 +38,10 @@ plan 'no_plan';
 #-- load the modules -----------------------------------------------------------
 
 use IO::Socket::INET;
+use POSIX ':signal_h';
+use Sys::SigAction qw(
+    set_sig_handler
+);
 
 use Kafka qw(
     $REQUEST_TIMEOUT
@@ -95,12 +99,21 @@ throws_ok {
     );
 } 'Kafka::Exception::IO', 'error thrown';
 
+# In the process of Kafka::IO->new we are working with alarm clock internally
+my $LED_signal_handling;
+my $sig_handler = set_sig_handler( SIGALRM ,sub { ++$LED_signal_handling; } );
+ok( !defined( $LED_signal_handling ), 'LED signal handling not defined' );
+
 $io = Kafka::IO->new(
     host    => 'localhost',
     port    => $port,
     timeout => $REQUEST_TIMEOUT,
 );
 isa_ok( $io, 'Kafka::IO' );
+
+ok( !defined( $LED_signal_handling ), 'LED signal handling not defined' );
+kill ALRM => $$;
+is $LED_signal_handling, 1, 'the signal handler to be reset to the previous value';
 
 #-- is_alive
 

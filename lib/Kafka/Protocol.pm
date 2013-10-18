@@ -2,11 +2,11 @@ package Kafka::Protocol;
 
 =head1 NAME
 
-Kafka::Protocol - functions to process messages in the Apache Kafka protocol.
+Kafka::Protocol - Functions to process messages in the Apache Kafka protocol.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Protocol> version 0.800_4 .
+This documentation refers to C<Kafka::Protocol> version 0.800_5 .
 
 =cut
 
@@ -18,7 +18,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_4';
+our $VERSION = '0.800_5';
 
 use Exporter qw(
     import

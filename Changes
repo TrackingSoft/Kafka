@@ -1,5 +1,10 @@
 Revision history for Kafka package
 
+0.800_5 Fri Oct  19 2013
+    CHANGES:
+    - Test t/??_io.t checks the external ALRM signal handler.
+    - Minor improvements in documentation.
+
 0.800_4 Fri Sep  27 2013
     CHANGES:
     - Refactored error handling. See documentation for module Kafka::Exceptions.

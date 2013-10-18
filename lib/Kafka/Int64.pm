@@ -2,12 +2,12 @@ package Kafka::Int64;
 
 =head1 NAME
 
-Kafka::Int64 - functions to work with 64 bit elements of the
+Kafka::Int64 - Functions to work with 64 bit elements of the
 protocol on 32 bit systems.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Int64> version 0.800_4 .
+This documentation refers to C<Kafka::Int64> version 0.800_5 .
 
 =cut
 
@@ -21,7 +21,7 @@ use bigint; # this allows integers of practially any size at the cost of signifi
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_4';
+our $VERSION = '0.800_5';
 
 use Exporter qw(
     import

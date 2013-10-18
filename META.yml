@@ -34,4 +34,4 @@ requires:
   String::CRC32: 1.4
   Sys::SigAction: 0.15
   Try::Tiny: 0.18
-version: 0.800_4
+version: 0.800_5

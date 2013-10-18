@@ -2,11 +2,11 @@ package Kafka::IO;
 
 =head1 NAME
 
-Kafka::IO - interface to network communication with the Apache Kafka server.
+Kafka::IO - Interface to network communication with the Apache Kafka server.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::IO> version 0.800_4 .
+This documentation refers to C<Kafka::IO> version 0.800_5 .
 
 =cut
 
@@ -20,7 +20,7 @@ use sigtrap;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_4';
+our $VERSION = '0.800_5';
 
 #-- load the modules -----------------------------------------------------------
 

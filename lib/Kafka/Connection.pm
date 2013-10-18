@@ -2,11 +2,11 @@ package Kafka::Connection;
 
 =head1 NAME
 
-Kafka::Connection - object interface to connect to a kafka cluster.
+Kafka::Connection - Object interface to connect to a kafka cluster.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Connection> version 0.800_4 .
+This documentation refers to C<Kafka::Connection> version 0.800_5 .
 
 =cut
 
@@ -18,7 +18,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_4';
+our $VERSION = '0.800_5';
 
 #-- load the modules -----------------------------------------------------------
 
