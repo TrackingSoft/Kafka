@@ -6,7 +6,7 @@ Kafka::Connection - Object interface to connect to a kafka cluster.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Connection> version 0.800_5 .
+This documentation refers to C<Kafka::Connection> version 0.800_6 .
 
 =cut
 
@@ -18,7 +18,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_5';
+our $VERSION = '0.800_6';
 
 #-- load the modules -----------------------------------------------------------
 
@@ -212,6 +212,24 @@ C<$timeout> is in seconds, could be a positive integer or a floating-point numbe
 C<$REQUEST_TIMEOUT> is the default timeout that can be imported from the
 L<Kafka|Kafka> module.
 
+Special behavior when C<timeout> is set to C<undef>:
+
+=back
+
+=over 3
+
+=item * 
+
+Alarms are not used internally (namely when performing C<gethostbyname>).
+
+=item *
+
+Default C<$REQUEST_TIMEOUT> is used for the rest of IO operations.
+
+=back
+
+=over 3
+
 =item C<CorrelationId =E<gt> $correlation_id>
 
 Optional, default = C<undef> .
@@ -274,7 +292,7 @@ sub new {
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'port' )
         unless _POSINT( $self->{port} );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'timeout' )
-        unless _NUMBER( $self->{timeout} ) && $self->{timeout} > 0;
+        unless ( _NUMBER( $self->{timeout} ) && $self->{timeout} > 0 ) || !defined( $self->{timeout} );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'broker_list' )
         unless _ARRAY0( $self->{broker_list} );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'CorrelationId' )

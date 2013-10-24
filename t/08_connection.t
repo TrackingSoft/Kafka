@@ -169,7 +169,7 @@ sub testing {
     new_ERROR_MISMATCH_ARGUMENT( 'port', @not_posint );
 
 # timeout
-    new_ERROR_MISMATCH_ARGUMENT( 'timeout', @not_number );
+    new_ERROR_MISMATCH_ARGUMENT( 'timeout', grep { defined $_ } @not_number );
 
 # broker_list
     new_ERROR_MISMATCH_ARGUMENT( 'broker_list', @not_array0 );

@@ -9,7 +9,7 @@ Kafka - Apache Kafka interface for Perl.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka> package version 0.800_5 .
+This documentation refers to C<Kafka> package version 0.800_6 .
 
 =cut
 
@@ -21,7 +21,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_5';
+our $VERSION = '0.800_6';
 
 use Exporter qw(
     import
@@ -1054,8 +1054,13 @@ Using Unicode strings may cause an error or data corruption.
 
 This module does not support Kafka protocol versions earlier than 0.8.
 
-The Kafka package was written, tested, and found working on recent Linux
-distributions.
+L<Kafka::IO-E<gt>new|Kafka::IO/new>' uses L<Sys::SigAction|Sys::SigAction> and C<alarm()>
+to limit some internal operations. This means that if an external C<alarm()> was set, signal
+delivery may be delayed.
+
+You can disable the use of C<alarm()> by setting C<timeout =E<gt> undef> in the constructor.
+
+The Kafka package was written, tested, and found working on recent Linux distributions.
 
 There are no known bugs in this package.
 

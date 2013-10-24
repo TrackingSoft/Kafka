@@ -6,7 +6,7 @@ Kafka::IO - Interface to network communication with the Apache Kafka server.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::IO> version 0.800_5 .
+This documentation refers to C<Kafka::IO> version 0.800_6 .
 
 =cut
 
@@ -20,7 +20,7 @@ use sigtrap;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_5';
+our $VERSION = '0.800_6';
 
 #-- load the modules -----------------------------------------------------------
 
@@ -144,9 +144,23 @@ Optional, default = C<$REQUEST_TIMEOUT>.
 C<$timeout> specifies how long we wait for remote server to respond before
 the IO object disconnects and throws internal exception.
 The C<$timeout> is specified in seconds (could be any integer or floating-point type)
-and supported by  gethostbyname, connect, blocking receive and send calls.
+and supported by C<gethostbyname()>, connect, blocking receive and send calls.
 
 C<$REQUEST_TIMEOUT> is the default timeout that can be imported from the L<Kafka|Kafka> module.
+
+Special behavior when C<timeout> is set to C<undef>:
+
+=back
+
+=over 3
+
+=item * 
+
+Alarms are not used internally (namely when performing C<gethostbyname>).
+
+=item *
+
+Default C<$REQUEST_TIMEOUT> is used for the rest of IO operations.
 
 =back
 
@@ -211,7 +225,7 @@ sub send {
 
     my ( $sent, $mask );
     {
-        last unless ( select( undef, $mask = $self->{_select}, undef, $self->{timeout} ) );
+        last unless ( select( undef, $mask = $self->{_select}, undef, $self->{timeout} // $REQUEST_TIMEOUT ) );
         $sent += send( $self->{socket}, $message, 0 ) // 0;
         redo if $sent < $len;
     }
@@ -237,7 +251,7 @@ sub receive {
     my ( $from_recv, $message, $buf, $mask );
     $message = q{};
     {
-        last unless ( select( $mask = $self->{_select}, undef, undef, $self->{timeout} ) );
+        last unless ( select( $mask = $self->{_select}, undef, undef, $self->{timeout} // $REQUEST_TIMEOUT ) );
         $from_recv = recv( $self->{socket}, $buf = q{}, $length, 0 );
         last if !defined( $from_recv ) || $buf eq q{};
         $message .= $buf;
@@ -298,18 +312,41 @@ sub _connect {
 
     my $ip;
     if( $name =~ /[a-zA-Z]/s ) {
-        # DNS lookup.
-        local $@;
-        my $h = set_sig_handler( 'ALRM', sub { die 'alarm clock restarted' } );
-        eval {
-            alarm $self->{timeout};
+        if ( defined $timeout ) {
+            my $remaining;
+            my $start = time();
+
+            # DNS lookup.
+            local $@;
+            my $h = set_sig_handler( 'ALRM', sub { die 'alarm clock restarted' },
+                {
+                    mask    => [ 'ALRM' ],
+                    safe    => 0,   # perl 5.8+ uses safe signal delivery so we need unsafe signal for timeout to work
+                }
+            );
+            eval {
+                $remaining = alarm $timeout;
+                $ip = $self->_gethostbyname( $name );
+                alarm 0;
+            };
+            alarm 0;                                # race condition protection
+            my $error = $@;
+            undef $h;
+            die $error if $error;
+            die( "gethostbyname $name: $?\n" ) unless defined $ip;
+
+            my $elapsed = time() - $start;
+            # $SIG{ALRM} restored automatically, but we need to restart previous alarm manually
+            if ( $remaining ) {
+                if ( $remaining - $elapsed > 0 ) {
+                    alarm( $remaining - $elapsed );
+                } else {
+                    $SIG{ALRM}->();
+                }
+            }
+        } else {
             $ip = gethostbyname( $name );
-            alarm 0;
-        };
-        alarm 0;                                # race condition protection
-        die $@ if $@;
-        die( "gethostbyname $name: $?\n" ) unless defined $ip;
-        undef $h;
+        }
         $ip = inet_ntoa( $ip );
     }
     else {
@@ -342,7 +379,7 @@ sub _connect {
     # Use select() to poll for completion or error. When connect succeeds we can write.
     my $vec = q{};
     vec( $vec, fileno( $connection ), 1 ) = 1;
-    select( undef, $vec, undef, $timeout );
+    select( undef, $vec, undef, $timeout // $REQUEST_TIMEOUT );
     unless( vec( $vec, fileno( $connection ), 1 ) ) {
         # If no response yet, impose our own timeout.
         $! = Errno::ETIMEDOUT();
@@ -364,12 +401,19 @@ sub _connect {
     # the first byte. The print() and syswrite() calls are similarly different.
     # <> is of course similar to read() but delimited by newlines instead of buffer
     # sizes.
-    setsockopt( $connection, SOL_SOCKET, SO_SNDTIMEO, pack( q{L!L!}, $timeout, 0 ) ) or die "setsockopt SOL_SOCKET, SO_SNDTIMEO: $!\n";
-    setsockopt( $connection, SOL_SOCKET, SO_RCVTIMEO, pack( q{L!L!}, $timeout, 0 ) ) or die "setsockopt SOL_SOCKET, SO_RCVTIMEO: $!\n";
+    setsockopt( $connection, SOL_SOCKET, SO_SNDTIMEO, pack( q{L!L!}, $timeout // $REQUEST_TIMEOUT, 0 ) ) or die "setsockopt SOL_SOCKET, SO_SNDTIMEO: $!\n";
+    setsockopt( $connection, SOL_SOCKET, SO_RCVTIMEO, pack( q{L!L!}, $timeout // $REQUEST_TIMEOUT, 0 ) ) or die "setsockopt SOL_SOCKET, SO_RCVTIMEO: $!\n";
 
     vec( $self->{_select} = q{}, fileno( $self->{socket} ), 1 ) = 1;
 
     return $connection;
+}
+
+# NOTE: to facilitate testing
+sub _gethostbyname {
+    my ( $self, $name ) = @_;
+
+    return gethostbyname( $name );
 }
 
 # Show additional debugging information

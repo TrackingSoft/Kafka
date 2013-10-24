@@ -39,6 +39,8 @@ plan 'no_plan';
 
 use IO::Socket::INET;
 use POSIX ':signal_h';
+use Socket;
+use Sub::Install;
 use Sys::SigAction qw(
     set_sig_handler
 );
@@ -78,7 +80,7 @@ my $server_code = sub {
     }
 };
 
-my ( $server, $port, $io, $sent, $resp, $test_message );
+my ( $server, $port, $io, $sent, $resp, $test_message, $timer );
 
 #-- Global data ----------------------------------------------------------------
 
@@ -91,6 +93,14 @@ $test_message = "Test message\n";
 
 # INSTRUCTIONS -----------------------------------------------------------------
 
+# NOTE: In the process of Kafka::IO->new we are working with alarm clock internally
+
+#-- ALRM handler
+
+my $marker_signal_handling;
+my $sig_handler = set_sig_handler( SIGALRM ,sub { ++$marker_signal_handling; } );
+ok( !defined( $marker_signal_handling ), 'marker signal handling not defined' );
+
 throws_ok {
     $io = Kafka::IO->new(
         host    => 'something bad',
@@ -99,11 +109,6 @@ throws_ok {
     );
 } 'Kafka::Exception::IO', 'error thrown';
 
-# In the process of Kafka::IO->new we are working with alarm clock internally
-my $LED_signal_handling;
-my $sig_handler = set_sig_handler( SIGALRM ,sub { ++$LED_signal_handling; } );
-ok( !defined( $LED_signal_handling ), 'LED signal handling not defined' );
-
 $io = Kafka::IO->new(
     host    => 'localhost',
     port    => $port,
@@ -111,11 +116,74 @@ $io = Kafka::IO->new(
 );
 isa_ok( $io, 'Kafka::IO' );
 
-ok( !defined( $LED_signal_handling ), 'LED signal handling not defined' );
+ok( !defined( $marker_signal_handling ), 'marker signal handling not defined' );
 kill ALRM => $$;
-is $LED_signal_handling, 1, 'the signal handler to be reset to the previous value';
+is $marker_signal_handling, 1, 'the signal handler to be reset to the previous value';
+
+#-- ALRM timer
+
+$SIG{ALRM} = sub { ++$marker_signal_handling; };
+$timer = $REQUEST_TIMEOUT + 2;
+
+# timer < timeout
+# controllable block is correctly closed after 'timer', but before 'timeout'
+
+my $original = \&Kafka::IO::_gethostbyname;
+Sub::Install::reinstall_sub( {
+    code    => sub {
+        sleep $timer + 1;
+        return inet_aton( 'localhost' );
+    },
+    into    => 'Kafka::IO',
+    as      => '_gethostbyname',
+} );
+
+$marker_signal_handling = 0;
+eval {
+    alarm $timer;
+    eval {
+        $io = Kafka::IO->new(
+            host    => 'something bad',
+            port    => $port,
+            timeout => $timer + 2,
+        );
+    };
+    alarm 0;
+};
+is $marker_signal_handling, 1, 'signal handler is triggered';
+
+Sub::Install::reinstall_sub( {
+    code    => $original,
+    into    => 'Kafka::IO',
+    as      => '_gethostbyname',
+} );
+
+# timer > timeout
+# controllable block is correctly closed before 'timeout' and before 'timer'
+
+$marker_signal_handling = 0;
+eval {
+    alarm $timer;
+    eval {
+        $io = Kafka::IO->new(
+            host    => 'localhost',
+            port    => $port,
+            timeout => $REQUEST_TIMEOUT,
+        );
+        is $marker_signal_handling, 0, 'signal handler is not triggered yet';
+        sleep $timer;
+    };
+    alarm 0;
+};
+is $marker_signal_handling, 1, 'signal handler is triggered';
 
 #-- is_alive
+
+$io = Kafka::IO->new(
+    host    => 'localhost',
+    port    => $port,
+    timeout => $REQUEST_TIMEOUT,
+);
 
 ok $io->is_alive, 'socket alive';
 
