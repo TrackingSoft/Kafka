@@ -43,7 +43,7 @@ $tools_dir      = abs_path( 'tools' );
 
 # INSTRUCTIONS -----------------------------------------------------------------
 
-eval { use Test::EOL; };
+eval 'use Test::EOL;';  ## no critic
 plan skip_all => 'because Test::EOL required for testing' if $@;
 
 all_perl_files_ok(

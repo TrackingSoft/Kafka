@@ -154,7 +154,7 @@ Special behavior when C<timeout> is set to C<undef>:
 
 =over 3
 
-=item * 
+=item *
 
 Alarms are not used internally (namely when performing C<gethostbyname>).
 

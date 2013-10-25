@@ -55,7 +55,7 @@ foreach my $config (
 
 # INSTRUCTIONS -----------------------------------------------------------------
 
-eval { use Test::Vars; };
+eval 'use Test::Vars;'; ## no critic
 plan( skip_all => 'Test::Vars not installed: $@; skipping' ) if $@;
 
 vars_ok( $_ ) foreach @modules, @t_modules;

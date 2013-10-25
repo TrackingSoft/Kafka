@@ -22,7 +22,7 @@ use Test::More;
 
 # INSTRUCTIONS -----------------------------------------------------------------
 
-eval { use Test::Kwalitee; };
+eval 'use Test::Kwalitee;'; ## no critic
 plan skip_all => 'because Test::Kwalitee required for testing' if $@;
 
 # POSTCONDITIONS ---------------------------------------------------------------

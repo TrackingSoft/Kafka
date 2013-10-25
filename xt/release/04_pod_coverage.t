@@ -26,7 +26,7 @@ use Test::More;
 
 # INSTRUCTIONS -----------------------------------------------------------------
 
-eval { use Test::Pod::Coverage; };
+eval 'use Test::Pod::Coverage;';    ## no critic
 plan skip_all => 'because Test::Pod::Coverage required for testing' if $@;
 
 all_pod_coverage_ok();

@@ -1,12 +1,12 @@
 Revision history for Kafka package
 
-0.800_6 Thu Oct  24 2013
+0.800_6 Fri Oct  25 2013
     CHANGES:
-    - You can disable ALARMS usage by Kafka by passing timeout => undef to 
-      Kafka::Connection->new or Kafka::IO->new. In this case '$REQUEST_TIMEOUT' 
+    - You can disable ALARMS usage by Kafka by passing timeout => undef to
+      Kafka::Connection->new or Kafka::IO->new. In this case '$REQUEST_TIMEOUT'
       is used for the rest of IO operations.
     BUGFIXES:
-    - Kafka::IO->new preserves external alarms but this may delay alarm signal 
+    - Kafka::IO->new preserves external alarms but this may delay alarm signal
       delivery (thanks to Stephen Sprague).
 
 0.800_5 Fri Oct  18 2013

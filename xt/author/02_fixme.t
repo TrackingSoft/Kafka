@@ -27,7 +27,7 @@ use Cwd qw(
 # INSTRUCTIONS -----------------------------------------------------------------
 
 #-- Test::Fixme - check code for FIXMEs.
-eval { use Test::Fixme };
+eval 'use Test::Fixme'; ## no critic
 plan skip_all => 'because Test::Fixme required for testing' if $@;
 
 run_tests(

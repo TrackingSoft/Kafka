@@ -42,7 +42,7 @@ $tools_dir      = abs_path( 'tools' );
 
 # INSTRUCTIONS -----------------------------------------------------------------
 
-eval { use Test::PureASCII; };
+eval 'use Test::PureASCII;';    ## no critic
 plan skip_all => 'because Test::PureASCII required for testing' if $@;
 
 all_perl_files_are_pure_ascii(
