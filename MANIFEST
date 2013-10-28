@@ -55,6 +55,7 @@ xt/author/06_eol.t
 xt/author/07_notabs.t
 xt/author/08_PureASCII.t
 xt/release/01_kwalitee.t
-xt/release/02_distribution.t
-xt/release/03_pod.t
-xt/release/04_pod_coverage.t
+xt/release/02_kwalitee_extra.t
+xt/release/03_distribution.t
+xt/release/04_pod.t
+xt/release/05_pod_coverage.t

@@ -6,7 +6,7 @@ Kafka::Cluster - object interface to manage a test kafka cluster.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Cluster> version 0.800_6 .
+This documentation refers to C<Kafka::Cluster> version 0.800_15 .
 
 =cut
 
@@ -18,7 +18,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_6';
+our $VERSION = '0.800_15';
 
 use Exporter qw(
     import
@@ -574,7 +574,7 @@ sub start {
             $io->send( pack( 'H*', '000000300003000000000000000C746573742D726571756573740000000100146E6F745F7265706C696361626C655F746F706963' ) );
 
             my $response = $io->receive( 4 );
-            my $tail = $io->receive( unpack( "N", $$response ) );
+            my $tail = $io->receive( unpack( 'N', $$response ) );
             $$response .= $$tail;
             $io->close;
         } catch {

@@ -6,7 +6,7 @@ Kafka::IO - Interface to network communication with the Apache Kafka server.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::IO> version 0.800_6 .
+This documentation refers to C<Kafka::IO> version 0.800_15 .
 
 =cut
 
@@ -20,22 +20,32 @@ use sigtrap;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_6';
+our $VERSION = '0.800_15';
 
 #-- load the modules -----------------------------------------------------------
 
 use Carp;
 use Errno;
 use Fcntl;
+use POSIX qw(
+    ceil
+);
 use Scalar::Util qw(
     dualvar
 );
-use Socket;
+use Socket qw(
+    PF_INET
+    SOCK_STREAM
+    SOL_SOCKET
+    SO_ERROR
+    SO_RCVTIMEO
+    SO_SNDTIMEO
+    inet_aton
+    inet_ntoa
+    pack_sockaddr_in
+);
 use Sys::SigAction qw(
     set_sig_handler
-);
-use Time::HiRes qw(
-    alarm
 );
 use Try::Tiny;
 
@@ -213,7 +223,8 @@ sub send {
     ( my $len = length( $message ) ) <= $MAX_SOCKET_REQUEST_BYTES
         or $self->_error( $ERROR_MISMATCH_ARGUMENT, '->send' );
 
-    $self->_debug_msg( 'Request to', 'green', $message ) if $DEBUG;
+    $self->_debug_msg( $message, 'Request to', 'green' )
+        if $DEBUG == 1;
 
     # accept not accepted earlier
     while ( select( my $mask = $self->{_select}, undef, undef, 0 ) ) {
@@ -262,7 +273,8 @@ sub receive {
     ( defined( $from_recv ) && !$self->{not_accepted} )
         or $self->_error( $ERROR_CANNOT_RECV, "->receive - $!" );
 
-    $self->_debug_msg( 'Response from', 'yellow', $message ) if $DEBUG;
+    $self->_debug_msg( $message, 'Response from', 'yellow' )
+        if $DEBUG == 1;
     return \$message;
 }
 
@@ -325,24 +337,38 @@ sub _connect {
                 }
             );
             eval {
-                $remaining = alarm $timeout;
+                $remaining = alarm( ceil( $timeout ) );
                 $ip = $self->_gethostbyname( $name );
                 alarm 0;
             };
             alarm 0;                                # race condition protection
             my $error = $@;
             undef $h;
+
+            $self->_debug_msg( "_connect: ip = '".( defined( $ip ) ? inet_ntoa( $ip ) : '<undef>' ).", error = '$error', \$? = $?, \$! = '$!'" )
+                if $DEBUG == 2;
+
             die $error if $error;
-            die( "gethostbyname $name: $?\n" ) unless defined $ip;
+            die( "gethostbyname $name: \$? = '$?', \$! = '$!'\n" ) unless defined $ip;
 
             my $elapsed = time() - $start;
             # $SIG{ALRM} restored automatically, but we need to restart previous alarm manually
+
+            $self->_debug_msg( "_connect: ".( $remaining // '<undef>' )." (remaining) - $elapsed (elapsed) = ".( $remaining - $elapsed ) )
+                if $DEBUG == 2;
             if ( $remaining ) {
                 if ( $remaining - $elapsed > 0 ) {
-                    alarm( $remaining - $elapsed );
+                    $self->_debug_msg( '_connect: remaining - elapsed > 0 (to alarm restart)' )
+                        if $DEBUG == 2;
+                    alarm( ceil( $remaining - $elapsed ) );
                 } else {
-                    $SIG{ALRM}->();
+                    $self->_debug_msg( '_connect: remaining - elapsed < 0 (to alarm function call)' )
+                        if $DEBUG == 2;
+                    # $SIG{ALRM}->();
+                    kill ALRM => $$;
                 }
+                $self->_debug_msg( "_connect: after alarm 'recalled'" )
+                    if $DEBUG == 2;
             }
         } else {
             $ip = gethostbyname( $name );
@@ -354,7 +380,7 @@ sub _connect {
     }
 
     # Create socket.
-    socket( my $connection, PF_INET, SOCK_STREAM, getprotobyname( "tcp" ) ) or die( "socket: $!\n" );
+    socket( my $connection, PF_INET, SOCK_STREAM, getprotobyname( 'tcp' ) ) or die( "socket: $!\n" );
 
     # Set autoflushing.
     $_ = select( $connection ); $| = 1; select $_;
@@ -383,7 +409,7 @@ sub _connect {
     unless( vec( $vec, fileno( $connection ), 1 ) ) {
         # If no response yet, impose our own timeout.
         $! = Errno::ETIMEDOUT();
-        die("connect ${ip}:${port} (${name}): $!\n");
+        die( "connect ${ip}:${port} (${name}): $!\n" );
     }
 
     # This is how we see whether it connected or there was an error. Document Unix, are you kidding?!
@@ -418,42 +444,47 @@ sub _gethostbyname {
 
 # Show additional debugging information
 sub _debug_msg {
-    my ( $self, $header, $colour, $message ) = @_;
+    my ( $self, $message, $header, $colour ) = @_;
 
-    unless ( $_hdr ) {
-        require Data::HexDump::Range;
-        $_hdr = Data::HexDump::Range->new(
-            FORMAT                          => 'ANSI',  # 'ANSI'|'ASCII'|'HTML'
-            COLOR                           => 'bw',    # 'bw' | 'cycle'
-            OFFSET_FORMAT                   => 'hex',   # 'hex' | 'dec'
-            DATA_WIDTH                      => 16,      # 16 | 20 | ...
-            DISPLAY_RANGE_NAME              => 0,
-#            MAXIMUM_RANGE_NAME_SIZE         => 16,
-            DISPLAY_COLUMN_NAMES            => 1,
-            DISPLAY_RULER                   => 1,
-            DISPLAY_OFFSET                  => 1,
-#            DISPLAY_CUMULATIVE_OFFSET       => 1,
-            DISPLAY_ZERO_SIZE_RANGE_WARNING => 0,
-            DISPLAY_ZERO_SIZE_RANGE         => 1,
-            DISPLAY_RANGE_NAME              => 0,
-#            DISPLAY_RANGE_SIZE              => 1,
-            DISPLAY_ASCII_DUMP              => 1,
-            DISPLAY_HEX_DUMP                => 1,
-#            DISPLAY_DEC_DUMP                => 1,
-#            COLOR_NAMES                     => {},
-            ORIENTATION                     => 'horizontal',
-        );
+    if ( $DEBUG == 1 ) {
+        unless ( $_hdr ) {
+            require Data::HexDump::Range;
+            $_hdr = Data::HexDump::Range->new(
+                FORMAT                          => 'ANSI',  # 'ANSI'|'ASCII'|'HTML'
+                COLOR                           => 'bw',    # 'bw' | 'cycle'
+                OFFSET_FORMAT                   => 'hex',   # 'hex' | 'dec'
+                DATA_WIDTH                      => 16,      # 16 | 20 | ...
+                DISPLAY_RANGE_NAME              => 0,
+#                MAXIMUM_RANGE_NAME_SIZE         => 16,
+                DISPLAY_COLUMN_NAMES            => 1,
+                DISPLAY_RULER                   => 1,
+                DISPLAY_OFFSET                  => 1,
+#                DISPLAY_CUMULATIVE_OFFSET       => 1,
+                DISPLAY_ZERO_SIZE_RANGE_WARNING => 0,
+                DISPLAY_ZERO_SIZE_RANGE         => 1,
+                DISPLAY_RANGE_NAME              => 0,
+#                DISPLAY_RANGE_SIZE              => 1,
+                DISPLAY_ASCII_DUMP              => 1,
+                DISPLAY_HEX_DUMP                => 1,
+#                DISPLAY_DEC_DUMP                => 1,
+#                COLOR_NAMES                     => {},
+                ORIENTATION                     => 'horizontal',
+            );
+        }
+
+        warn
+            "# $header ", $self->{host}, ':', $self->{port}, "\n",
+            '# Hex Stream: ', unpack( q{H*}, $message ), "\n",
+            $_hdr->dump(
+                [
+                    [ 'data', length( $message ), $colour ],
+                ],
+                $message
+            )
+        ;
+    } elsif ( $DEBUG == 2 ) {
+        say STDERR '# [ time = ', Time::HiRes::time(), ' ] ', $message;
     }
-
-    warn
-        "# $header ", $self->{host}, ':', $self->{port}, "\n",
-        '# Hex Stream: ', unpack( q{H*}, $message ), "\n",
-        $_hdr->dump(
-            [
-                [ 'data', length( $message ), $colour ],
-            ],
-            $message
-        );
 }
 
 # Handler for errors

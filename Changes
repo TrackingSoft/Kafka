@@ -1,5 +1,25 @@
 Revision history for Kafka package
 
+0.800_15 Wed Nov  06 2013
+    CHANGES:
+    - Improvement of test t/*_io.t .
+
+0.800_14 Thu Oct  31 2013
+    CHANGES:
+    - We use alarm internally in Kafka::IO (not Time::HiRes::alarm).
+    - For 'gethostbyname' operations the timeout is rounded
+      to the nearest greater positive integer.
+
+0.800_8 - 0.800_13 Wed Oct  30 2013
+    CHANGES:
+    - Debugging Test t/*_io.t .
+
+0.800_7 Mon Oct  28 2013
+    CHANGES:
+    - t/*_io.t test more ways how external alarm may interfere with internal
+      alarm used by Kafka::IO.
+    - Added to META.yml the list of the modules provided by this distribution.
+
 0.800_6 Fri Oct  25 2013
     CHANGES:
     - You can disable ALARMS usage by Kafka by passing timeout => undef to

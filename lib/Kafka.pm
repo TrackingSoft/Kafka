@@ -9,7 +9,7 @@ Kafka - Apache Kafka interface for Perl.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka> package version 0.800_6 .
+This documentation refers to C<Kafka> package version 0.800_15 .
 
 =cut
 
@@ -21,7 +21,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_6';
+our $VERSION = '0.800_15';
 
 use Exporter qw(
     import
@@ -1057,6 +1057,13 @@ This module does not support Kafka protocol versions earlier than 0.8.
 L<Kafka::IO-E<gt>new|Kafka::IO/new>' uses L<Sys::SigAction|Sys::SigAction> and C<alarm()>
 to limit some internal operations. This means that if an external C<alarm()> was set, signal
 delivery may be delayed.
+
+With non-empty timeout, we use C<alarm()> internally in L<Kafka::IO|Kafka::IO> and try preserving existing C<alarm()> if possible.
+However, if L<Time::HiRes::ualarm()|Time::HiRes/ualarm> is set before calling Kafka modules,
+its behaviour is unspecified (i.e. it could be reset or preserved etc.).
+
+For C<gethostbyname> operations the non-empty timeout is rounded to the nearest greater positive integer;
+any timeouts less than 1 second are rounded to 1 second.
 
 You can disable the use of C<alarm()> by setting C<timeout =E<gt> undef> in the constructor.
 

@@ -5,16 +5,15 @@ author:
 build_requires:
   Capture::Tiny: 0.22
   Config::IniFiles: 2.82
-  File::Find::Rule: 0.33
   Proc::Daemon: 0.14
   Sub::Install: 0.926
   Test::Deep: 0.109
   Test::Exception: 0.31
-  Test::TCP: 2.00
+  Test::TCP: 2
 configure_requires:
   ExtUtils::MakeMaker: 0
 dynamic_config: 1
-generated_by: 'ExtUtils::MakeMaker version 6.62, CPAN::Meta::Converter version 2.120921'
+generated_by: 'ExtUtils::MakeMaker version 6.8, CPAN::Meta::Converter version 2.132830'
 license: perl
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.4.html
@@ -23,10 +22,43 @@ name: Kafka
 no_index:
   directory:
     - t
-    - xt
     - inc
+    - xt
+    - tools
+provides:
+  Kafka:
+    file: lib/Kafka.pm
+    version: 0.800_15
+  Kafka::Connection:
+    file: lib/Kafka/Connection.pm
+    version: 0.800_15
+  Kafka::Consumer:
+    file: lib/Kafka/Consumer.pm
+    version: 0.800_15
+  Kafka::Exceptions:
+    file: lib/Kafka/Exceptions.pm
+    version: 0.800_15
+  Kafka::IO:
+    file: lib/Kafka/IO.pm
+    version: 0.800_15
+  Kafka::Int64:
+    file: lib/Kafka/Int64.pm
+    version: 0.800_15
+  Kafka::Internals:
+    file: lib/Kafka/Internals.pm
+    version: 0.800_15
+  Kafka::Message:
+    file: lib/Kafka/Message.pm
+    version: 0.800_15
+  Kafka::Producer:
+    file: lib/Kafka/Producer.pm
+    version: 0.800_15
+  Kafka::Protocol:
+    file: lib/Kafka/Protocol.pm
+    version: 0.800_15
 requires:
   Const::Fast: 0.014
+  Data::HexDump::Range: 0.13
   Exception::Class: 1.37
   List::MoreUtils: 0.33
   Params::Util: 1.07
@@ -34,4 +66,5 @@ requires:
   String::CRC32: 1.4
   Sys::SigAction: 0.15
   Try::Tiny: 0.18
-version: 0.800_6
+  perl: 5.010
+version: 0.800_15
