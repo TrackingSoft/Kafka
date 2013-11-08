@@ -6,7 +6,7 @@ Kafka::Exceptions - Perl Kafka API exception definitions.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Exceptions> version 0.800_15 .
+This documentation refers to C<Kafka::Exceptions> version 0.800_16 .
 
 =cut
 
@@ -18,7 +18,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_15';
+our $VERSION = '0.800_16';
 
 use Exporter qw(
     import
@@ -198,7 +198,7 @@ sub throw_args {
 
     return(
         code    => $error_code,
-        message => $ERROR{ $error_code }.': '.( $description // q{} ),
+        message => $ERROR{ $error_code }.( $description ? ": $description" : q{} ),
     );
 }
 

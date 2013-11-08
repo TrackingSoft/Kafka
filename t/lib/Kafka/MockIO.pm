@@ -7,7 +7,7 @@ the Apache Kafka server.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::MockIO> version 0.800_15 .
+This documentation refers to C<Kafka::MockIO> version 0.800_16 .
 
 =cut
 
@@ -19,7 +19,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_15';
+our $VERSION = '0.800_16';
 
 #-- load the modules -----------------------------------------------------------
 
@@ -39,7 +39,6 @@ use Scalar::Util qw(
     blessed
 );
 use Sub::Install;
-use Sys::Hostname;
 
 use Kafka qw(
     $ERROR_MISMATCH_ARGUMENT
@@ -108,7 +107,7 @@ The following constants are available for export
 
 =head3 C<$PARTITION>
 
-Partition number.
+0 - Partition number.
 
 =cut
 const our $PARTITION                => 0;
@@ -120,6 +119,13 @@ that can be imported from the L<Kafka|Kafka> module and = 9092.
 
 =cut
 const our $KAFKA_MOCK_SERVER_PORT   => $KAFKA_SERVER_PORT;
+
+=head3 C<$KAFKA_MOCK_HOSTNAME>
+
+'localhost' - C<$KAFKA_MOCK_HOSTNAME> is the default local host name.
+
+=cut
+const our $KAFKA_MOCK_HOSTNAME      => 'localhost';
 
 #-- Global data ----------------------------------------------------------------
 
@@ -222,17 +228,17 @@ my $decoded_metadata_response = {
     Broker                              => [
         {
             NodeId                      => 2,
-            Host                        => hostname,
+            Host                        => $KAFKA_MOCK_HOSTNAME,
             Port                        => $KAFKA_MOCK_SERVER_PORT + 2,
         },
         {
             NodeId                      => 0,
-            Host                        => hostname,
+            Host                        => $KAFKA_MOCK_HOSTNAME,
             Port                        => $KAFKA_MOCK_SERVER_PORT,
         },
         {
             NodeId                      => 1,
-            Host                        => hostname,
+            Host                        => $KAFKA_MOCK_HOSTNAME,
             Port                        => $KAFKA_MOCK_SERVER_PORT + 1,
         },
     ],

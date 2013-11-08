@@ -6,7 +6,7 @@ Kafka::Connection - Object interface to connect to a kafka cluster.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Connection> version 0.800_15 .
+This documentation refers to C<Kafka::Connection> version 0.800_16 .
 
 =cut
 
@@ -18,7 +18,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_15';
+our $VERSION = '0.800_16';
 
 #-- load the modules -----------------------------------------------------------
 
@@ -42,7 +42,6 @@ use Params::Util qw(
 use Scalar::Util::Numeric qw(
     isint
 );
-use Sys::Hostname;
 use Time::HiRes qw(
     sleep
 );
@@ -336,7 +335,6 @@ sub new {
         $self->_error( $ERROR_MISMATCH_ARGUMENT, 'bad host:port or broker_list element' )
             unless $self->_is_like_server( $server );
         my ( $host, $port ) = split /:/, $server;
-        $host = $self->_localhost_to_hostname( $host );
         my $correct_server = $self->_build_server_name( $host, $port );
         $IO_cache->{ $correct_server } = {
             NodeId  => undef,
@@ -645,7 +643,7 @@ sub _update_metadata {
         or $self->_error( $ERROR_MISMATCH_CORRELATIONID );
 
     _ARRAY( $decoded_response->{Broker} )
-        or $self->_error( $ERROR_NO_KNOWN_BROKERS );
+        or $self->_error( $ERROR_NO_KNOWN_BROKERS, "topic = $topic" );
 
     my $IO_cache = $self->{_IO_cache};
 
@@ -797,13 +795,6 @@ sub _is_like_server {
     }
 
     return $server;
-}
-
-# transforms localhost because metadata using the 'Host' defined by hostname
-sub _localhost_to_hostname {
-    my ( $self, $host ) = @_;
-
-    return $host =~ /^(?:localhost|127\.0\.0\.1)$/i ? hostname : $host;
 }
 
 # Handler for errors

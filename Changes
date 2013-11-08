@@ -1,5 +1,9 @@
 Revision history for Kafka package
 
+0.800_16 Fri Nov  08 2013
+    BUGFIXES:
+    - Fixed problem with connecting to servers running on localhost.
+
 0.800_15 Wed Nov  06 2013
     CHANGES:
     - Improvement of test t/*_io.t .
