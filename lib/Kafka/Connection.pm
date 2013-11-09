@@ -443,7 +443,7 @@ sub receive_response_to_request {
 
     unless ( %{ $self->{_metadata} } ) {    # the first request
         $self->_update_metadata( $topic_name )  # hash metadata could be updated
-            or $self->_error( $ERROR_CANNOT_GET_METADATA );
+            or $self->_error( $ERROR_CANNOT_GET_METADATA, "topic = '$topic_name', partition = $partition" );
     }
     my $encoded_request = $protocol{ $api_key }->{encode}->( $request );
 
@@ -504,7 +504,7 @@ sub receive_response_to_request {
 
         sleep $self->{RETRY_BACKOFF} / 1000;
         $self->_update_metadata( $topic_name )
-            or $self->_error( $ERROR_CANNOT_GET_METADATA );
+            or $self->_error( $ERROR_CANNOT_GET_METADATA, "topic = '$topic_name', partition = $partition" );
     }
 
     # NOTE: it is possible to repeat the operation here
@@ -689,7 +689,7 @@ sub _update_metadata {
     }
 
     %$received_metadata
-        or $self->_error( $ERROR_CANNOT_GET_METADATA );
+        or $self->_error( $ERROR_CANNOT_GET_METADATA, "topic = '$topic'" );
 
     # Replace the information in the metadata
     $self->{_metadata}  = $received_metadata;
