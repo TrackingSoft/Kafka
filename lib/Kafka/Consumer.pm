@@ -6,7 +6,7 @@ Kafka::Consumer - Perl interface for Kafka consumer client.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Consumer> version 0.800_16 .
+This documentation refers to C<Kafka::Consumer> version 0.800_17 .
 
 =cut
 
@@ -18,7 +18,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_16';
+our $VERSION = '0.800_17';
 
 #-- load the modules -----------------------------------------------------------
 
@@ -335,7 +335,7 @@ The C<$partition> must be a non-negative integer.
 
 Offset in topic and partition to start from (64-bit integer).
 
-Optional. The argument must be a non-negative integer. The argument may be a
+The argument must be a non-negative integer. The argument may be a
 L<Math::BigInt|Math::BigInt> integer on 32-bit system.
 
 =item C<$max_size>

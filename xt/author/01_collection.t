@@ -173,7 +173,9 @@ API
 ApiKey
 APIs
 ApiVersion
+AutoCreateTopicsEnable
 bigint
+Backoff
 BigInteger
 bla
 Checksum

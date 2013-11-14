@@ -9,7 +9,7 @@ Kafka - Apache Kafka interface for Perl.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka> package version 0.800_16 .
+This documentation refers to C<Kafka> package version 0.800_17 .
 
 =cut
 
@@ -21,7 +21,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_16';
+our $VERSION = '0.800_17';
 
 use Exporter qw(
     import
@@ -497,20 +497,28 @@ const our $DEFAULT_MAX_BYTES                    => 1_000_000;
 
 =item C<$SEND_MAX_RETRIES>
 
-3 - The leader may be unavailable transiently, which can fail the sending of a message.
+4 - The leader may be unavailable transiently, which can fail the sending of a message.
 This property specifies the number of retries when such failures occur.
 
 =cut
-const our $SEND_MAX_RETRIES                     => 3;
+const our $SEND_MAX_RETRIES                     => 4;
 
 =item C<$RETRY_BACKOFF>
 
-100 - (ms) Before each retry, the producer refreshes the metadata of relevant topics.
+200 - (ms)
+
+According to Apache Kafka documentation:
+
+Producer Configs -
+Before each retry, the producer refreshes the metadata of relevant topics.
 Since leader election takes a bit of time, this property specifies the amount of time
 that the producer waits before refreshing the metadata.
 
+Consumer Configs -
+Backoff time to wait before trying to determine the leader of a partition that has just lost its leader.
+
 =cut
-const our $RETRY_BACKOFF                        => 100;
+const our $RETRY_BACKOFF                        => 200;
 
 # Used to ask for all messages before a certain time (ms). There are two special values.
 

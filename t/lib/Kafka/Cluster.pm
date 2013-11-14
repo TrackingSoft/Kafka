@@ -6,7 +6,7 @@ Kafka::Cluster - object interface to manage a test kafka cluster.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Cluster> version 0.800_16 .
+This documentation refers to C<Kafka::Cluster> version 0.800_17 .
 
 =cut
 
@@ -18,13 +18,14 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_16';
+our $VERSION = '0.800_17';
 
 use Exporter qw(
     import
 );
 
 our @EXPORT_OK = qw(
+    $DEFAULT_REPLICATION_FACTOR
     $DEFAULT_TOPIC
     $START_PORT
 );
@@ -131,11 +132,11 @@ Used topic name.
 
 =cut
 const our   $DEFAULT_TOPIC                  => 'mytopic';
+const our   $DEFAULT_REPLICATION_FACTOR     => 3;       # The cluster contains 3 servers
 
 const my    $MAX_ATTEMPT                    => 5;
 const my    $INI_SECTION                    => 'GENERAL';
 const my    $RELATIVE_LOG4J_PROPERTY_FILE   => catfile( '..', '..', 'config', 'log4j.properties' );
-const my    $DEFAULT_CLUSTER_FACTOR         => 3;       # The cluster contains 3 servers
 const my    $ZOOKEEPER_PROPERTIES_FILE      => 'zookeeper.properties';
 const my    $KAFKA_PROPERTIES_FILE          => 'server.properties';
 const my    $KAFKA_LOGS_DIR_MASK            => 'kafka-logs-';
@@ -175,7 +176,7 @@ The following arguments are currently recognized:
 
 The root directory of the Kafka installation.
 
-=item C<cluster_factor =E<gt> $cluster_factor>
+=item C<replication_factor =E<gt> $replication_factor>
 
 Number kafka servers belonging to the generated cluster.
 
@@ -209,9 +210,9 @@ sub new {
     defined( _STRING( $args{kafka_dir} ) )      # must match the settings of your system
         // confess( "The value of 'kafka_dir' should be a string" );
 
-    my $kafka_cluster_factor = $args{cluster_factor} //= $DEFAULT_CLUSTER_FACTOR;
-    _POSINT( $kafka_cluster_factor )
-        // confess( "The value of 'cluster_factor' should be a positive integer" );
+    my $kafka_replication_factor = $args{replication_factor} //= $DEFAULT_REPLICATION_FACTOR;
+    _POSINT( $kafka_replication_factor )
+        // confess( "The value of 'replication_factor' should be a positive integer" );
 
     $start_dir = $args{t_dir} // $Bin;
 
@@ -253,13 +254,13 @@ sub new {
         unless $self->_is_kafka_0_8;
 
     # zookeeper
-    my ( $inifile, $cfg, $zookeeper_client_port, $cluster_factor );
+    my ( $inifile, $cfg, $zookeeper_client_port, $replication_factor );
 
     opendir( my $dh, $kafka_data_dir )
         or confess "can't opendir $kafka_data_dir: $!";
     foreach my $file ( readdir( $dh ) ) {
         next if $file !~ /^$KAFKA_LOGS_DIR_MASK/;
-        ++$cluster_factor;
+        ++$replication_factor;
         if ( !$cfg && -e ( $inifile = catfile( $kafka_data_dir, $file, $KAFKA_PROPERTIES_FILE ) ) ) {
             if ( !( $cfg = Config::IniFiles->new(
                     -file       => $inifile,
@@ -288,9 +289,11 @@ sub new {
     closedir $dh;
 
     confess 'Desired cluster factor does not correspond to the number of already existing data directory'
-        if $cluster_factor && $cluster_factor != $kafka_cluster_factor;
+        if $replication_factor && $replication_factor != $kafka_replication_factor;
 
     unless ( $zookeeper_client_port ) {
+        confess( "Zookeeper server is not running" )
+            if $does_not_start;
         # the port at which the clients will connect the Zookeeper server
         $self->{kafka}->{zookeeper_clientPort} = $zookeeper_client_port = $self->_start_zookeeper;
     }
@@ -322,7 +325,7 @@ sub new {
     else {
         my $port    = $START_PORT;
         my $node_id = 0;
-        for ( 1..$kafka_cluster_factor ) {
+        for ( 1..$kafka_replication_factor ) {
             $port = empty_port( $port - 1 );
             my $server = $self->{cluster}->{ $port } = {};  # server in the cluster identify by its port
             $server->{node_id} = $node_id;
@@ -661,6 +664,8 @@ sub close {
         say '# [', scalar( localtime ), '] Removing zookeeper log tree: ', $self->_data_dir;
         remove_tree( catdir( $self->_data_dir, 'zookeeper' ) );
     }
+
+    $_used = 0;
 }
 
 #-- private attributes ---------------------------------------------------------

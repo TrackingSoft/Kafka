@@ -30,9 +30,10 @@ t/08_connection.t
 t/09_message.t
 t/10_producer.t
 t/11_consumer.t
-t/70_kafka_usage.t
-t/71_kafka_bench.t
-t/89_cluster_stop.t
+t/20_kafka_usage.t
+t/21_kafka_bench.t
+t/30_cluster_stop.t
+t/40_autocreate_topics.t
 t/90_mock_io.t
 t/91_mock_usage.t
 t/92_mock_bench.t

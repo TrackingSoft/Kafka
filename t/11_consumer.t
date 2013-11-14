@@ -33,8 +33,6 @@ plan 'no_plan';
 #-- load the modules -----------------------------------------------------------
 
 use Const::Fast;
-#use Data::Dumper;
-#use File::HomeDir;
 use Params::Util qw(
     _ARRAY
     _HASH
@@ -70,7 +68,6 @@ use Kafka::TestInternals qw(
 #-- declarations ---------------------------------------------------------------
 
 # WARNING: must match the settings of your system
-#const my $KAFKA_BASE_DIR    => $ENV{KAFKA_BASE_DIR} || File::Spec->catdir( File::HomeDir->my_home, 'kafka' );
 const my $KAFKA_BASE_DIR    => $ENV{KAFKA_BASE_DIR};
 
 my ( $port, $connect, $partition, $consumer, $offsets, $messages );
@@ -319,7 +316,7 @@ sub testing {
 #        $RECEIVE_EARLIEST_OFFSETS,      # time
         $RECEIVE_LATEST_OFFSET,         # time
         $DEFAULT_MAX_NUMBER_OF_OFFSETS, # max_number
-        );
+    );
     ok _ARRAY( $offsets ), 'offsets are received';
     if( $offsets ) {
         foreach my $offset ( @$offsets ) {
@@ -346,8 +343,7 @@ sub testing {
 #                note 'offset             : ', $message->offset;
 #                note 'next_offset        : ', $message->next_offset;
 #                note 'HighwaterMarkOffset: ', $message->HighwaterMarkOffset;
-            }
-            else {
+            } else {
                 diag 'error              : ', $message->error;
             }
         }

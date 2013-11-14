@@ -33,8 +33,6 @@ plan 'no_plan';
 #-- load the modules -----------------------------------------------------------
 
 use Const::Fast;
-#use Data::Dumper;
-#use File::HomeDir;
 use Params::Util qw(
     _ARRAY
     _HASH
@@ -67,7 +65,6 @@ use Kafka::TestInternals qw(
 #-- declarations ---------------------------------------------------------------
 
 # WARNING: must match the settings of your system
-#const my $KAFKA_BASE_DIR    => $ENV{KAFKA_BASE_DIR} || File::Spec->catdir( File::HomeDir->my_home, 'kafka' );
 const my $KAFKA_BASE_DIR    => $ENV{KAFKA_BASE_DIR};
 
 my ( $port, $connect, $partition, $producer, $response );
@@ -244,8 +241,6 @@ sub testing {
             'Single message'            # message
         );
         ok _HASH( $response ), 'response is received';
-#use Data::Dumper;
-#diag( Data::Dumper->Dump( [ $response ], [ 'produce_response' ] ) );
 
         # Sending a series of messages
         $response = $producer->send(
@@ -258,8 +253,6 @@ sub testing {
             ]
         );
         ok _HASH( $response ), 'response is received';
-#use Data::Dumper;
-#diag( Data::Dumper->Dump( [ $response ], [ 'produce_response' ] ) );
     }
 
 #-- Response to errors in communication modules
