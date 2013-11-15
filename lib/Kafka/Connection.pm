@@ -286,6 +286,11 @@ If C<auto.create.topics.enable> in server configuration is C<false>, this settin
 sub new {
     my ( $class, @args ) = @_;
 
+# WARNING:
+# Make sure that you always connect to brokers using EXACTLY the same address or host name
+# as specified in broker configuration (host.name in server.properties).
+# Avoid using default value (when host.name is commented out) in server.properties - always use explicit value instead.
+
     my $self = bless {
         host                    => q{},
         port                    => $KAFKA_SERVER_PORT,

@@ -4,6 +4,7 @@ author:
   - 'TrackingSoft LLC <sgladkov@trackingsoft.com>'
 build_requires:
   Capture::Tiny: 0.22
+  Clone: 0.35
   Config::IniFiles: 2.82
   Proc::Daemon: 0.14
   Sub::Install: 0.926

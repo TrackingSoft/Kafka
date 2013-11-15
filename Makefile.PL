@@ -33,6 +33,7 @@ my %config = (
     },
     BUILD_REQUIRES      => {            # more to the list $Module::CoreList::version{5.010}
         'Capture::Tiny'         => 0.22,
+        'Clone'                 => 0.35,
         'Config::IniFiles'      => 2.82,
         'Proc::Daemon'          => 0.14,
         'Sub::Install'          => 0.926,

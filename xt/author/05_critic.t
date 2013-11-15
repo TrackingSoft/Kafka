@@ -47,7 +47,7 @@ $tools_dir      = abs_path( 'tools' );
 eval 'use Test::Perl::Critic;'; ## no critic
 plan skip_all => 'because Test::Perl::Critic required for testing' if $@;
 
-Test::Perl::Critic->import( -profile => catfile( $author_dir, '.perlcriticrc' ) );
+Test::Perl::Critic->import( -profile => catfile( $author_dir, '.perlcritic.rc' ) );
 
 all_critic_ok(
     $modules_dir,

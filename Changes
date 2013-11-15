@@ -2,7 +2,8 @@ Revision history for Kafka package
 
 0.800_17 Fri Nov  15 2013
     CHANGES:
-    - 'AutoCreateTopicsEnable' argument is added to Kafka::Connection->new.
+    - 'AutoCreateTopicsEnable' argument is added to Kafka::Connection->new
+      (thanks to Ed Silva).
 
 0.800_16 Fri Nov  08 2013
     BUGFIXES:

@@ -1027,6 +1027,7 @@ you have the following packages installed before you install
 Kafka:
 
     Const::Fast
+    Clone
     Exception::Class
     List::MoreUtils
     Params::Util
