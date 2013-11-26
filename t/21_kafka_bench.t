@@ -153,7 +153,7 @@ sub next_offset {
         $RECEIVE_LATEST_OFFSET,             # time
         $DEFAULT_MAX_NUMBER_OF_OFFSETS,     # max_number
     );
-    if( $offsets ) {
+    if ( $offsets ) {
         ok( _ARRAY0( $offsets ), 'offsets are obtained' ) if $is_package;
         return $offsets->[0];
     }

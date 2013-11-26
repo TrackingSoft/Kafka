@@ -6,7 +6,7 @@ Kafka::Cluster - object interface to manage a test kafka cluster.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Cluster> version 0.800_17 .
+This documentation refers to C<Kafka::Cluster> version 0.800_18 .
 
 =cut
 
@@ -18,7 +18,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_17';
+our $VERSION = '0.800_18';
 
 use Exporter qw(
     import
@@ -147,6 +147,8 @@ const my    $START_ZOOKEEPER_ARG            => 'org.apache.zookeeper.server.quor
 # File mask specific to version 0.8
 const my    $KAFKA_0_8_REF_FILE_MASK        => catfile( 'bin', 'kafka-create-topic.sh' );
 
+const our   $HOST                           => 'localhost';
+
 my $start_dir;
 
 #-- constructor ----------------------------------------------------------------
@@ -182,6 +184,12 @@ Number kafka servers belonging to the generated cluster.
 
 Optional, default = 3.
 
+=item C<partition =E<gt> $partitions>
+
+The number of partitions per created topic.
+
+Optional, default = 1.
+
 =item C<does_not_start =E<gt> $does_not_start>
 
 Sign of the need to connect to the already created cluster.
@@ -213,6 +221,8 @@ sub new {
     my $kafka_replication_factor = $args{replication_factor} //= $DEFAULT_REPLICATION_FACTOR;
     _POSINT( $kafka_replication_factor )
         // confess( "The value of 'replication_factor' should be a positive integer" );
+    _POSINT( $args{partition} //= 1 )
+        // confess( "The value of 'partition' should be a positive integer" );
 
     $start_dir = $args{t_dir} // $Bin;
 
@@ -225,6 +235,7 @@ sub new {
                                                 #   'data_dir'              => ...,
                                                 #   'zookeeper_clientPort'  => ...,
                                                 #   'is_first_run'          => ...,
+                                                #   'partition'             => ...,
                                                 # }
         cluster => {},                          # {
                                                 #   server (port)   => {
@@ -234,6 +245,8 @@ sub new {
                                                 # }
     };
     bless( $self, $class );
+
+    $self->{kafka}->{partition} = $args{partition};
 
     # basic definitions (existence of most service directory is assumed)
     my ( $does_not_start, $kafka_base_dir, $kafka_bin_dir, $kafka_config_dir, $kafka_data_dir );
@@ -547,7 +560,7 @@ sub start {
         my $error;
         try {
             my $io = Kafka::IO->new(
-                host       => 'localhost',
+                host       => $HOST,
                 port       => $port,
             );
 
@@ -620,7 +633,7 @@ sub request {
         // confess( "The value of '\$bin_stream' should be a string" );
 
     my $io = Kafka::IO->new(
-        host       => 'localhost',
+        host       => $HOST,
         port       => $port,
     );
 
@@ -919,7 +932,7 @@ sub _create_kafka_log_dir {
         $cfg->setval( $INI_SECTION, 'log.dir'               => $log_dir );
         $cfg->setval( $INI_SECTION, 'kafka.csv.metrics.dir' => $metrics_dir );
         $cfg->setval( $INI_SECTION, 'broker.id'             => $self->node_id( $port ) );
-        $cfg->setval( $INI_SECTION, 'zookeeper.connect'     => 'localhost:'.$self->zookeeper_port );
+        $cfg->setval( $INI_SECTION, 'zookeeper.connect'     => "$HOST:".$self->zookeeper_port );
         $cfg->RewriteConfig( $inifile );
     }
 }
@@ -1060,18 +1073,20 @@ sub _create_topic {
     # the log will be recorded in the appropriate directory
     my $port    = $servers[0];
     my $log_dir = $self->log_dir( $port );
+    my $partitions = $self->{kafka}->{partition};
 
     my @args = (
         'bin/kafka-create-topic.sh',
         "--topic $DEFAULT_TOPIC",
         '--replica '.scalar( @servers ),
-        '--zookeeper localhost:'.$self->zookeeper_port,
+        "--zookeeper $HOST:".$self->zookeeper_port,
+        "--partition $partitions",
     );
 
     my $cwd = getcwd();
     chdir $self->base_dir;
 
-    say '# [', scalar( localtime ), "] Creating topic '$DEFAULT_TOPIC': replication factor = ", scalar( @servers );
+    say '# [', scalar( localtime ), "] Creating topic '$DEFAULT_TOPIC': replication factor = ", scalar( @servers ), ", partition = $partitions";
     my ( $exit_status, $child_error );
     {
         my $out_fh = IO::File->new( catfile( $log_dir, 'kafka-create-topic-stdout.log' ), 'w+' );

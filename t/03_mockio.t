@@ -96,21 +96,21 @@ Kafka::MockIO::override();
 
 #-- special_cases
 
-ok !%{ Kafka::IO::special_cases() }, 'There are no special cases';
+ok !%{ Kafka::MockIO::special_cases() }, 'There are no special cases';
 
 #-- add_special_case
 
-Kafka::IO::add_special_case( { $test_message => $test_message } );
-ok( scalar( keys( %{ Kafka::IO::special_cases() } ) ) == 1 && Kafka::IO::special_cases()->{ $test_message } eq $test_message, 'The special case added' );
+Kafka::MockIO::add_special_case( { $test_message => $test_message } );
+ok( scalar( keys( %{ Kafka::MockIO::special_cases() } ) ) == 1 && Kafka::MockIO::special_cases()->{ $test_message } eq $test_message, 'The special case added' );
 
 #-- del_special_case
 
-Kafka::IO::del_special_case( $test_message );
-ok !%{ Kafka::IO::special_cases() }, 'The special case deleted';
+Kafka::MockIO::del_special_case( $test_message );
+ok !%{ Kafka::MockIO::special_cases() }, 'The special case deleted';
 
 #-- Kafka::IO API ----------
 
-Kafka::IO::add_special_case( { $test_message => $test_message } );
+Kafka::MockIO::add_special_case( { $test_message => $test_message } );
 
 # NOTE: Is duplicated test code t/02_io.t partially (Section INSTRUCTIONS)
 

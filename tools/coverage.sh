@@ -23,6 +23,8 @@ perl -MDevel::Cover t/21_kafka_bench.t
 perl -MDevel::Cover t/30_cluster_stop.t
 perl -MDevel::Cover t/40_autocreate_topics.t
 perl -MDevel::Cover t/41_fork.t
+perl -MDevel::Cover t/42_nonfatal_errors.t
+perl -MDevel::Cover t/43_competition.t
 perl -MDevel::Cover t/90_mock_io.t
 perl -MDevel::Cover t/91_mock_usage.t
 perl -MDevel::Cover t/92_mock_bench.t

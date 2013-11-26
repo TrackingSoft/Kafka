@@ -2,12 +2,12 @@ package Kafka::MockIO;
 
 =head1 NAME
 
-Kafka::MockIO - object interface to simulate the socket communications with
-the Apache Kafka server.
+Kafka::MockIO - object interface to simulate communications with the Apache Kafka
+server via socket.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::MockIO> version 0.800_17 .
+This documentation refers to C<Kafka::MockIO> version 0.800_18 .
 
 =cut
 
@@ -19,7 +19,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_17';
+our $VERSION = '0.800_18';
 
 #-- load the modules -----------------------------------------------------------
 
@@ -105,6 +105,13 @@ The following constants are available for export
 
 =cut
 
+=head3 C<$TOPIC>
+
+Topic name.
+
+=cut
+const our $TOPIC                    => 'mytopic';
+
 =head3 C<$PARTITION>
 
 0 - Partition number.
@@ -161,7 +168,7 @@ my $decoded_produce_response = {
     CorrelationId                           => 0,           # for example
     topics                                  => [
         {
-            TopicName                       => 'mytopic',   # for example
+            TopicName                       => $TOPIC,      # for example
             partitions                      => [
                 {
                     Partition               => $PARTITION,
@@ -177,7 +184,7 @@ my $decoded_fetch_response = {
     CorrelationId                           => 0,           # for example
     topics                                  => [
         {
-            TopicName                       => 'mytopic',   # for example
+            TopicName                       => $TOPIC,      # for example
             partitions                      => [
                 {
                     Partition               => $PARTITION,
@@ -209,7 +216,7 @@ my $decoded_offset_response = {
     CorrelationId                       => 0,           # for example
     topics                              => [
         {
-            TopicName                   => 'mytopic',   # for example
+            TopicName                   => $TOPIC,      # for example
             PartitionOffsets            => [
                 {
                     Partition           => $PARTITION,
@@ -245,7 +252,7 @@ my $decoded_metadata_response = {
     TopicMetadata                       => [
         {
             ErrorCode                   => 0,
-            TopicName                   => 'mytopic',   # for example
+            TopicName                   => $TOPIC,      # for example
             PartitionMetadata           => [
                 {
                     ErrorCode           => 0,

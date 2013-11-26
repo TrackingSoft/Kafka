@@ -1,5 +1,11 @@
 Revision history for Kafka package
 
+0.800_18 Mon Dec  02 2013
+    CHANGES:
+    - Improvements to error handling.
+    - 'MaxLoggedErrors' argument is added to Kafka::Connection->new.
+    - Added method Kafka::Connection->nonfatal_errors.
+
 0.800_17 Fri Nov  15 2013
     CHANGES:
     - 'AutoCreateTopicsEnable' argument is added to Kafka::Connection->new

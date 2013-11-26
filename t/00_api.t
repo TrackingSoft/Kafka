@@ -325,10 +325,12 @@ BEGIN {
     $methods_Kafka_Connection = [ qw(
         close
         close_connection
+        cluster_errors
         get_known_servers
         is_server_alive
         is_server_known
         new
+        nonfatal_errors
         receive_response_to_request
     ) ];
 

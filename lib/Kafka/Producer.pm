@@ -6,7 +6,7 @@ Kafka::Producer - Perl interface for Kafka producer client.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Producer> version 0.800_17 .
+This documentation refers to C<Kafka::Producer> version 0.800_18 .
 
 =cut
 
@@ -18,7 +18,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_17';
+our $VERSION = '0.800_18';
 
 #-- load the modules -----------------------------------------------------------
 
@@ -288,7 +288,7 @@ sub send {
 
     $messages = [ $messages ] unless ref( $messages );
     foreach my $message ( @$messages ) {
-        $self->_error( $ERROR_MISMATCH_ARGUMENT, 'message' )
+        $self->_error( $ERROR_MISMATCH_ARGUMENT, 'message = '.( $message // '<undef>' ) )
             unless defined( $message ) && ( $message eq q{} || ( defined( _STRING( $message ) ) && !utf8::is_utf8( $message ) ) );
     }
 

@@ -35,9 +35,6 @@ plan 'no_plan';
 use Const::Fast;
 #use Data::Dumper;
 
-# Usage - Basic functionalities to include a simple Producer and Consumer
-# You need to have access to your Kafka instance and be able to connect through TCP
-
 use Kafka qw(
     $DEFAULT_MAX_BYTES
     $DEFAULT_MAX_NUMBER_OF_OFFSETS
@@ -45,7 +42,7 @@ use Kafka qw(
     $RECEIVE_LATEST_OFFSET
     $RECEIVE_EARLIEST_OFFSETS
     $REQUEST_TIMEOUT
-    );
+);
 use Kafka::Connection;
 use Kafka::Consumer;
 use Kafka::Producer;
