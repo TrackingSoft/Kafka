@@ -61,7 +61,9 @@ use Kafka qw(
     $ERROR_CANNOT_BIND
     $ERROR_CANNOT_RECV
     $ERROR_CANNOT_SEND
+    $ERROR_SEND_NO_ACK
     $MIN_BYTES_RESPOND_HAS_DATA
+    $RECEIVE_EARLIEST_OFFSETS
     $REQUEST_TIMEOUT
     $SEND_MAX_RETRIES
     $WAIT_WRITTEN_TO_LOCAL_LOG
@@ -73,15 +75,18 @@ use Kafka::Consumer;
 use Kafka::Producer;
 
 use Kafka::Internals qw(
+    $APIKEY_OFFSET
     $APIKEY_PRODUCE
     $PRODUCER_ANY_OFFSET
 );
 use Kafka::MockProtocol qw(
     encode_metadata_response
+    encode_offset_response
     encode_produce_response
 );
 use Kafka::Protocol qw(
     encode_metadata_request
+    encode_offset_request
     encode_produce_request
 );
 
@@ -90,6 +95,7 @@ use Kafka::MockIO;
 #-- setting up facilities ------------------------------------------------------
 
 Kafka::MockIO::override();
+#$Kafka::Connection::DEBUG = 1;
 
 #-- declarations ---------------------------------------------------------------
 
@@ -99,9 +105,7 @@ const my $topic             => $Kafka::MockIO::TOPIC;
 const my $partition         => $Kafka::MockIO::PARTITION;
 const my $CorrelationId     => 0;
 
-my ( $normal_encoded_produce_request, $normal_encoded_metadata_request, $normal_encoded_metadata_response, $data_exchange, $decoded_produce_request );
-
-$decoded_produce_request = {
+my $decoded_produce_request = {
     ApiKey                              => $APIKEY_PRODUCE,
     CorrelationId                       => $CorrelationId,
     ClientId                            => 'producer',
@@ -125,9 +129,28 @@ $decoded_produce_request = {
         },
     ],
 };
-$normal_encoded_produce_request = encode_produce_request( $decoded_produce_request );
+my $normal_encoded_produce_request = encode_produce_request( $decoded_produce_request );
 
-$data_exchange->{ $ERROR_NO_ERROR } = {
+my $decoded_offset_request = {
+    ApiKey                              => $APIKEY_OFFSET,
+    CorrelationId                       => $CorrelationId,
+    ClientId                            => 'consumer',
+    topics                              => [
+        {
+            TopicName                   => $topic,
+            partitions                  => [
+                {
+                    Partition           => $partition,
+                    Time                => $RECEIVE_EARLIEST_OFFSETS,
+                    MaxNumberOfOffsets  => 1,
+                },
+            ],
+        },
+    ],
+};
+my $normal_encoded_offset_request = encode_offset_request( $decoded_offset_request );
+
+my $data_exchange->{ $ERROR_NO_ERROR } = {
     decoded_metadata_request    => {
             CorrelationId           => $CorrelationId,
             ClientId                => q{},
@@ -179,8 +202,8 @@ $data_exchange->{ $ERROR_NO_ERROR } = {
         ],
     },
 };
-$normal_encoded_metadata_request  = encode_metadata_request( $data_exchange->{ $ERROR_NO_ERROR }->{decoded_metadata_request} );
-$normal_encoded_metadata_response = encode_metadata_response( $data_exchange->{ $ERROR_NO_ERROR }->{decoded_metadata_response} );
+my $normal_encoded_metadata_request  = encode_metadata_request( $data_exchange->{ $ERROR_NO_ERROR }->{decoded_metadata_request} );
+my $normal_encoded_metadata_response = encode_metadata_response( $data_exchange->{ $ERROR_NO_ERROR }->{decoded_metadata_response} );
 
 #-- NON-FATAL errors
 
@@ -256,6 +279,7 @@ sub Kafka_IO_error {
     $skip_calls             = shift;
     my $expected_error_code = shift;
     my $expected_nonfatals  = shift;
+    my $decoded_request     = shift;
 
     my $replaced_method_name = 'Kafka::IO::'.$method_name;
     $replaced_method = \&$replaced_method_name;
@@ -283,7 +307,7 @@ sub Kafka_IO_error {
     );
 
     is scalar( @{ $connection->nonfatal_errors } ), 0, 'non-fatal errors are not fixed';
-    eval { $connection->receive_response_to_request( $decoded_produce_request ); };
+    eval { $connection->receive_response_to_request( $decoded_request ); };
     my $result_error = $@;
     isa_ok( $result_error, 'Kafka::Exception::Connection' );
     is $result_error->code, $expected_error_code, 'non-fatal error: '.$ERROR{ $expected_error_code };
@@ -330,6 +354,9 @@ isa_ok( $error, 'Kafka::Exception::Connection' );
 is $error->code, $ERROR_LEADER_NOT_FOUND, 'non-fatal error: '.$ERROR{ $ERROR_LEADER_NOT_FOUND };
 is scalar( @{ $connection->nonfatal_errors } ), $SEND_MAX_RETRIES, 'non-fatal errors are fixed';
 
+is scalar( @{ $connection->clear_nonfatals } ), 0, 'non-fatal errors are not fixed now';
+is scalar( @{ $connection->nonfatal_errors } ), 0, 'non-fatal errors are not fixed';
+
 Kafka::MockIO::add_special_case( { $normal_encoded_metadata_request => $normal_encoded_metadata_response, } );
 
 #-- connect IO
@@ -341,6 +368,7 @@ Kafka_IO_error(
     $ERROR_CANNOT_BIND, # expected error code
     # because connection is not available
     $SEND_MAX_RETRIES,  # expected non-fatal errors
+    $decoded_produce_request,
 );
 
 #-- send IO
@@ -352,6 +380,7 @@ Kafka_IO_error(
     $ERROR_CANNOT_SEND, # expected error code
     # because connection is available, but you can not send a request for metadata
     1,                  # expected non-fatal errors
+    $decoded_offset_request,
 );
 
 #-- receive IO
@@ -360,9 +389,20 @@ Kafka_IO_error(
     'receive',          # method name
     # skip to receive a response for the initial preparation of metadata (consists of two consecutive readings from the socket)
     2,                  # skip calls
+    $ERROR_SEND_NO_ACK, # expected error code
+    # because connection is available, but you can not receive a response for metadata
+    0,                  # expected non-fatal errors
+    $decoded_produce_request,
+);
+
+Kafka_IO_error(
+    'receive',          # method name
+    # skip to receive a response for the initial preparation of metadata (consists of two consecutive readings from the socket)
+    2,                  # skip calls
     $ERROR_CANNOT_RECV, # expected error code
     # because connection is available, but you can not receive a response for metadata
     1,                  # expected non-fatal errors
+    $decoded_offset_request,
 );
 
 #-- %Kafka::Connection::RETRY_ON_ERRORS

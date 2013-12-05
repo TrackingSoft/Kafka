@@ -18,6 +18,8 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
+our $DEBUG = 0;
+
 our $VERSION = '0.800_18';
 
 use Exporter qw(
@@ -80,9 +82,11 @@ use Kafka qw(
     $ERROR_MISMATCH_ARGUMENT
     $ERROR_MISMATCH_CORRELATIONID
     $ERROR_NO_KNOWN_BROKERS
+    $ERROR_SEND_NO_ACK
     $ERROR_UNKNOWN_APIKEY
     $KAFKA_SERVER_PORT
     $NOT_SEND_ANY_RESPONSE
+    $RECEIVE_MAX_RETRIES
     $REQUEST_TIMEOUT
     $RETRY_BACKOFF
     $SEND_MAX_RETRIES
@@ -204,20 +208,20 @@ another attempt to fetch data.
 =cut
 # When any of the following error happens, a possible change in meta-data on server is expected.
 const our %RETRY_ON_ERRORS => (
-#    $ERROR_NO_ERROR                         => 1,   # 0 - No error
+#   $ERROR_NO_ERROR                         => 1,   # 0 - No error
     $ERROR_UNKNOWN                          => 1,   # -1 - An unexpected server error
-#    $ERROR_OFFSET_OUT_OF_RANGE              => 1,   # 1 - The requested offset is outside the range of offsets available at the server for the given topic/partition
-#    $ERROR_INVALID_MESSAGE                  => 1,   # 2 - Message contents does not match its control sum
-#    $ERROR_UNKNOWN_TOPIC_OR_PARTITION       => 1,   # 3 - Unknown topic or partition
-#    $ERROR_INVALID_MESSAGE_SIZE             => 1,   # 4 - Message has invalid size
+#   $ERROR_OFFSET_OUT_OF_RANGE              => 1,   # 1 - The requested offset is outside the range of offsets available at the server for the given topic/partition
+#   $ERROR_INVALID_MESSAGE                  => 1,   # 2 - Message contents does not match its control sum
+#   $ERROR_UNKNOWN_TOPIC_OR_PARTITION       => 1,   # 3 - Unknown topic or partition
+#   $ERROR_INVALID_MESSAGE_SIZE             => 1,   # 4 - Message has invalid size
     $ERROR_LEADER_NOT_AVAILABLE             => 1,   # 5 - Unable to write due to ongoing Kafka leader selection
     $ERROR_NOT_LEADER_FOR_PARTITION         => 1,   # 6 - Server is not a leader for partition
     $ERROR_REQUEST_TIMED_OUT                => 1,   # 7 - Request time-out
     $ERROR_BROKER_NOT_AVAILABLE             => 1,   # 8 - Broker is not available
     $ERROR_REPLICA_NOT_AVAILABLE            => 1,   # 9 - Replica not available
-#    $ERROR_MESSAGE_SIZE_TOO_LARGE           => 1,   # 10 - Message is too big
+#   $ERROR_MESSAGE_SIZE_TOO_LARGE           => 1,   # 10 - Message is too big
     $ERROR_STALE_CONTROLLER_EPOCH_CODE      => 1,   # 11 - Stale Controller Epoch Code
-#    $ERROR_OFFSET_METADATA_TOO_LARGE_CODE   => 1,   # 12 - Specified metadata offset is too big
+#   $ERROR_OFFSET_METADATA_TOO_LARGE_CODE   => 1,   # 12 - Specified metadata offset is too big
 );
 
 #-- constructor ----------------------------------------------------------------
@@ -259,13 +263,10 @@ or C<broker_list> must be supplied.
 
 =item C<timeout =E<gt> $timeout>
 
-Optional, default = C<$REQUEST_TIMEOUT>.
+Optional, default = C<$Kafka::REQUEST_TIMEOUT>.
 
 C<$timeout> specifies how long we wait for the remote server to respond.
 C<$timeout> is in seconds, could be a positive integer or a floating-point number not bigger than int32 positive integer.
-
-C<$REQUEST_TIMEOUT> is the default timeout that can be imported from the
-L<Kafka|Kafka> module.
 
 Special behavior when C<timeout> is set to C<undef>:
 
@@ -299,21 +300,24 @@ If C<CorrelationId> is not provided, it is set to a random negative integer.
 
 =item C<SEND_MAX_RETRIES =E<gt> $retries>
 
-Optional, int32 signed integer, default = C<$SEND_MAX_RETRIES> .
+Optional, int32 signed integer, default = C<$Kafka::SEND_MAX_RETRIES> .
 
-C<$SEND_MAX_RETRIES> is the default number of retries that can be imported from the
-L<Kafka|Kafka> module and = 3 .
+In some circumstances (leader is temporarily unavailable, outdated metadata, etc) we may fail to send a message.
+This property specifies the maximum number of attempts to send a message.
+The C<$retries> should be an integer number.
 
-The leader may be unavailable transiently, which can fail the sending of a message.
-This property specifies the number of retries when such failures occur.
+=item C<RECEIVE_MAX_RETRIES =E<gt> $retries>
+
+Optional, int32 signed integer, default = C<$Kafka::RECEIVE_MAX_RETRIES> .
+
+In some circumstances (temporarily network issues, server high load, socket error, etc) we may fail to
+recieve a response.
+This property specifies the maximum number of attempts to recieve a message.
 The C<$retries> should be an integer number.
 
 =item C<RETRY_BACKOFF =E<gt> $backoff>
 
-Optional, default = C<$RETRY_BACKOFF> .
-
-C<$RETRY_BACKOFF> is the default timeout that can be imported from the
-L<Kafka|Kafka> module and = 100 ms.
+Optional, default = C<$Kafka::RETRY_BACKOFF> .
 
 Since leader election takes a bit of time, this property specifies the amount of time,
 in milliseconds, that the producer waits before refreshing the metadata.
@@ -361,6 +365,7 @@ sub new {
         timeout                 => $REQUEST_TIMEOUT,
         CorrelationId           => undef,
         SEND_MAX_RETRIES        => $SEND_MAX_RETRIES,
+        RECEIVE_MAX_RETRIES     => $RECEIVE_MAX_RETRIES,
         RETRY_BACKOFF           => $RETRY_BACKOFF,
         AutoCreateTopicsEnable  => 0,
         MaxLoggedErrors         => 100,
@@ -385,6 +390,8 @@ sub new {
         unless isint( $self->{CorrelationId} ) && $self->{CorrelationId} <= $MAX_CORRELATIONID;
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'SEND_MAX_RETRIES' )
         unless _POSINT( $self->{SEND_MAX_RETRIES} );
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'RECEIVE_MAX_RETRIES' )
+        unless _POSINT( $self->{RECEIVE_MAX_RETRIES} );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'RETRY_BACKOFF' )
         unless _POSINT( $self->{RETRY_BACKOFF} );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'MaxLoggedErrors' )
@@ -524,8 +531,7 @@ sub receive_response_to_request {
     my $api_key = $request->{ApiKey};
 
 # WARNING: The current version of the module limited to the following:
-# No clear answer to the question, one leader for any combination of topic + partition, or at the same time, there are several different leaders?
-# Therefore supports queries with only one combination of topic + partition (first and only).
+# supports queries with only one combination of topic + partition (first and only).
 
     my $topic_data  = $request->{topics}->[0];
     my $topic_name  = $topic_data->{TopicName};
@@ -584,13 +590,22 @@ sub receive_response_to_request {
                             },
                         ],
                     };
-                }
-                else {
+                } else {
                     my $encoded_response_ref;
                     unless ( $encoded_response_ref = $self->_receiveIO( $server ) ) {
-                        $ErrorCode = $ERROR_CANNOT_RECV;
-                        $self->_remember_nonfatal_error( undef, $self->{_IO_cache}->{ $server }->{error}, $server, $topic_name, $partition );
-                        last REQUEST;   # go to the next attempt
+                        if ( $api_key == $APIKEY_PRODUCE ) {
+# WARNING: Unfortunately, the sent package (one or more messages) does not have a unique identifier
+# and there is no way to verify the delivery of data
+                            $ErrorCode = $ERROR_SEND_NO_ACK;
+
+                            # Should not be allowed to re-send data on the next attempt
+                            # FATAL error
+                            $self->_error( $ErrorCode, $self->{_IO_cache}->{ $server }->{error} );
+                        } else {
+                            $ErrorCode = $ERROR_CANNOT_RECV;
+                            $self->_remember_nonfatal_error( $ErrorCode, $self->{_IO_cache}->{ $server }->{error}, $server, $topic_name, $partition );
+                            last REQUEST;   # go to the next attempt
+                        }
                     }
                     $response = $protocol{ $api_key }->{decode}->( $encoded_response_ref );
                 }
@@ -613,7 +628,16 @@ sub receive_response_to_request {
             }
         }
 
+        # Expect to possible changes in the situation, such as restoration of connection
+        printf STDERR
+            "# sleeping for %d ms before making attempt #%d (%s)\n",
+            $self->{RETRY_BACKOFF},
+            $self->{SEND_MAX_RETRIES} - $retries + 1,
+            $ErrorCode == $ERROR_NO_ERROR ? 'refreshing metadata' : "ErrorCode ${ErrorCode}"
+        if $DEBUG;
+
         sleep $self->{RETRY_BACKOFF} / 1000;
+
         $self->_update_metadata( $topic_name )
             # FATAL error
             or $self->_error( $ErrorCode || $ERROR_CANNOT_GET_METADATA, "topic = '$topic_name', partition = $partition" );
@@ -694,6 +718,21 @@ sub nonfatal_errors {
     return $self->{_nonfatal_errors};
 }
 
+=head3 C<clear_nonfatals>
+
+Clears an array of the last non-fatal errors.
+
+A reference to the empty array is returned because there are no non-fatal errors now.
+
+=cut
+sub clear_nonfatals {
+    my ( $self ) = @_;
+
+    @{ $self->{_nonfatal_errors} } = ();
+
+    return $self->{_nonfatal_errors};
+}
+
 #-- private attributes ---------------------------------------------------------
 
 #-- private methods ------------------------------------------------------------
@@ -713,8 +752,11 @@ sub _remember_nonfatal_error {
         $topic      // '<undef>',
         $partition  // '<undef>',
         $error_code // 'IO error',
-        $error,
+        $error      // ( $ERROR{ $error_code } || '<undef>' ),
     );
+
+    say STDERR "# Non-fatal error: $msg" if $DEBUG;
+
     push @{ $self->{_nonfatal_errors} }, $msg;
 
     return $msg;
@@ -864,9 +906,9 @@ sub _update_metadata {
         # FATAL error
         or $self->_error( $ERROR_CANNOT_GET_METADATA, "topic = '$topic'" );
 
-    # Replace the information in the metadata
-    $self->{_metadata}  = $received_metadata;
-    $self->{_leaders}   = $leaders;
+    # Update metadata for received topics
+    $self->{_metadata}->{ $_ }  = $received_metadata->{ $_ } foreach keys %{ $received_metadata };
+    $self->{_leaders}->{ $_ }   = $leaders->{ $_ } foreach keys %{ $leaders };
 
     return 1;
 }
@@ -947,14 +989,33 @@ sub _receiveIO {
 
     my $server_data = $self->{_IO_cache}->{ $server };
     my $response_ref;
-    try {
-        my $io = $server_data->{IO};
-        $response_ref   = $io->receive( 4 );
-        $$response_ref .= ${ $io->receive( unpack( 'l>', $$response_ref ) ) };
-    } catch {
-        # NOTE: it is possible to repeat the operation here
-        $self->_on_io_error( $server_data, $_ );
-    };
+
+    my $error;
+    my $retries = $self->{RECEIVE_MAX_RETRIES};
+    ATTEMPTS:
+    while ( $retries-- ) {
+        $error = undef;
+        try {
+            my $io = $server_data->{IO};
+            $response_ref   = $io->receive( 4 ) unless $response_ref;
+            $$response_ref .= ${ $io->receive( unpack( 'l>', $$response_ref ) ) };
+        } catch {
+            $error = $_;
+        };
+        last unless $error;
+
+        printf STDERR
+            "# sleeping for %d ms before making attempt #%d (error '%s')\n",
+            $self->{RETRY_BACKOFF},
+            $self->{RECEIVE_MAX_RETRIES} - $retries + 1,
+            $error
+        if $DEBUG;
+
+        sleep $self->{RETRY_BACKOFF} / 1000;
+    }
+    $self->_on_io_error( $server_data, $_ )
+        if $error;
+
     return $response_ref;
 }
 

@@ -20,6 +20,8 @@ use sigtrap;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
+our $DEBUG = 0;
+
 our $VERSION = '0.800_18';
 
 #-- load the modules -----------------------------------------------------------
@@ -118,7 +120,6 @@ This class allows you to create Kafka 0.8 clients.
 
 =cut
 
-our $DEBUG = 0;
 our $_hdr;
 
 #-- constructor ----------------------------------------------------------------

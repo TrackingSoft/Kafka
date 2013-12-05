@@ -52,6 +52,7 @@ use Kafka qw(
     $NOT_SEND_ANY_RESPONSE
     $RECEIVE_EARLIEST_OFFSETS
     $RECEIVE_LATEST_OFFSET
+    $RECEIVE_MAX_RETRIES
     $REQUEST_TIMEOUT
     $RETRY_BACKOFF
     $SEND_MAX_RETRIES
@@ -100,6 +101,7 @@ sub new_ERROR_MISMATCH_ARGUMENT {
                 port                => $port,
                 CorrelationId       => undef,
                 SEND_MAX_RETRIES    => $SEND_MAX_RETRIES,
+                RECEIVE_MAX_RETRIES => $RECEIVE_MAX_RETRIES,
                 RETRY_BACKOFF       => $RETRY_BACKOFF,
                 $field              => $bad_value,
             );
@@ -180,6 +182,9 @@ sub testing {
 
 # SEND_MAX_RETRIES
     new_ERROR_MISMATCH_ARGUMENT( 'SEND_MAX_RETRIES', @not_posint );
+
+# RECEIVE_MAX_RETRIES
+    new_ERROR_MISMATCH_ARGUMENT( 'RECEIVE_MAX_RETRIES', @not_posint );
 
 # RETRY_BACKOFF
     new_ERROR_MISMATCH_ARGUMENT( 'RETRY_BACKOFF', @not_posint );

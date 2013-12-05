@@ -82,7 +82,7 @@ my ( $io, $decoded_request, $encoded_request, $decoded_response, $encoded_respon
 
 sub fulfill_request {
     $len = $io->send( $encoded_request );
-    is $len, length $encoded_request, 'request sended correctly';
+    is $len, length $encoded_request, 'request sent correctly';
     $len = 4;
     undef $encoded_response;
     $encoded_response = $io->receive( $len );

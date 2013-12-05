@@ -57,6 +57,7 @@ our @EXPORT_OK = qw(
     $ERROR_REPLICA_NOT_AVAILABLE
     $ERROR_REQUEST_OR_RESPONSE
     $ERROR_REQUEST_TIMED_OUT
+    $ERROR_SEND_NO_ACK
     $ERROR_STALE_CONTROLLER_EPOCH_CODE
     $ERROR_TOPIC_DOES_NOT_MATCH
     $ERROR_UNKNOWN
@@ -69,6 +70,7 @@ our @EXPORT_OK = qw(
     $NOT_SEND_ANY_RESPONSE
     $RECEIVE_EARLIEST_OFFSETS
     $RECEIVE_LATEST_OFFSET
+    $RECEIVE_MAX_RETRIES
     $REQUEST_TIMEOUT
     $RETRY_BACKOFF
     $SEND_MAX_RETRIES
@@ -503,6 +505,14 @@ This property specifies the number of retries when such failures occur.
 =cut
 const our $SEND_MAX_RETRIES                     => 4;
 
+=item C<$RECEIVE_MAX_RETRIES>
+
+4 - The leader may be unavailable transiently, which can fail the receiving of a response.
+This property specifies the number of retries when such failures occur.
+
+=cut
+const our $RECEIVE_MAX_RETRIES                  => 4;
+
 =item C<$RETRY_BACKOFF>
 
 200 - (ms)
@@ -641,89 +651,96 @@ const our $ERROR_MISMATCH_ARGUMENT              => -1000;
 =cut
 const our $ERROR_CANNOT_SEND                    => -1001;
 
-=item C<ERROR_CANNOT_RECV>
+=item C<$ERROR_SEND_NO_ACK>
 
--1002 - Can't receive
+-1002 - Not binary string
 
 =cut
-const our $ERROR_CANNOT_RECV                    => -1002;
+const our $ERROR_SEND_NO_ACK                    => -1002;
+
+=item C<ERROR_CANNOT_RECV>
+
+-1003 - No acknowledgement for sent request
+
+=cut
+const our $ERROR_CANNOT_RECV                    => -1003;
 
 =item C<ERROR_CANNOT_BIND>
 
--1003 - Can't bind
+-1004 - Can't bind
 
 =cut
-const our $ERROR_CANNOT_BIND                    => -1003;
+const our $ERROR_CANNOT_BIND                    => -1004;
 
 =item C<$ERROR_COMPRESSED_PAYLOAD>
 
--1004 - Compressed payload
+-1005 - Compressed payload
 
 =cut
-const our $ERROR_COMPRESSED_PAYLOAD             => -1004;
+const our $ERROR_COMPRESSED_PAYLOAD             => -1005;
 
 =item C<$ERROR_UNKNOWN_APIKEY>
 
--1005 - Unknown ApiKey
+-1006 - Unknown ApiKey
 
 =cut
-const our $ERROR_UNKNOWN_APIKEY                 => -1005;
+const our $ERROR_UNKNOWN_APIKEY                 => -1006;
 
 =item C<$ERROR_CANNOT_GET_METADATA>
 
--1006 - Can't get Metadata
+-1007 - Can't get Metadata
 
 =cut
-const our $ERROR_CANNOT_GET_METADATA            => -1006;
+const our $ERROR_CANNOT_GET_METADATA            => -1007;
 
 =item C<$ERROR_LEADER_NOT_FOUND>
 
--1007 - Leader not found
+-1008 - Leader not found
 
 =cut
-const our $ERROR_LEADER_NOT_FOUND               => -1007;
+const our $ERROR_LEADER_NOT_FOUND               => -1008;
 
 =item C<$ERROR_MISMATCH_CORRELATIONID>
 
--1008 - Mismatch CorrelationId
+-1009 - Mismatch CorrelationId
 
 =cut
-const our $ERROR_MISMATCH_CORRELATIONID         => -1008;
+const our $ERROR_MISMATCH_CORRELATIONID         => -1009;
 
 =item C<$ERROR_NO_KNOWN_BROKERS>
 
--1009 - There are no known brokers
+-1010 - There are no known brokers
 
 =cut
-const our $ERROR_NO_KNOWN_BROKERS               => -1009;
+const our $ERROR_NO_KNOWN_BROKERS               => -1010;
 
 =item C<$ERROR_REQUEST_OR_RESPONSE>
 
--1010 - Bad request or response element
+-1011 - Bad request or response element
 
 =cut
-const our $ERROR_REQUEST_OR_RESPONSE            => -1010;
+const our $ERROR_REQUEST_OR_RESPONSE            => -1011;
 
 =item C<$ERROR_TOPIC_DOES_NOT_MATCH>
 
--1011 - Topic does not match the requested
+-1012 - Topic does not match the requested
 
 =cut
-const our $ERROR_TOPIC_DOES_NOT_MATCH           => -1011;
+const our $ERROR_TOPIC_DOES_NOT_MATCH           => -1012;
 
 =item C<$ERROR_PARTITION_DOES_NOT_MATCH>
 
--1012 - Partition does not match the requested
+-1013 - Partition does not match the requested
 
 =cut
-const our $ERROR_PARTITION_DOES_NOT_MATCH       => -1012;
+const our $ERROR_PARTITION_DOES_NOT_MATCH       => -1013;
 
 =item C<$ERROR_NOT_BINARY_STRING>
 
--1013 - Not binary string
+-1014 - Not binary string
 
 =cut
-const our $ERROR_NOT_BINARY_STRING              => -1013;
+const our $ERROR_NOT_BINARY_STRING              => -1014;
 
 =back
 
@@ -867,6 +884,7 @@ our %ERROR = (
     # Errors fixed by Kafka package
     $ERROR_MISMATCH_ARGUMENT                => q{Invalid argument},
     $ERROR_CANNOT_SEND                      => q{Can't send},
+    $ERROR_SEND_NO_ACK                      => q{No acknowledgement for sent request},
     $ERROR_CANNOT_RECV                      => q{Can't recv},
     $ERROR_CANNOT_BIND                      => q{Can't bind},
     $ERROR_COMPRESSED_PAYLOAD               => q{Compressed payload},

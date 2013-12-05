@@ -50,6 +50,7 @@ use List::Util qw(
 use POSIX ':sys_wait_h';
 
 use Kafka qw(
+    $BLOCK_UNTIL_IS_COMMITTED
     $MESSAGE_SIZE_OVERHEAD
     $RECEIVE_LATEST_OFFSET
 );
@@ -402,10 +403,12 @@ $connection = Kafka::Connection->new(
     AutoCreateTopicsEnable  => 1,
 );
 $producer = Kafka::Producer->new(
-    Connection  => $connection,
+    Connection      => $connection,
+    # For sure the next verifying the number of messages sent and recorded
+    RequiredAcks    => $BLOCK_UNTIL_IS_COMMITTED,
 );
 $consumer = Kafka::Consumer->new(
-    Connection  => $connection,
+    Connection      => $connection,
 );
 
 @clients = ();
@@ -451,6 +454,12 @@ while ( scalar @clients ) {
 
     if ( $count > $CLIENT_MSGS ) {
         note "Finished '$client_type', partition = $partition";
+
+        #-- total
+        if ( $client_type eq 'producer' ) {
+            is $count, next_offset( $partition ), "total number of recorded messages coincides with the number of messages sent ($count)";
+        }
+
         splice( @clients, $i, 1 );
     }
 
