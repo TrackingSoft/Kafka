@@ -44,6 +44,9 @@ use Kafka qw(
 use Kafka::Exceptions;
 use Kafka::Internals qw(
     $APIKEY_PRODUCE
+    $MAX_CORRELATIONID
+    $MAX_INT16
+    $MAX_INT32
     $PRODUCER_ANY_OFFSET
     _get_CorrelationId
 );
@@ -144,7 +147,7 @@ the Apache Kafka cluster.
 
 =item C<CorrelationId =E<gt> $correlation_id>
 
-Optional, default = C<undef> .
+Optional, int32 signed integer, default = C<undef> .
 
 C<Correlation> is a user-supplied integer.
 It will be passed back in the response by the server, unmodified.
@@ -164,7 +167,7 @@ If C<ClientId> is not passed to constructor, its value will be automatically ass
 
 =item C<RequiredAcks =E<gt> $acks>
 
-The C<$acks> should be an integer number.
+The C<$acks> should be an int16 signed integer.
 
 Indicates how many acknowledgements the servers should receive before responding to the request.
 
@@ -186,7 +189,7 @@ can be imported from the L<Kafka|Kafka> module.
 This provides a maximum time the server can await the receipt
 of the number of acknowledgements in RequiredAcks.
 
-The C<$timeout> in seconds, could be any integer or floating-point type.
+The C<$timeout> in seconds, could be any integer or floating-point type not bigger than int32 positive integer.
 
 Optional, default = C<$REQUEST_TIMEOUT>.
 
@@ -217,14 +220,14 @@ sub new {
 
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'Connection' )
         unless _INSTANCE( $self->{Connection}, 'Kafka::Connection' );
-    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'CorrelationId' )
-        unless isint( $self->{CorrelationId} );
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'CorrelationId ('.( $self->{CorrelationId} // '<undef>' ).')' )
+        unless isint( $self->{CorrelationId} ) && $self->{CorrelationId} <= $MAX_CORRELATIONID;
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'ClientId' )
         unless ( $self->{ClientId} eq q{} || defined( _STRING( $self->{ClientId} ) ) ) && !utf8::is_utf8( $self->{ClientId} );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'RequiredAcks' )
-        unless defined( $self->{RequiredAcks} ) && isint( $self->{RequiredAcks} );
-    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'Timeout' )
-        unless _NUMBER( $self->{Timeout} );
+        unless defined( $self->{RequiredAcks} ) && isint( $self->{RequiredAcks} ) && $self->{RequiredAcks} <= $MAX_INT16;
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'Timeout ('.( $self->{Timeout} // '<undef>' ).')' )
+        unless _NUMBER( $self->{Timeout} ) && $self->{Timeout} <= $MAX_INT32;
 
     return $self;
 }

@@ -30,6 +30,9 @@ our @EXPORT_OK = qw(
     $APIKEY_OFFSET
     $APIKEY_METADATA
     $DEFAULT_RAISE_ERROR
+    $MAX_CORRELATIONID
+    $MAX_INT16
+    $MAX_INT32
     $MAX_SOCKET_REQUEST_BYTES
     $PRODUCER_ANY_OFFSET
     _isbig
@@ -140,7 +143,21 @@ const our $PRODUCER_ANY_OFFSET                  => 0;
 Largest positive integer on 32-bit machines.
 
 =cut
-const my  $MAX_CORRELATIONID                    => 2**31 - 1;
+const our $MAX_CORRELATIONID                    => 0x7fffffff;
+
+=head3 C<$MAX_INT32>
+
+Largest positive integer on 32-bit machines.
+
+=cut
+const our $MAX_INT32                            => 0x7fffffff;
+
+=head3 C<$MAX_INT16>
+
+Largest positive int16 value.
+
+=cut
+const our $MAX_INT16                            => 0x7fff;
 
 #-- public functions -----------------------------------------------------------
 

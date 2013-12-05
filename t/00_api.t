@@ -167,6 +167,9 @@ BEGIN {
         $APIKEY_FETCH
         $APIKEY_OFFSET
         $APIKEY_METADATA
+        $MAX_CORRELATIONID
+        $MAX_INT16
+        $MAX_INT32
         $MAX_SOCKET_REQUEST_BYTES
         $PRODUCER_ANY_OFFSET
     ) ];

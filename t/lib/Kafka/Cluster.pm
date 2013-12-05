@@ -1077,14 +1077,16 @@ sub _create_topic {
 
     my @args = (
         'bin/kafka-create-topic.sh',
-        "--topic $DEFAULT_TOPIC",
-        '--replica '.scalar( @servers ),
         "--zookeeper $HOST:".$self->zookeeper_port,
+        '--replica '.scalar( @servers ),
         "--partition $partitions",
+        "--topic $DEFAULT_TOPIC",
     );
 
     my $cwd = getcwd();
     chdir $self->base_dir;
+
+    $ENV{KAFKA_JVM_PERFORMANCE_OPTS} = ' ';
 
     say '# [', scalar( localtime ), "] Creating topic '$DEFAULT_TOPIC': replication factor = ", scalar( @servers ), ", partition = $partitions";
     my ( $exit_status, $child_error );
@@ -1097,6 +1099,8 @@ sub _create_topic {
             $child_error = $?;
         } stdout => $out_fh, stderr => $err_fh;
     }
+
+    delete $ENV{KAFKA_JVM_PERFORMANCE_OPTS};
 
     chdir $cwd;
 

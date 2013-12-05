@@ -52,6 +52,7 @@ use Kafka::Exceptions;
 use Kafka::Internals qw(
     $APIKEY_FETCH
     $APIKEY_OFFSET
+    $MAX_INT32
     _get_CorrelationId
     _isbig
 );
@@ -230,18 +231,18 @@ immediately. If it is set to C<$MIN_BYTES_RESPOND_HAS_DATA>, the server will res
 as at least one partition has at least 1 byte of data or the specified timeout occurs.
 Setting higher values in combination with the bigger timeouts allows reading larger chunks of data.
 
-Optional, default is C<$MIN_BYTES_RESPOND_IMMEDIATELY>.
+Optional, int32 signed integer, default is C<$MIN_BYTES_RESPOND_IMMEDIATELY>.
 
 C<$MIN_BYTES_RESPOND_IMMEDIATELY>, C<$MIN_BYTES_RESPOND_HAS_DATA> are the defaults that
 can be imported from the L<Kafka|Kafka> module.
 
-The C<$min_bytes> must be a non-negative integer.
+The C<$min_bytes> must be a non-negative int32 signed integer.
 
 =item C<MaxBytes =E<gt> $max_bytes>
 
 The maximum bytes to include in the message set for this partition.
 
-Optional, default = C<$DEFAULT_MAX_BYTES> (1_000_000).
+Optional, int32 signed integer, default = C<$DEFAULT_MAX_BYTES> (1_000_000).
 
 The C<$max_bytes> must be more than C<$MESSAGE_SIZE_OVERHEAD>
 (size of protocol overhead - data added by Kafka wire protocol to each message).
@@ -255,7 +256,7 @@ Limit the number of offsets returned by Kafka.
 
 That is a non-negative integer.
 
-Optional, default = C<$DEFAULT_MAX_NUMBER_OF_OFFSETS> (100).
+Optional, int32 signed integer, default = C<$DEFAULT_MAX_NUMBER_OF_OFFSETS> (100).
 
 C<$DEFAULT_MAX_NUMBER_OF_OFFSETS>
 is the default that can be imported from the L<Kafka|Kafka> module.
@@ -291,14 +292,14 @@ sub new {
         unless defined( $self->{CorrelationId} ) && isint( $self->{CorrelationId} );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'ClientId' )
         unless ( $self->{ClientId} eq q{} || defined( _STRING( $self->{ClientId} ) ) ) && !utf8::is_utf8( $self->{ClientId} );
-    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'MaxWaitTime' )
-        unless defined( $self->{MaxWaitTime} ) && isint( $self->{MaxWaitTime} ) && $self->{MaxWaitTime} > 0;
-    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'MinBytes' )
-        unless defined( _NONNEGINT( $self->{MinBytes} ) );
-    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'MaxBytes' )
-        unless _POSINT( $self->{MaxBytes} ) && $self->{MaxBytes} >= $MESSAGE_SIZE_OVERHEAD;
-    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'MaxNumberOfOffsets' )
-        unless defined( _POSINT( $self->{MaxNumberOfOffsets} ) );
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'MaxWaitTime ('.( $self->{MaxWaitTime} // '<undef>' ).')' )
+        unless defined( $self->{MaxWaitTime} ) && isint( $self->{MaxWaitTime} ) && $self->{MaxWaitTime} > 0 && $self->{MaxWaitTime} <= $MAX_INT32;
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'MinBytes ('.( $self->{MinBytes} // '<undef>' ).')' )
+        unless ( _isbig( $self->{MinBytes} ) ? ( $self->{MinBytes} >= 0 ) : defined( _NONNEGINT( $self->{MinBytes} ) ) ) && $self->{MinBytes} <= $MAX_INT32;
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'MaxBytes ('.( $self->{MaxBytes} // '<undef>' ).')' )
+        unless ( _isbig( $self->{MaxBytes} ) ? ( $self->{MaxBytes} > 0 ) : _POSINT( $self->{MaxBytes} ) ) && $self->{MaxBytes} >= $MESSAGE_SIZE_OVERHEAD && $self->{MaxBytes} <= $MAX_INT32;
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'MaxNumberOfOffsets ('.( $self->{MaxNumberOfOffsets} // '<undef>' ).')' )
+        unless defined( _POSINT( $self->{MaxNumberOfOffsets} ) ) && $self->{MaxNumberOfOffsets} <= $MAX_INT32;
 
     return $self;
 }
@@ -341,7 +342,7 @@ L<Math::BigInt|Math::BigInt> integer on 32-bit system.
 =item C<$max_size>
 
 C<$max_size> is the maximum size of the messages set to return. The argument
-must be a positive integer.
+must be a positive int32 signed integer.
 
 The maximum size of a request limited by C<MAX_SOCKET_REQUEST_BYTES> that
 can be imported from L<Kafka|Kafka> module.
@@ -358,8 +359,8 @@ sub fetch {
         unless defined( $partition ) && isint( $partition );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, '$offset' )
         unless defined( $offset ) && ( ( _isbig( $offset ) && $offset >= 0 ) || defined( _NONNEGINT( $offset ) ) );
-    $self->_error( $ERROR_MISMATCH_ARGUMENT, '$max_size' )
-        unless ( !defined( $max_size ) || ( _POSINT( $max_size ) && $max_size >= $MESSAGE_SIZE_OVERHEAD ) );
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, "\$max_size ($max_size)" )
+        unless ( !defined( $max_size ) || ( ( _isbig( $max_size ) || _POSINT( $max_size ) ) && $max_size >= $MESSAGE_SIZE_OVERHEAD && $max_size <= $MAX_INT32 ) );
 
     my $request = {
         ApiKey                              => $APIKEY_FETCH,
@@ -459,7 +460,7 @@ are the defaults that can be imported from the L<Kafka|Kafka> module.
 
 C<$max_number> is the maximum number of offsets to retrieve.
 
-Optional. The argument must be a positive integer.
+Optional. The argument must be a positive int32 signed integer.
 
 =back
 
@@ -473,8 +474,8 @@ sub offsets {
         unless defined( $partition ) && isint( $partition );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, '$time' )
         unless defined( $time ) && ( _isbig( $time ) || isint( $time ) ) && $time >= $RECEIVE_EARLIEST_OFFSETS;
-    $self->_error( $ERROR_MISMATCH_ARGUMENT, '$max_number' )
-        unless !defined( $max_number ) || _POSINT( $max_number );
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, "\$max_number ($max_number)" )
+        unless !defined( $max_number ) || ( _POSINT( $max_number ) && $max_number <= $MAX_INT32 );
 
     my $request = {
         ApiKey                              => $APIKEY_OFFSET,

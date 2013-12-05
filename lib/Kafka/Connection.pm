@@ -93,6 +93,8 @@ use Kafka::Internals qw(
     $APIKEY_METADATA
     $APIKEY_OFFSET
     $APIKEY_PRODUCE
+    $MAX_CORRELATIONID
+    $MAX_INT32
     _get_CorrelationId
 );
 use Kafka::IO;
@@ -260,7 +262,7 @@ or C<broker_list> must be supplied.
 Optional, default = C<$REQUEST_TIMEOUT>.
 
 C<$timeout> specifies how long we wait for the remote server to respond.
-C<$timeout> is in seconds, could be a positive integer or a floating-point number.
+C<$timeout> is in seconds, could be a positive integer or a floating-point number not bigger than int32 positive integer.
 
 C<$REQUEST_TIMEOUT> is the default timeout that can be imported from the
 L<Kafka|Kafka> module.
@@ -297,7 +299,7 @@ If C<CorrelationId> is not provided, it is set to a random negative integer.
 
 =item C<SEND_MAX_RETRIES =E<gt> $retries>
 
-Optional, default = C<$SEND_MAX_RETRIES> .
+Optional, int32 signed integer, default = C<$SEND_MAX_RETRIES> .
 
 C<$SEND_MAX_RETRIES> is the default number of retries that can be imported from the
 L<Kafka|Kafka> module and = 3 .
@@ -375,12 +377,12 @@ sub new {
         unless defined( $self->{host} ) && ( $self->{host} eq q{} || defined( _STRING( $self->{host} ) ) ) && !utf8::is_utf8( $self->{host} );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'port' )
         unless _POSINT( $self->{port} );
-    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'timeout' )
-        unless ( _NUMBER( $self->{timeout} ) && $self->{timeout} > 0 ) || !defined( $self->{timeout} );
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'timeout ('.( $self->{timeout} // '<undef>' ).')' )
+        unless ( _NUMBER( $self->{timeout} ) && $self->{timeout} > 0 && $self->{timeout} <= $MAX_INT32 ) || !defined( $self->{timeout} );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'broker_list' )
         unless _ARRAY0( $self->{broker_list} );
-    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'CorrelationId' )
-        unless isint( $self->{CorrelationId} );
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'CorrelationId ('.( $self->{CorrelationId} // '<undef>' ).')' )
+        unless isint( $self->{CorrelationId} ) && $self->{CorrelationId} <= $MAX_CORRELATIONID;
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'SEND_MAX_RETRIES' )
         unless _POSINT( $self->{SEND_MAX_RETRIES} );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'RETRY_BACKOFF' )
@@ -706,7 +708,7 @@ sub _remember_nonfatal_error {
     shift( @{ $self->{_nonfatal_errors} } )
         if scalar( @{ $self->{_nonfatal_errors} } ) == $max_logged_errors;
     my $msg = sprintf( "[%s] server '%s', topic '%s', partition %s : (%s) %s",
-        localtime.q{},
+        localtime().q{},
         $server     // '<undef>',
         $topic      // '<undef>',
         $partition  // '<undef>',

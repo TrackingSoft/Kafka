@@ -20,13 +20,14 @@ then
   exit 1
 fi
 
-#base_dir=$(dirname $0)/..
 base_dir=${KAFKA_BASE_DIR}
 
-SCALA_VERSION=2.8.0
+if [ -z "$SCALA_VERSION" ]; then
+  SCALA_VERSION=2.8.0
+fi
 
 # assume all dependencies have been packaged into one jar with sbt-assembly's task "assembly-package-dependency"
-for file in $base_dir/core/target/scala-2.8.0/*.jar;
+for file in $base_dir/core/target/${SCALA_VERSION}/*.jar;
 do
   CLASSPATH=$CLASSPATH:$file
 done
@@ -47,32 +48,34 @@ do
   CLASSPATH=$CLASSPATH:$file
 done
 
+# JMX settings
 if [ -z "$KAFKA_JMX_OPTS" ]; then
   KAFKA_JMX_OPTS="-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.authenticate=false  -Dcom.sun.management.jmxremote.ssl=false "
 fi
 
+# Log4j settings
+# Memory options
 if [ -z "$KAFKA_OPTS" ]; then
-#  KAFKA_OPTS="-Xmx512M -server  -Dlog4j.configuration=file:$base_dir/config/log4j.properties"
-  KAFKA_OPTS=(-Xmx512M -server "-Dlog4j.configuration=file:$base_dir/config/log4j.properties")
+  KAFKA_OPTS=(-Xmx256M -server "-Dlog4j.configuration=file:$base_dir/config/log4j.properties")
 fi
 
+# JMX port to use
 if [  $JMX_PORT ]; then
   KAFKA_JMX_OPTS="$KAFKA_JMX_OPTS -Dcom.sun.management.jmxremote.port=$JMX_PORT "
 fi
 
+# Which java to use
 if [ -z "$JAVA_HOME" ]; then
   JAVA="java"
 else
   JAVA="$JAVA_HOME/bin/java"
 fi
 
-#$JAVA $KAFKA_OPTS $KAFKA_JMX_OPTS -cp $CLASSPATH "$@"
 $JAVA "${KAFKA_OPTS[@]}" $KAFKA_JMX_OPTS -cp $CLASSPATH "$@"
 
 exitval=$?
 
 if [ $exitval -eq "1" ] ; then
-#	$JAVA $KAFKA_OPTS $KAFKA_JMX_OPTS -cp $CLASSPATH "$@" >& exception.txt
 	$JAVA "${KAFKA_OPTS[@]}" $KAFKA_JMX_OPTS -cp $CLASSPATH "$@" >& exception.txt
 	exception=`cat exception.txt`
 	noBuildMessage='Please build the project using sbt. Documentation is available at http://kafka.apache.org/'

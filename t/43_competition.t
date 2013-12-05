@@ -56,6 +56,9 @@ use Kafka qw(
 use Kafka::Cluster;
 use Kafka::Connection;
 use Kafka::Consumer;
+use Kafka::Internals qw(
+    $MAX_CORRELATIONID
+);
 use Kafka::MockIO;
 use Kafka::Producer;
 
@@ -84,13 +87,13 @@ copy( $properties_file, $bak_properties_file );
 # All messages have the same length
 
 const my $PAIRS_CLIENTS         => 10;
-const my $MAX_DATA              => 50 * 1024 *1024; # MBs
+const my $MAX_DATA              => 20 * 1024 *1024; # MBs
 const my $MAX_DATA_RECORS       => 1_000_000;
 const my $MSG_LEN               => int( $MAX_DATA / $MAX_DATA_RECORS );
-const my $MAX_MSGS_SENT         => 10_000,
-const my $MAX_MSGS_RECV         => 10_000,
+const my $MAX_MSGS_SENT         => min( 10_000, int( $MAX_CORRELATIONID / ( $MSG_LEN + $MESSAGE_SIZE_OVERHEAD ) ) ),
+const my $MAX_MSGS_RECV         => min( 10_000, int( $MAX_CORRELATIONID / ( $MSG_LEN + $MESSAGE_SIZE_OVERHEAD ) ) ),
 const my $CLIENT_MSGS           => int( $MAX_DATA_RECORS / $PAIRS_CLIENTS );
-const my $SECS_TO_WAIT          => 120;
+const my $SECS_TO_WAIT          => 300;
 
 const my $AUTO_CREATE_TOPICS    => 'true';
 const my $REPLICATION_FACTOR    => 3;
