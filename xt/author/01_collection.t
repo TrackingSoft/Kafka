@@ -221,6 +221,7 @@ ReplicaId
 RequiredAcks
 sec
 Sergey
+Sergiy
 Simplistically
 Solovey
 subclasses
@@ -230,3 +231,4 @@ TopicName
 TrackingSoft
 unblessed
 ZooKeeper
+Zuban

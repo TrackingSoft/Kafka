@@ -6,7 +6,7 @@ Kafka::Internals - Constants and functions used internally.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Internals> version 0.800_18 .
+This documentation refers to C<Kafka::Internals> version 0.8001 .
 
 =cut
 
@@ -18,7 +18,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_18';
+our $VERSION = '0.8001';
 
 use Exporter qw(
     import
@@ -35,6 +35,7 @@ our @EXPORT_OK = qw(
     $MAX_INT32
     $MAX_SOCKET_REQUEST_BYTES
     $PRODUCER_ANY_OFFSET
+    debug_level
     _isbig
     _get_CorrelationId
 );
@@ -84,28 +85,28 @@ The following constants are available for export
 
 =head3 C<$APIKEY_PRODUCE>
 
-The numeric code that the ApiKey in the request take for the C<ProduceRequest> request type.
+The numeric code that the C<ApiKey> in the request take for the C<ProduceRequest> request type.
 
 =cut
 const our $APIKEY_PRODUCE                       => 0;
 
 =head3 C<$APIKEY_FETCH>
 
-The numeric code that the ApiKey in the request take for the C<FetchRequest> request type.
+The numeric code that the C<ApiKey> in the request take for the C<FetchRequest> request type.
 
 =cut
 const our $APIKEY_FETCH                         => 1;
 
 =head3 C<$APIKEY_OFFSET>
 
-The numeric code that the ApiKey in the request take for the C<OffsetRequest> request type.
+The numeric code that the C<ApiKey> in the request take for the C<OffsetRequest> request type.
 
 =cut
 const our $APIKEY_OFFSET                        => 2;
 
 =head3 C<$APIKEY_METADATA>
 
-The numeric code that the ApiKey in the request take for the C<MetadataRequest> request type.
+The numeric code that the C<ApiKey> in the request take for the C<MetadataRequest> request type.
 
 =cut
 const our $APIKEY_METADATA                      => 3;
@@ -125,7 +126,7 @@ const our $APIKEY_OFFSETFETCH                   => 7;   # Not used now
 The maximum number of bytes in a socket request.
 
 The maximum size of a request that the socket server will accept.
-Default limit (as configured in server.properties) is 104857600.
+Default limit (as configured in F<server.properties>) is 104857600.
 
 =cut
 const our $MAX_SOCKET_REQUEST_BYTES             => 100 * 1024 * 1024;
@@ -177,7 +178,49 @@ sub _isbig {
 
 #-- public attributes ----------------------------------------------------------
 
+=head2 METHODS
+
+The following methods are defined in the C<Kafka::Internals>:
+
+=cut
+
 #-- public methods -------------------------------------------------------------
+
+=head3 C<debug_level( $flags )>
+
+Gets or sets debug level for a particular L<Kafka|Kafka> module, based on environment variable C<PERL_KAFKA_DEBUG> or flags.
+
+$flags - (string) argument that can be used to pass coma delimited module names (omit C<Kafka::>).
+
+Returns C<$DEBUG> level for the module from which C<debug_level> was called.
+
+=cut
+sub debug_level {
+    no strict 'refs';                                               ## no critic
+
+    my $class = ref( $_[0] ) || $_[0];
+    my $flags = $_[1] // $ENV{PERL_KAFKA_DEBUG}
+        // return( ${ "${class}::DEBUG" } );                        ## no critic
+
+    my ( $result, @elements, $module_name, $level );
+    foreach my $spec ( split /\s*,\s*/, $flags ) {
+        @elements = split /\s*:\s*/, $spec;
+        if ( scalar( @elements ) > 1 ) {
+            ( $module_name, $level ) = @elements;
+        } else {
+            $module_name = ( $class =~ /([^:]+)$/ )[0];
+            $level = $spec;
+        }
+
+        if ( eval( "exists \$Kafka::${module_name}::{DEBUG}" ) ) {  ## no critic
+            $result = ${ "Kafka::${module_name}::DEBUG" } = $level;
+        } else {
+            $result = undef;
+        }
+    }
+
+    return ${ "${class}::DEBUG" };
+}
 
 #-- private attributes ---------------------------------------------------------
 
@@ -230,6 +273,8 @@ Sergey Gladkov, E<lt>sgladkov@trackingsoft.comE<gt>
 Alexander Solovey
 
 Jeremy Jordan
+
+Sergiy Zuban
 
 Vlad Marchenko
 

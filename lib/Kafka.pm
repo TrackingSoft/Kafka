@@ -9,7 +9,7 @@ Kafka - Apache Kafka interface for Perl.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka> package version 0.800_18 .
+This documentation refers to C<Kafka> package version 0.8001 .
 
 =cut
 
@@ -21,7 +21,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_18';
+our $VERSION = '0.8001';
 
 use Exporter qw(
     import
@@ -653,14 +653,14 @@ const our $ERROR_CANNOT_SEND                    => -1001;
 
 =item C<$ERROR_SEND_NO_ACK>
 
--1002 - Not binary string
+-1002 - No acknowledgement for sent request
 
 =cut
 const our $ERROR_SEND_NO_ACK                    => -1002;
 
 =item C<ERROR_CANNOT_RECV>
 
--1003 - No acknowledgement for sent request
+-1003 - Can't recv
 
 =cut
 const our $ERROR_CANNOT_RECV                    => -1003;
@@ -1068,6 +1068,25 @@ Kafka package has the following optional dependencies:
 
 If the optional modules are missing, some "prereq" tests are skipped.
 
+=head1 DIAGNOSTICS
+
+Debug output can be enabled by setting level via one of the following
+environment variables:
+
+C<PERL_KAFKA_DEBUG=1>               - debug is enabled for the whole C<Kafka> package.
+
+C<PERL_KAFKA_DEBUG=IO:1>            - enable debug only for L<Kafka::IO|Kafka::IO> only.
+
+C<PERL_KAFKA_DEBUG=Connection:1>    - enable debug only for particular L<Kafka::Connection|Kafka::Connection>.
+
+It's possible to set different debug levels, like in the following example:
+
+C<PERL_KAFKA_DEBUG=Connection:1,IO:2>
+
+See documentation for a particular module for explanation of various debug levels.
+
+=cut
+
 =head1 BUGS AND LIMITATIONS
 
 Currently, the package does not implement send and response of compressed
@@ -1149,6 +1168,8 @@ Sergey Gladkov, E<lt>sgladkov@trackingsoft.comE<gt>
 Alexander Solovey
 
 Jeremy Jordan
+
+Sergiy Zuban
 
 Vlad Marchenko
 

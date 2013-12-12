@@ -7,7 +7,7 @@ server via socket.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::MockIO> version 0.800_18 .
+This documentation refers to C<Kafka::MockIO> version 0.8001 .
 
 =cut
 
@@ -19,7 +19,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_18';
+our $VERSION = '0.8001';
 
 #-- load the modules -----------------------------------------------------------
 
@@ -91,7 +91,7 @@ Simplistically emulates interaction with kafka server.
 
 =back
 
-Examples see C<t/??_mock_io.t>.
+Examples see C<t/*_mock_io.t>.
 
 =cut
 
@@ -445,7 +445,8 @@ sub send {
     ( my $len = length( $message .= q{} ) ) <= $MAX_SOCKET_REQUEST_BYTES
         or Kafka::IO::_error( $self, $ERROR_MISMATCH_ARGUMENT, $description );
 
-    Kafka::IO::_debug_msg( $self, 'Request to', 'green', $message ) if $Kafka::IO::DEBUG;
+    Kafka::IO::_debug_msg( $self, $message, 'Request to', 'green' )
+        if Kafka::IO->debug_level == 1;
 
     if ( exists $_special_cases{ $message } ) {
         $encoded_response = $_special_cases{ $message };
@@ -612,8 +613,8 @@ sub receive {
 
     my $message = substr( $encoded_response, 0, $length, q{} );
 
-    Kafka::IO::_debug_msg( $self, 'Response from', 'yellow', $message )
-        if $Kafka::IO::DEBUG;
+    Kafka::IO::_debug_msg( $self, $message, 'Response from', 'yellow' )
+        if Kafka::IO->debug_level == 1;
 
     return \$message;
 }
@@ -737,6 +738,8 @@ Sergey Gladkov, E<lt>sgladkov@trackingsoft.comE<gt>
 Alexander Solovey
 
 Jeremy Jordan
+
+Sergiy Zuban
 
 Vlad Marchenko
 

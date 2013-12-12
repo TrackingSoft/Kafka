@@ -60,9 +60,13 @@ use Kafka::TestInternals qw(
 
 #-- setting up facilities ------------------------------------------------------
 
+# See Kafka::IO
 use constant DEBUG  => 0;
-#use constant DEBUG  => 2;   # See Kafka::IO
-$Kafka::IO::DEBUG = DEBUG if DEBUG;
+#use constant DEBUG  => 1;
+#use constant DEBUG  => 2;
+
+Kafka::IO->debug_level( DEBUG ) if DEBUG;
+
 STDOUT->autoflush;
 
 #-- declarations ---------------------------------------------------------------
@@ -91,7 +95,7 @@ my $server_code = sub {
 sub debug_msg {
     my ( $message ) = @_;
 
-    return unless DEBUG;
+    return if Kafka::IO->debug_level != 2;
 
     diag '[ time = ', Time::HiRes::time(), ' ] ', $message;
 }

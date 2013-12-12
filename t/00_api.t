@@ -123,6 +123,7 @@ BEGIN {
         $ERROR_MESSAGE_SIZE_TOO_LARGE
         $ERROR_MISMATCH_ARGUMENT
         $ERROR_MISMATCH_CORRELATIONID
+        $ERROR_SEND_NO_ACK
         $ERROR_NO_ERROR
         $ERROR_NO_KNOWN_BROKERS
         $ERROR_NOT_BINARY_STRING
@@ -325,6 +326,8 @@ BEGIN {
 
 BEGIN {
     $ours_Kafka_Connection = [ qw (
+        DEBUG
+        RETRY_ON_ERRORS
     ) ];
 
     $methods_Kafka_Connection = [ qw(
@@ -332,6 +335,7 @@ BEGIN {
         close
         close_connection
         cluster_errors
+        debug_level
         get_known_servers
         is_server_alive
         is_server_known

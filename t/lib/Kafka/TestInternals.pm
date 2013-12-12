@@ -6,7 +6,7 @@ Kafka::TestInternals - Constants and functions used in the tests.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::TestInternals> version 0.800_18 .
+This documentation refers to C<Kafka::TestInternals> version 0.8001 .
 
 =cut
 
@@ -18,7 +18,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_18';
+our $VERSION = '0.8001';
 
 use Exporter qw(
     import
@@ -286,7 +286,7 @@ const our @not_array => (
 =head3 C<@not_topics_array>
 
 The values do not correspond to a 'topics' ARRAY reference.
-For 'topics' ARRAY examples see C<t/??_decode_encode.t>.
+For 'topics' ARRAY examples see C<t/*_decode_encode.t>.
 
 =cut
 our @not_topics_array;
@@ -461,6 +461,8 @@ Sergey Gladkov, E<lt>sgladkov@trackingsoft.comE<gt>
 Alexander Solovey
 
 Jeremy Jordan
+
+Sergiy Zuban
 
 Vlad Marchenko
 

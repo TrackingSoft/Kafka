@@ -6,7 +6,7 @@ Kafka::IO - Interface to network communication with the Apache Kafka server.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::IO> version 0.800_18 .
+This documentation refers to C<Kafka::IO> version 0.8001 .
 
 =cut
 
@@ -22,7 +22,7 @@ use sigtrap;
 
 our $DEBUG = 0;
 
-our $VERSION = '0.800_18';
+our $VERSION = '0.8001';
 
 #-- load the modules -----------------------------------------------------------
 
@@ -64,6 +64,7 @@ use Kafka qw(
 use Kafka::Exceptions;
 use Kafka::Internals qw(
     $MAX_SOCKET_REQUEST_BYTES
+    debug_level
 );
 
 #-- declarations ---------------------------------------------------------------
@@ -110,7 +111,7 @@ The main features of the C<Kafka::IO> class are:
 
 =item *
 
-Provides an object oriented API for communication with Kafka
+Provides an object oriented API for communication with Kafka.
 
 =item *
 
@@ -225,7 +226,7 @@ sub send {
         or $self->_error( $ERROR_MISMATCH_ARGUMENT, '->send' );
 
     $self->_debug_msg( $message, 'Request to', 'green' )
-        if $DEBUG == 1;
+        if $self->debug_level;
 
     # accept not accepted earlier
     while ( select( my $mask = $self->{_select}, undef, undef, 0 ) ) {
@@ -275,7 +276,7 @@ sub receive {
         or $self->_error( $ERROR_CANNOT_RECV, "->receive - $!" );
 
     $self->_debug_msg( $message, 'Response from', 'yellow' )
-        if $DEBUG == 1;
+        if $self->debug_level;
     return \$message;
 }
 
@@ -347,7 +348,7 @@ sub _connect {
             undef $h;
 
             $self->_debug_msg( "_connect: ip = '".( defined( $ip ) ? inet_ntoa( $ip ) : '<undef>' ).", error = '$error', \$? = $?, \$! = '$!'" )
-                if $DEBUG == 2;
+                if $self->debug_level >= 2;
 
             die $error if $error;
             die( "gethostbyname $name: \$? = '$?', \$! = '$!'\n" ) unless defined $ip;
@@ -356,20 +357,20 @@ sub _connect {
             # $SIG{ALRM} restored automatically, but we need to restart previous alarm manually
 
             $self->_debug_msg( "_connect: ".( $remaining // '<undef>' )." (remaining) - $elapsed (elapsed) = ".( $remaining - $elapsed ) )
-                if $DEBUG == 2;
+                if $self->debug_level >= 2;
             if ( $remaining ) {
                 if ( $remaining - $elapsed > 0 ) {
                     $self->_debug_msg( '_connect: remaining - elapsed > 0 (to alarm restart)' )
-                        if $DEBUG == 2;
+                        if $self->debug_level >= 2;
                     alarm( ceil( $remaining - $elapsed ) );
                 } else {
                     $self->_debug_msg( '_connect: remaining - elapsed < 0 (to alarm function call)' )
-                        if $DEBUG == 2;
+                        if $self->debug_level >= 2;
                     # $SIG{ALRM}->();
                     kill ALRM => $$;
                 }
                 $self->_debug_msg( "_connect: after alarm 'recalled'" )
-                    if $DEBUG == 2;
+                    if $self->debug_level >= 2;
             }
         } else {
             $ip = gethostbyname( $name );
@@ -447,7 +448,7 @@ sub _gethostbyname {
 sub _debug_msg {
     my ( $self, $message, $header, $colour ) = @_;
 
-    if ( $DEBUG == 1 ) {
+    if ( $self->debug_level ) {
         unless ( $_hdr ) {
             require Data::HexDump::Range;
             $_hdr = Data::HexDump::Range->new(
@@ -473,7 +474,7 @@ sub _debug_msg {
             );
         }
 
-        warn
+        say STDERR
             "# $header ", $self->{host}, ':', $self->{port}, "\n",
             '# Hex Stream: ', unpack( q{H*}, $message ), "\n",
             $_hdr->dump(
@@ -483,8 +484,8 @@ sub _debug_msg {
                 $message
             )
         ;
-    } elsif ( $DEBUG == 2 ) {
-        say STDERR '# [ time = ', Time::HiRes::time(), ' ] ', $message;
+    } elsif ( $self->debug_level >= 2 ) {
+        say STDERR '[', scalar( localtime ), ' ] ', $message;
     }
 }
 
@@ -517,7 +518,9 @@ information about thrown exception. Consult documentation of the L<Kafka::Except
 for the list of all available methods.
 
 Authors suggest using of L<Try::Tiny|Try::Tiny>'s C<try> and C<catch> to handle exceptions while
-working with Kafka module.
+working with L<Kafka|Kafka> package.
+
+Here is the list of possible error messages that C<Kafka::IO> may produce:
 
 =over 3
 
@@ -536,6 +539,29 @@ Message can't be received.
 =item C<Can't bind>
 
 TCP connection can't be established on given host and port.
+
+=back
+
+=head2 Debug mode
+
+Debug output can be enabled by passing desired level via environment variable
+using one of the following ways:
+
+C<PERL_KAFKA_DEBUG=1>     - debug is enabled for the whole L<Kafka|Kafka> package.
+
+C<PERL_KAFKA_DEBUG=IO:1>  - enable debug for C<Kafka::IO> only.
+
+C<Kafka::IO> supports two debug levels (level 2 includes debug output of 1):
+
+=over 3
+
+=item 1
+
+Dump of binary messages exchange with Kafka server.
+
+=item 2
+
+Additional information about processing events/alarms.
 
 =back
 
@@ -582,6 +608,8 @@ Sergey Gladkov, E<lt>sgladkov@trackingsoft.comE<gt>
 Alexander Solovey
 
 Jeremy Jordan
+
+Sergiy Zuban
 
 Vlad Marchenko
 

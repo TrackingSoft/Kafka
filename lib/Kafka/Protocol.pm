@@ -6,7 +6,7 @@ Kafka::Protocol - Functions to process messages in the Apache Kafka protocol.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Protocol> version 0.800_18 .
+This documentation refers to C<Kafka::Protocol> version 0.8001 .
 
 =cut
 
@@ -18,7 +18,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_18';
+our $VERSION = '0.8001';
 
 use Exporter qw(
     import
@@ -161,7 +161,7 @@ use Kafka::Internals qw(
     my $decoded_response = decode_produce_response( \$encoded );
     say 'decoded correctly' if Compare( $decoded_response, $decoded );
 
-    # more examples, see t/??_decode_encode.t
+    # more examples, see t/*_decode_encode.t
 
 =head1 DESCRIPTION
 
@@ -477,7 +477,7 @@ This function take argument. The following argument is currently recognized:
 =item C<$Produce_Request>
 
 C<$Produce_Request> is a reference to the hash representing
-the structure of the PRODUCE Request (examples see C<t/??_decode_encode.t>).
+the structure of the PRODUCE Request (examples see C<t/*_decode_encode.t>).
 
 =back
 
@@ -552,7 +552,7 @@ my $_decode_produce_response_template = qq{x[l]l>l>X[l]l>/(s>/al>X[l]l>/(l>s>${_
 =head3 C<decode_produce_response( $bin_stream_ref )>
 
 Decodes the argument and returns a reference to the hash representing
-the structure of the PRODUCE Response (examples see C<t/??_decode_encode.t>).
+the structure of the PRODUCE Response (examples see C<t/*_decode_encode.t>).
 
 This function take argument. The following argument is currently recognized:
 
@@ -615,7 +615,7 @@ This function take argument. The following argument is currently recognized:
 =item C<$Fetch_Request>
 
 C<$Fetch_Request> is a reference to the hash representing
-the structure of the FETCH Request (examples see C<t/??_decode_encode.t>).
+the structure of the FETCH Request (examples see C<t/*_decode_encode.t>).
 
 =back
 
@@ -675,7 +675,7 @@ sub encode_fetch_request {
 =head3 C<decode_fetch_response( $bin_stream_ref )>
 
 Decodes the argument and returns a reference to the hash representing
-the structure of the FETCH Response (examples see C<t/??_decode_encode.t>).
+the structure of the FETCH Response (examples see C<t/*_decode_encode.t>).
 
 This function take argument. The following argument is currently recognized:
 
@@ -758,7 +758,7 @@ This function take argument. The following argument is currently recognized:
 =item C<$Offset_Request>
 
 C<$Offset_Request> is a reference to the hash representing
-the structure of the OFFSET Request (examples see C<t/??_decode_encode.t>).
+the structure of the OFFSET Request (examples see C<t/*_decode_encode.t>).
 
 =back
 
@@ -839,7 +839,7 @@ my $_decode_offset_response_template = qq{x[l]l>l>X[l]l>/(s>/al>X[l]l>/(l>s>l>X[
 =head3 C<decode_offset_response( $bin_stream_ref )>
 
 Decodes the argument and returns a reference to the hash representing
-the structure of the OFFSET Response (examples see C<t/??_decode_encode.t>).
+the structure of the OFFSET Response (examples see C<t/*_decode_encode.t>).
 
 This function take argument. The following argument is currently recognized:
 
@@ -908,7 +908,7 @@ This function take argument. The following argument is currently recognized:
 =item C<$Metadata_Request>
 
 C<$Metadata_Request> is a reference to the hash representing
-the structure of the METADATA Request (examples see C<t/??_decode_encode.t>).
+the structure of the METADATA Request (examples see C<t/*_decode_encode.t>).
 
 =back
 
@@ -988,7 +988,7 @@ my $_decode_metadata_response_template = q{x[l]l>l>X[l]l>/(l>s>/al>)l>X[l]l>/(s>
 =head3 C<decode_metadata_response( $bin_stream_ref )>
 
 Decodes the argument and returns a reference to the hash representing
-the structure of the METADATA Response (examples see C<t/??_decode_encode.t>).
+the structure of the METADATA Response (examples see C<t/*_decode_encode.t>).
 
 This function take argument. The following argument is currently recognized:
 
@@ -1412,6 +1412,8 @@ Sergey Gladkov, E<lt>sgladkov@trackingsoft.comE<gt>
 Alexander Solovey
 
 Jeremy Jordan
+
+Sergiy Zuban
 
 Vlad Marchenko
 

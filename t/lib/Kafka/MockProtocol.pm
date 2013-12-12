@@ -7,7 +7,7 @@ by the kafka server (in the Apache Kafka's Protocol).
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::MockProtocol> version 0.800_18 .
+This documentation refers to C<Kafka::MockProtocol> version 0.8001 .
 
 =cut
 
@@ -19,7 +19,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_18';
+our $VERSION = '0.8001';
 
 use Exporter qw(
     import
@@ -178,7 +178,7 @@ The following functions are available for C<Kafka::MockProtocol> module.
 =head3 C<decode_produce_request( $bin_stream_ref )>
 
 Decodes the argument and returns a reference to the hash representing
-the structure of the PRODUCE Request (examples see C<t/??_decode_encode.t>).
+the structure of the PRODUCE Request (examples see C<t/*_decode_encode.t>).
 
 This function take argument. The following argument is currently recognized:
 
@@ -264,7 +264,7 @@ This function take argument. The following argument is currently recognized:
 =item C<$Produce_Response>
 
 C<$Produce_Response> is a reference to the hash representing
-the structure of the PRODUCE Response (examples see C<t/??_decode_encode.t>).
+the structure of the PRODUCE Response (examples see C<t/*_decode_encode.t>).
 
 =back
 
@@ -353,7 +353,7 @@ my $_decode_fetch_request_template = qq{x[l]s>s>l>s>/al>l>l>l>X[l]l>/(s>/al>X[l]
 =head3 C<decode_fetch_request( $bin_stream_ref )>
 
 Decodes the argument and returns a reference to the hash representing
-the structure of the FETCH Request (examples see C<t/??_decode_encode.t>).
+the structure of the FETCH Request (examples see C<t/*_decode_encode.t>).
 
 This function take argument. The following argument is currently recognized:
 
@@ -428,7 +428,7 @@ This function take argument. The following argument is currently recognized:
 =item C<$Fetch_Response>
 
 C<$Fetch_Response> is a reference to the hash representing
-the structure of the FETCH Response (examples see C<t/??_decode_encode.t>).
+the structure of the FETCH Response (examples see C<t/*_decode_encode.t>).
 
 =back
 
@@ -517,7 +517,7 @@ my $_decode_offset_request_template = qq{x[l]s>s>l>s>/al>l>X[l]l>/(s>/al>X[l]l>/
 =head3 C<decode_offset_request( $bin_stream_ref )>
 
 Decodes the argument and returns a reference to the hash representing
-the structure of the OFFSET Request (examples see C<t/??_decode_encode.t>).
+the structure of the OFFSET Request (examples see C<t/*_decode_encode.t>).
 
 This function take argument. The following argument is currently recognized:
 
@@ -590,7 +590,7 @@ This function take argument. The following argument is currently recognized:
 =item C<$Offset_Response>
 
 C<$Offset_Response> is a reference to the hash representing
-the structure of the OFFSET Response (examples see C<t/??_decode_encode.t>).
+the structure of the OFFSET Response (examples see C<t/*_decode_encode.t>).
 
 =back
 
@@ -676,7 +676,7 @@ my $_decode_metadata_request_template = q{x[l]s>s>l>s>/al>X[l]l>/(s>/a)};
 =head3 C<decode_metadata_request( $bin_stream_ref )>
 
 Decodes the argument and returns a reference to the hash representing
-the structure of the METADATA Request (examples see C<t/??_decode_encode.t>).
+the structure of the METADATA Request (examples see C<t/*_decode_encode.t>).
 
 This function take argument. The following argument is currently recognized:
 
@@ -730,7 +730,7 @@ This function take argument. The following argument is currently recognized:
 =item C<$Metadata_Response>
 
 C<$Metadata_Response> is a reference to the hash representing
-the structure of the METADATA Response (examples see C<t/??_decode_encode.t>).
+the structure of the METADATA Response (examples see C<t/*_decode_encode.t>).
 
 =back
 
@@ -1050,6 +1050,8 @@ Sergey Gladkov, E<lt>sgladkov@trackingsoft.comE<gt>
 Alexander Solovey
 
 Jeremy Jordan
+
+Sergiy Zuban
 
 Vlad Marchenko
 

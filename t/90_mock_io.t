@@ -102,7 +102,7 @@ $io = Kafka::IO->new(
     );
 isa_ok( $io, 'Kafka::IO' );
 
-#$Kafka::IO::DEBUG = 1;
+#Kafka::IO->debug_level( 1 );
 
 #-- Special cases --------------------------------------------------------------
 

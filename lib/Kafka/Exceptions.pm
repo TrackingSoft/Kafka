@@ -6,7 +6,7 @@ Kafka::Exceptions - Perl Kafka API exception definitions.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Exceptions> version 0.800_18 .
+This documentation refers to C<Kafka::Exceptions> version 0.8001 .
 
 =cut
 
@@ -18,7 +18,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_18';
+our $VERSION = '0.8001';
 
 use Exporter qw(
     import
@@ -156,7 +156,7 @@ See L<Kafka::Producer|Kafka::Producer> methods.
 =back
 
 Authors suggest using of L<Try::Tiny|Try::Tiny>'s C<try> and C<catch> to handle exceptions while
-working with Kafka module.
+working with L<Kafka|Kafka> package.
 
 You may also want to review documentation of L<Exception::Class|Exception::Class>,
 which is the default base class for all exception objects created by this module.
@@ -255,6 +255,8 @@ Sergey Gladkov, E<lt>sgladkov@trackingsoft.comE<gt>
 Alexander Solovey
 
 Jeremy Jordan
+
+Sergiy Zuban
 
 Vlad Marchenko
 

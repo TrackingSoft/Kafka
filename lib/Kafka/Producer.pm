@@ -6,7 +6,7 @@ Kafka::Producer - Perl interface for Kafka producer client.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Producer> version 0.800_18 .
+This documentation refers to C<Kafka::Producer> version 0.8001 .
 
 =cut
 
@@ -18,7 +18,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_18';
+our $VERSION = '0.8001';
 
 #-- load the modules -----------------------------------------------------------
 
@@ -187,7 +187,7 @@ can be imported from the L<Kafka|Kafka> module.
 =item C<Timeout =E<gt> $timeout>
 
 This provides a maximum time the server can await the receipt
-of the number of acknowledgements in RequiredAcks.
+of the number of acknowledgements in C<RequiredAcks>.
 
 The C<$timeout> in seconds, could be any integer or floating-point type not bigger than int32 positive integer.
 
@@ -353,7 +353,7 @@ information about thrown exception. Consult documentation of the L<Kafka::Except
 for the list of all available methods.
 
 Authors suggest using of L<Try::Tiny|Try::Tiny>'s C<try> and C<catch> to handle exceptions while
-working with Kafka module.
+working with L<Kafka|Kafka> package.
 
 =over 3
 
@@ -439,6 +439,8 @@ Sergey Gladkov, E<lt>sgladkov@trackingsoft.comE<gt>
 Alexander Solovey
 
 Jeremy Jordan
+
+Sergiy Zuban
 
 Vlad Marchenko
 

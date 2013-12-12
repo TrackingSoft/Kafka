@@ -6,7 +6,7 @@ Kafka::Connection - Object interface to connect to a kafka cluster.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Connection> version 0.800_18 .
+This documentation refers to C<Kafka::Connection> version 0.8001 .
 
 =cut
 
@@ -20,7 +20,7 @@ use warnings;
 
 our $DEBUG = 0;
 
-our $VERSION = '0.800_18';
+our $VERSION = '0.8001';
 
 use Exporter qw(
     import
@@ -47,6 +47,9 @@ use Params::Util qw(
     _NUMBER
     _POSINT
     _STRING
+);
+use Scalar::Util qw(
+    blessed
 );
 use Scalar::Util::Numeric qw(
     isint
@@ -99,6 +102,7 @@ use Kafka::Internals qw(
     $APIKEY_PRODUCE
     $MAX_CORRELATIONID
     $MAX_INT32
+    debug_level
     _get_CorrelationId
 );
 use Kafka::IO;
@@ -311,8 +315,8 @@ The C<$retries> should be an integer number.
 Optional, int32 signed integer, default = C<$Kafka::RECEIVE_MAX_RETRIES> .
 
 In some circumstances (temporarily network issues, server high load, socket error, etc) we may fail to
-recieve a response.
-This property specifies the maximum number of attempts to recieve a message.
+receive a response.
+This property specifies the maximum number of attempts to receive a message.
 The C<$retries> should be an integer number.
 
 =item C<RETRY_BACKOFF =E<gt> $backoff>
@@ -629,25 +633,21 @@ sub receive_response_to_request {
         }
 
         # Expect to possible changes in the situation, such as restoration of connection
-        printf STDERR
-            "# sleeping for %d ms before making attempt #%d (%s)\n",
-            $self->{RETRY_BACKOFF},
-            $self->{SEND_MAX_RETRIES} - $retries + 1,
-            $ErrorCode == $ERROR_NO_ERROR ? 'refreshing metadata' : "ErrorCode ${ErrorCode}"
-        if $DEBUG;
-
+        say STDERR sprintf( '[%s] sleeping for %d ms before making request attempt #%d (%s)',
+                scalar( localtime ),
+                $self->{RETRY_BACKOFF},
+                $self->{SEND_MAX_RETRIES} - $retries + 1,
+                $ErrorCode == $ERROR_NO_ERROR ? 'refreshing metadata' : "ErrorCode ${ErrorCode}",
+            ) if $self->debug_level;
         sleep $self->{RETRY_BACKOFF} / 1000;
 
         $self->_update_metadata( $topic_name )
             # FATAL error
             or $self->_error( $ErrorCode || $ERROR_CANNOT_GET_METADATA, "topic = '$topic_name', partition = $partition" );
     }
-    $self->_error( $ErrorCode, "topic = '".$topic_data->{TopicName}."'".( $partition_data ? ", partition = ".$partition_data->{Partition} : q{} ) )
-        # FATAL error
-        if $ErrorCode != $ERROR_NO_ERROR;
 
-    # NOTE: it is possible to repeat the operation here
-    return;
+    # FATAL error
+    $self->_error( $ErrorCode, "topic = '".$topic_data->{TopicName}."'".( $partition_data ? ", partition = ".$partition_data->{Partition} : q{} ) );
 }
 
 =head3 C<close_connection( $server )>
@@ -746,16 +746,17 @@ sub _remember_nonfatal_error {
 
     shift( @{ $self->{_nonfatal_errors} } )
         if scalar( @{ $self->{_nonfatal_errors} } ) == $max_logged_errors;
-    my $msg = sprintf( "[%s] server '%s', topic '%s', partition %s : (%s) %s",
-        localtime().q{},
+    my $msg = sprintf( "[%s] Non-fatal error: %s (ErrorCode %s, server '%s', topic '%s', partition %s)",
+        scalar( localtime ),
+        $error      // ( $ERROR{ $error_code } || '<undef>' ),
+        $error_code // 'IO error',
         $server     // '<undef>',
         $topic      // '<undef>',
         $partition  // '<undef>',
-        $error_code // 'IO error',
-        $error      // ( $ERROR{ $error_code } || '<undef>' ),
     );
 
-    say STDERR "# Non-fatal error: $msg" if $DEBUG;
+    say STDERR $msg
+        if $self->debug_level;
 
     push @{ $self->{_nonfatal_errors} }, $msg;
 
@@ -923,6 +924,11 @@ sub _retry_update_metadata {
     my $retries = $self->{SEND_MAX_RETRIES};
     ATTEMPTS:
     while ( $retries-- ) {
+        say STDERR sprintf( '[%s] sleeping for %d ms before making update metadata attempt #%d',
+                scalar( localtime ),
+                $self->{RETRY_BACKOFF},
+                $self->{RECEIVE_MAX_RETRIES} - $retries + 1,
+            ) if $self->debug_level;
         sleep $self->{RETRY_BACKOFF} / 1000;
         return( 1 ) if $self->_update_metadata( $topic, 1 );
     }
@@ -941,7 +947,14 @@ sub _build_server_name {
 sub _on_io_error {
     my ( $self, $server_data, $error ) = @_;
 
-    $server_data->{error}   = $error;
+    my $message;
+    if ( !blessed( $error ) || !$error->isa( 'Kafka::Exception' ) ) {
+        $message = $error;
+    } else {
+        $message = $error->message;
+    }
+
+    $server_data->{error}   = $message;
     $server_data->{IO}      = undef;
 }
 
@@ -1004,13 +1017,12 @@ sub _receiveIO {
         };
         last unless $error;
 
-        printf STDERR
-            "# sleeping for %d ms before making attempt #%d (error '%s')\n",
-            $self->{RETRY_BACKOFF},
-            $self->{RECEIVE_MAX_RETRIES} - $retries + 1,
-            $error
-        if $DEBUG;
-
+        say STDERR sprintf( "[%s] sleeping for %d ms before making receive attempt #%d (error '%s')",
+                scalar( localtime ),
+                $self->{RETRY_BACKOFF},
+                $self->{RECEIVE_MAX_RETRIES} - $retries + 1,
+                $error,
+            ) if $self->debug_level;
         sleep $self->{RETRY_BACKOFF} / 1000;
     }
     $self->_on_io_error( $server_data, $_ )
@@ -1063,12 +1075,14 @@ __END__
 
 =head1 DIAGNOSTICS
 
-When error is detected, an exception, represented by object of C<Kafka::Exception::Connection> class,
+When error is detected, an exception, represented by object of L<Kafka::Exception::Connection|Kafka::Exception::Connection> class,
 is thrown (see L<Kafka::Exceptions|Kafka::Exceptions>).
 
 L<code|Kafka::Exceptions/code> and a more descriptive L<message|Kafka::Exceptions/message> provide
 information about exception. Consult documentation of the L<Kafka::Exceptions|Kafka::Exceptions>
 for the list of all available methods.
+
+Here is the list of possible error messages that C<Kafka::Connection> may produce:
 
 =over 3
 
@@ -1109,6 +1123,18 @@ Failed to locate cluster broker.
 Received meta data is incorrect or missing.
 
 =back
+
+=head2 Debug mode
+
+Debug output can be enabled by passing desired level via environment variable
+using one of the following ways:
+
+C<PERL_KAFKA_DEBUG=1>             - debug is enabled for the whole L<Kafka|Kafka> package.
+
+C<PERL_KAFKA_DEBUG=Connection:1>  - enable debug for C<Kafka::Connection> only.
+
+C<Kafka::Connection> prints to C<STDERR> information about non-fatal errors,
+re-connection attempts and such when debug level is set to 1 or higher.
 
 =head1 SEE ALSO
 
@@ -1153,6 +1179,8 @@ Sergey Gladkov, E<lt>sgladkov@trackingsoft.comE<gt>
 Alexander Solovey
 
 Jeremy Jordan
+
+Sergiy Zuban
 
 Vlad Marchenko
 

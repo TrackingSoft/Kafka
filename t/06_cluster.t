@@ -60,16 +60,16 @@ my ( $response, $decode );
 
 # INSTRUCTIONS -----------------------------------------------------------------
 
-#$Kafka::IO::DEBUG = 1;
+#Kafka::IO->debug_level( 1 );
 my $cluster = Kafka::Cluster->new( kafka_dir => $KAFKA_BASE_DIR );
 isa_ok( $cluster, 'Kafka::Cluster' );
 
-#$Kafka::IO::DEBUG = 1;
+#Kafka::IO->debug_level( 1 );
 $cluster->init;
 $cluster->start;
 
 #-- MetadataRequest
-#$Kafka::IO::DEBUG = 1;
+#Kafka::IO->debug_level( 1 );
 $response = $cluster->request( ( $cluster->servers )[0], '000000230003000000000000000C746573742D726571756573740000000100076D79746F706963' );
 ok _SCALAR( $response ), 'correct request';
 #diag( 'Hex Stream: ', unpack( 'H*', $$response ) );
@@ -78,7 +78,7 @@ ok _HASH( $decode ), 'correct decode';
 #diag( Data::Dumper->Dump( [ $decode ], [ 'metadata_response' ] ) );
 
 #-- ProduceRequest
-#$Kafka::IO::DEBUG = 1;
+#Kafka::IO->debug_level( 1 );
 $response = $cluster->request( ( $cluster->servers )[0], '00000049000000000000000400000001000005dc0000000100076d79746f7069630000000100000000000000200000000000000000000000148dc795a20000ffffffff0000000648656c6c6f21' );
 ok _SCALAR( $response ), 'correct request';
 #diag( 'Hex Stream: ', unpack( 'H*', $$response ) );

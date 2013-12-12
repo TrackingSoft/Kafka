@@ -6,7 +6,7 @@ Kafka::Cluster - object interface to manage a test kafka cluster.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Cluster> version 0.800_18 .
+This documentation refers to C<Kafka::Cluster> version 0.8001 .
 
 =cut
 
@@ -18,7 +18,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_18';
+our $VERSION = '0.8001';
 
 use Exporter qw(
     import
@@ -72,7 +72,7 @@ use Kafka::IO;
 =head1 SYNOPSIS
 
     # For examples see:
-    # t/??_cluster.t, t/??_cluster_start.t, t/??_connection.t, t/??_cluster_stop.t
+    # t/*_cluster.t, t/*_cluster_start.t, t/*_connection.t, t/*_cluster_stop.t
 
 =head1 DESCRIPTION
 
@@ -461,7 +461,7 @@ sub init {
 
     $self->stop;
     # WARNING: Deleting old Kafka server log directories
-    say '# [', scalar( localtime ), '] Removing the kafka log tree: ', $self->_data_dir;
+    say '[', scalar( localtime ), '] Removing the kafka log tree: ', $self->_data_dir;
     $self->_remove_log_tree;
 
     return 1;
@@ -674,7 +674,7 @@ sub close {
     unless ( $self->is_run_in_base_dir ) {
         $self->_stop_zookeeper;
         # WARNING: Removing things is a much more dangerous proposition than creating things.
-        say '# [', scalar( localtime ), '] Removing zookeeper log tree: ', $self->_data_dir;
+        say '[', scalar( localtime ), '] Removing zookeeper log tree: ', $self->_data_dir;
         remove_tree( catdir( $self->_data_dir, 'zookeeper' ) );
     }
 
@@ -753,7 +753,7 @@ sub _kill_pid {
         carp( "$what $pid does not seem to be running" );
     }
     else {
-        say '# [', scalar( localtime ), "] Stopping $what: pid = $pid, signal = $signal";
+        say '[', scalar( localtime ), "] Stopping $what: pid = $pid, signal = $signal";
         kill $signal, $pid;
     }
 }
@@ -969,7 +969,7 @@ sub _start_server {
     $property_file = catfile( $log_dir, $property_file );
     my $cmd_str = "$server_start_cmd $arg $property_file";
     if( $pid ) {
-        say '# [', scalar( localtime ), "] Starting $server_name: port = ", $port, ", pid = $pid";
+        say '[', scalar( localtime ), "] Starting $server_name: port = ", $port, ", pid = $pid";
 
         my $attempts = $MAX_ATTEMPT * 2;
         while( $attempts-- ) {
@@ -1088,7 +1088,7 @@ sub _create_topic {
 
     $ENV{KAFKA_JVM_PERFORMANCE_OPTS} = ' ';
 
-    say '# [', scalar( localtime ), "] Creating topic '$DEFAULT_TOPIC': replication factor = ", scalar( @servers ), ", partition = $partitions";
+    say '[', scalar( localtime ), "] Creating topic '$DEFAULT_TOPIC': replication factor = ", scalar( @servers ), ", partition = $partitions";
     my ( $exit_status, $child_error );
     {
         my $out_fh = IO::File->new( catfile( $log_dir, 'kafka-create-topic-stdout.log' ), 'w+' );
@@ -1162,6 +1162,8 @@ Sergey Gladkov, E<lt>sgladkov@trackingsoft.comE<gt>
 Alexander Solovey
 
 Jeremy Jordan
+
+Sergiy Zuban
 
 Vlad Marchenko
 

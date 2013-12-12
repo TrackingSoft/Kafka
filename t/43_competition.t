@@ -196,9 +196,9 @@ sub fetching {
     my $next_offset = next_offset( $partition );
     return 0 unless $next_offset;
 
-    my $msgs_to_recieve     = min( $next_offset, int( rand( $MAX_MSGS_RECV ) + 1 ) );
-    my $start_offset        = int( rand( $next_offset - $msgs_to_recieve ) );
-    my $bytes_to_receive    = $msgs_to_recieve * ( $MSG_LEN + $MESSAGE_SIZE_OVERHEAD );
+    my $msgs_to_receive     = min( $next_offset, int( rand( $MAX_MSGS_RECV ) + 1 ) );
+    my $start_offset        = int( rand( $next_offset - $msgs_to_receive ) );
+    my $bytes_to_receive    = $msgs_to_receive * ( $MSG_LEN + $MESSAGE_SIZE_OVERHEAD );
 
     eval {
         $consumer->fetch(
@@ -212,7 +212,7 @@ sub fetching {
         fail "'fetch' FATAL error: $@";
         return;
     } else {
-        return $msgs_to_recieve;
+        return $msgs_to_receive;
     }
 }
 
