@@ -6,7 +6,7 @@ Kafka::IO - Interface to network communication with the Apache Kafka server.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::IO> version 0.8001 .
+This documentation refers to C<Kafka::IO> version 0.8002 .
 
 =cut
 
@@ -22,7 +22,7 @@ use sigtrap;
 
 our $DEBUG = 0;
 
-our $VERSION = '0.8001';
+our $VERSION = '0.8002';
 
 #-- load the modules -----------------------------------------------------------
 
@@ -226,7 +226,7 @@ sub send {
         or $self->_error( $ERROR_MISMATCH_ARGUMENT, '->send' );
 
     $self->_debug_msg( $message, 'Request to', 'green' )
-        if $self->debug_level;
+        if $self->debug_level >= 2;
 
     # accept not accepted earlier
     while ( select( my $mask = $self->{_select}, undef, undef, 0 ) ) {
@@ -276,7 +276,7 @@ sub receive {
         or $self->_error( $ERROR_CANNOT_RECV, "->receive - $!" );
 
     $self->_debug_msg( $message, 'Response from', 'yellow' )
-        if $self->debug_level;
+        if $self->debug_level >= 2;
     return \$message;
 }
 
@@ -330,6 +330,9 @@ sub _connect {
             my $remaining;
             my $start = time();
 
+            $self->_debug_msg( 'number of wallclock seconds = '.ceil( $timeout ) )
+                if $self->debug_level;
+
             # DNS lookup.
             local $@;
             my $h = set_sig_handler( 'ALRM', sub { die 'alarm clock restarted' },
@@ -348,7 +351,7 @@ sub _connect {
             undef $h;
 
             $self->_debug_msg( "_connect: ip = '".( defined( $ip ) ? inet_ntoa( $ip ) : '<undef>' ).", error = '$error', \$? = $?, \$! = '$!'" )
-                if $self->debug_level >= 2;
+                if $self->debug_level;
 
             die $error if $error;
             die( "gethostbyname $name: \$? = '$?', \$! = '$!'\n" ) unless defined $ip;
@@ -357,20 +360,20 @@ sub _connect {
             # $SIG{ALRM} restored automatically, but we need to restart previous alarm manually
 
             $self->_debug_msg( "_connect: ".( $remaining // '<undef>' )." (remaining) - $elapsed (elapsed) = ".( $remaining - $elapsed ) )
-                if $self->debug_level >= 2;
+                if $self->debug_level;
             if ( $remaining ) {
                 if ( $remaining - $elapsed > 0 ) {
                     $self->_debug_msg( '_connect: remaining - elapsed > 0 (to alarm restart)' )
-                        if $self->debug_level >= 2;
+                        if $self->debug_level;
                     alarm( ceil( $remaining - $elapsed ) );
                 } else {
                     $self->_debug_msg( '_connect: remaining - elapsed < 0 (to alarm function call)' )
-                        if $self->debug_level >= 2;
+                        if $self->debug_level;
                     # $SIG{ALRM}->();
                     kill ALRM => $$;
                 }
                 $self->_debug_msg( "_connect: after alarm 'recalled'" )
-                    if $self->debug_level >= 2;
+                    if $self->debug_level;
             }
         } else {
             $ip = gethostbyname( $name );
@@ -448,7 +451,7 @@ sub _gethostbyname {
 sub _debug_msg {
     my ( $self, $message, $header, $colour ) = @_;
 
-    if ( $self->debug_level ) {
+    if ( $header ) {
         unless ( $_hdr ) {
             require Data::HexDump::Range;
             $_hdr = Data::HexDump::Range->new(
@@ -484,7 +487,7 @@ sub _debug_msg {
                 $message
             )
         ;
-    } elsif ( $self->debug_level >= 2 ) {
+    } else {
         say STDERR '[', scalar( localtime ), ' ] ', $message;
     }
 }
@@ -557,11 +560,11 @@ C<Kafka::IO> supports two debug levels (level 2 includes debug output of 1):
 
 =item 1
 
-Dump of binary messages exchange with Kafka server.
+Additional information about processing events/alarms.
 
 =item 2
 
-Additional information about processing events/alarms.
+Dump of binary messages exchange with Kafka server.
 
 =back
 

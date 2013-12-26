@@ -61,8 +61,8 @@ use Kafka::TestInternals qw(
 #-- setting up facilities ------------------------------------------------------
 
 # See Kafka::IO
-use constant DEBUG  => 0;
-#use constant DEBUG  => 1;
+#use constant DEBUG  => 0;
+use constant DEBUG  => 1;
 #use constant DEBUG  => 2;
 
 Kafka::IO->debug_level( DEBUG ) if DEBUG;
@@ -120,6 +120,9 @@ $inet_aton = inet_aton( 'localhost' );
 
 debug_msg( 'ALRM handler verification' );
 
+# cancel the previous timer
+alarm 0;
+
 $sig_handler = set_sig_handler( SIGALRM ,sub {
         ++$marker_signal_handling;
         debug_msg( 'SIGALRM: signal handler triggered' );
@@ -155,6 +158,7 @@ is $marker_signal_handling, 1, 'the signal handler to be reset to the previous v
 
 # cancel the previous timer
 alarm 0;
+
 $SIG{ALRM} = sub {
     ++$marker_signal_handling;
     debug_msg( 'SIGALRM: signal handler triggered' );
@@ -182,6 +186,7 @@ ok !$marker_signal_handling, 'signal handler is not triggered';
 
 # cancel the previous timer
 alarm 0;
+
 $SIG{ALRM} = sub {
     ++$marker_signal_handling;
     debug_msg( 'SIGALRM: signal handler triggered' );
@@ -229,6 +234,7 @@ Sub::Install::reinstall_sub( {
 
 # cancel the previous timer
 alarm 0;
+
 $SIG{ALRM} = sub {
     ++$marker_signal_handling;
     debug_msg( 'SIGALRM: signal handler triggered' );
