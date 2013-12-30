@@ -6,7 +6,7 @@ Kafka::IO - Interface to network communication with the Apache Kafka server.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::IO> version 0.8002 .
+This documentation refers to C<Kafka::IO> version 0.8005 .
 
 =cut
 
@@ -22,7 +22,7 @@ use sigtrap;
 
 our $DEBUG = 0;
 
-our $VERSION = '0.8002';
+our $VERSION = '0.8005';
 
 #-- load the modules -----------------------------------------------------------
 
@@ -330,7 +330,7 @@ sub _connect {
             my $remaining;
             my $start = time();
 
-            $self->_debug_msg( 'number of wallclock seconds = '.ceil( $timeout ) )
+            $self->_debug_msg( "name = '$name', number of wallclock seconds = ".ceil( $timeout ) )
                 if $self->debug_level;
 
             # DNS lookup.

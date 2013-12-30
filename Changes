@@ -1,11 +1,11 @@
 Revision history for Kafka package
 
-0.8002 Thu Dec  26 2013
+0.8001_1 - 0.8005 Fri Dec  27 2013
     CHANGES:
+    - t/*_io.t examines possibility of using gethostbyname( 'localhost' ) .
     - Debug diagnostic and test improved.
-
-0.8001_1 Wed Dec  25 2013
-    CHANGES:    - Debugging Test t/*_io.t .
+    BUGFIXES:
+    - 'localhost' is no longer used in the t/*_io.t .
 
 0.8001 Tue Dec  24 2013
     CHANGES:
