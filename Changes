@@ -1,5 +1,9 @@
 Revision history for Kafka package
 
+0.8006 Thu Feb  20 2014
+    BUGFIXES:
+    - Corrected description of the error in Kafka::Connection.
+
 0.8001_1 - 0.8005 Fri Dec  27 2013
     CHANGES:
     - t/*_io.t examines possibility of using gethostbyname( 'localhost' ) .

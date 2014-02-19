@@ -6,7 +6,7 @@ Kafka::Connection - Object interface to connect to a kafka cluster.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Connection> version 0.8005 .
+This documentation refers to C<Kafka::Connection> version 0.8006 .
 
 =cut
 
@@ -20,7 +20,7 @@ use warnings;
 
 our $DEBUG = 0;
 
-our $VERSION = '0.8005';
+our $VERSION = '0.8006';
 
 use Exporter qw(
     import
@@ -748,7 +748,7 @@ sub _remember_nonfatal_error {
         if scalar( @{ $self->{_nonfatal_errors} } ) == $max_logged_errors;
     my $msg = sprintf( "[%s] Non-fatal error: %s (ErrorCode %s, server '%s', topic '%s', partition %s)",
         scalar( localtime ),
-        $error      // ( $ERROR{ $error_code } || '<undef>' ),
+        $error      // ( defined( $error_code ) && exists( $ERROR{ $error_code } ) ? $ERROR{ $error_code } : '<undef>' ),
         $error_code // 'IO error',
         $server     // '<undef>',
         $topic      // '<undef>',

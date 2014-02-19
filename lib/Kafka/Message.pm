@@ -6,7 +6,7 @@ Kafka::Message - Interface to the Kafka message properties.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Message> version 0.8005 .
+This documentation refers to C<Kafka::Message> version 0.8006 .
 
 =cut
 
@@ -18,7 +18,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.8005';
+our $VERSION = '0.8006';
 
 #-- load the modules -----------------------------------------------------------
 
