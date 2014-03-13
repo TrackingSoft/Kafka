@@ -145,7 +145,7 @@ const my    $START_KAFKA_ARG                => 'kafka.Kafka';
 const my    $START_ZOOKEEPER_ARG            => 'org.apache.zookeeper.server.quorum.QuorumPeerMain';
 
 # File mask specific to version 0.8
-const my    $KAFKA_0_8_REF_FILE_MASK        => catfile( 'bin', 'kafka-create-topic.sh' );
+const my    $KAFKA_0_8_REF_FILE_MASK        => catfile( 'bin', 'kafka-preferred-replica-election.sh' );
 
 const our   $HOST                           => 'localhost';
 
@@ -1075,16 +1075,35 @@ sub _create_topic {
     my $log_dir = $self->log_dir( $port );
     my $partitions = $self->{kafka}->{partition};
 
-    my @args = (
-        'bin/kafka-create-topic.sh',
-        "--zookeeper $HOST:".$self->zookeeper_port,
-        '--replica '.scalar( @servers ),
-        "--partition $partitions",
-        "--topic $DEFAULT_TOPIC",
-    );
-
     my $cwd = getcwd();
     chdir $self->base_dir;
+
+    my (
+        $KAFKA_TOPICS_CMD_FILE,
+        $KAFKA_TOPICS_CMD_CREATE_OPT,
+        $KAFKA_TOPICS_CMD_REPLICAS_OPT,
+        $KAFKA_TOPICS_CMD_PARTITIONS_OPT
+    );
+    $KAFKA_TOPICS_CMD_FILE = catfile( 'bin', 'kafka-create-topic.sh' );             # kafka 0.8.0
+    if ( -e $KAFKA_TOPICS_CMD_FILE ) {
+        $KAFKA_TOPICS_CMD_CREATE_OPT        = '',
+        $KAFKA_TOPICS_CMD_REPLICAS_OPT      = '--replica';
+        $KAFKA_TOPICS_CMD_PARTITIONS_OPT    = '--partition';
+    } else {
+        $KAFKA_TOPICS_CMD_FILE              = catfile( 'bin', 'kafka-topics.sh' );  # kafka 0.8.1
+        $KAFKA_TOPICS_CMD_CREATE_OPT        = '--create',
+        $KAFKA_TOPICS_CMD_REPLICAS_OPT      = '--replication-factor';
+        $KAFKA_TOPICS_CMD_PARTITIONS_OPT    = '--partitions';
+    }
+
+    my @args = (
+        $KAFKA_TOPICS_CMD_FILE,
+        $KAFKA_TOPICS_CMD_CREATE_OPT,
+        "--zookeeper $HOST:".$self->zookeeper_port,
+        "$KAFKA_TOPICS_CMD_REPLICAS_OPT ".scalar( @servers ),
+        "$KAFKA_TOPICS_CMD_PARTITIONS_OPT $partitions",
+        "--topic $DEFAULT_TOPIC",
+    );
 
     $ENV{KAFKA_JVM_PERFORMANCE_OPTS} = ' ';
 

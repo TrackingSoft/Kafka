@@ -38,6 +38,9 @@ plan 'no_plan';
 #-- load the modules -----------------------------------------------------------
 
 use IO::Socket::INET;
+use Net::EmptyPort qw(
+    empty_port
+);
 use POSIX ':signal_h';
 use Socket qw(
     inet_aton
@@ -49,6 +52,7 @@ use Sys::SigAction qw(
 use Time::HiRes;
 
 use Kafka qw(
+    $KAFKA_SERVER_PORT
     $REQUEST_TIMEOUT
 );
 use Kafka::IO;
@@ -107,7 +111,10 @@ sub debug_msg {
 
 #-- Global data ----------------------------------------------------------------
 
-$server = Test::TCP->new( code => $server_code );
+$server = Test::TCP->new(
+    code    => $server_code,
+    port    => empty_port( $KAFKA_SERVER_PORT - 1 ),
+);
 $port = $server->port;
 ok $port, "server port = $port";
 wait_port( $port );

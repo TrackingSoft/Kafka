@@ -1,5 +1,9 @@
 Revision history for Kafka package
 
+0.8007 Mon Mar  17 2014
+    CHANGES:
+    - Kafka::Cluster adapted for kafka 0.8.1 .
+
 0.8006 Thu Feb  20 2014
     BUGFIXES:
     - Corrected description of the error in Kafka::Connection.
@@ -84,8 +88,8 @@ Revision history for Kafka package
     revised documentation and update your code where necessary !!!
 
     CHANGES:
-    - Implement Kafka API ver 0.8. For communication with earlier versions of Kafka
-      use Kafka module versions before 0.8.
+    - Implement Kafka API ver 0.8.0 . For communication with earlier versions of Kafka
+      use Kafka module versions before 0.8.0 .
     - Added Kafka::Connection, Kafka::Internals.
     - Kafka::Mock renamed to Kafka::MockIO and moved to t/lib.
     - Additional testing units (in t/lib) for the following modules:
