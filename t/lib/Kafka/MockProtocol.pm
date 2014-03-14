@@ -7,7 +7,7 @@ by the kafka server (in the Apache Kafka's Protocol).
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::MockProtocol> version 0.8006 .
+This documentation refers to C<Kafka::MockProtocol> version 0.8007 .
 
 =cut
 
@@ -19,7 +19,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.8006';
+our $VERSION = '0.8007';
 
 use Exporter qw(
     import

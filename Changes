@@ -1,6 +1,6 @@
 Revision history for Kafka package
 
-0.8007 Mon Mar  17 2014
+0.8007 Fri Mar  14 2014
     CHANGES:
     - Kafka::Cluster adapted for kafka 0.8.1 .
 
