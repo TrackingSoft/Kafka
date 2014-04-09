@@ -60,6 +60,8 @@ use Scalar::Util qw(
     dualvar
 );
 use String::CRC32;
+use IO::Uncompress::Gunzip qw{ gunzip };
+use Compress::Snappy;
 
 use Kafka qw(
     $BITS64
@@ -345,8 +347,8 @@ const our $APIVERSION                   => 0;
 
 # According to Apache Kafka documentation:
 # Attributes - Metadata attributes about the message.
-# In particular the last 3 bits contain the compression codec used for the message.
-const our $COMPRESSION_CODEC_MASK       => 0b111;   # Not used now
+# In particular the last 2 bits contain the compression codec used for the message.
+const our $COMPRESSION_CODEC_MASK       => 0b11;
 
 #-- Codec numbers:
 
@@ -358,9 +360,9 @@ None = 0, ...'
 =cut
 const our $COMPRESSION_NONE             => 0;
 # codec number: GZIP = 1
-const our $COMPRESSION_GZIP             => 1;       # Not used now
+const our $COMPRESSION_GZIP             => 1;
 # codec number: Snappy = 2
-const our $COMPRESSION_SNAPPY           => 2;       # Not used now
+const our $COMPRESSION_SNAPPY           => 2;
 
 =head3 C<$CONSUMERS_REPLICAID>
 
@@ -1126,6 +1128,27 @@ sub _decode_fetch_response_template {
     }
 }
 
+# Decompress the snappy compressed data
+sub _decompress_snappy {
+    my ($data_ref, $dest_ref) = @_;
+    my $payload = $$data_ref;
+    my ($header, $x_version, $x_compatversion, $x_length) = unpack("a8 L> L> L>", $payload);
+    if ($header eq "\x82SNAPPY\x00") {
+        # Found a xerial header.... nonstandard snappy compression header, remove the header
+        if ($x_compatversion == 1 && $x_version == 1) {
+            $payload = substr($payload, 20);
+        } else {
+            #warn("V $x_version and comp $x_compatversion");
+            die("[BUG] Snappy compression with incompatible xerial header version found.");
+        }
+    }
+    my $out = decompress($payload);
+    if (!defined($out)) {
+        die("[BUG] Unable to decompress snappy compressed data.");
+    }
+    $$dest_ref = $out;
+}
+
 # Decrypts MessageSet
 sub _decode_MessageSet_array {
     my ( $response, $MessageSetSize, $i_ref, $MessageSet_array_ref ) = @_;
@@ -1157,7 +1180,34 @@ sub _decode_MessageSet_array {
         $Value_length                                                =  $data->[ $$i_ref++ ];   # Value length
         $Message->{Value} = $Value_length == $NULL_BYTES_LENGTH ? q{} : $data->[ $$i_ref++ ];   # Value
 
-        push( @$MessageSet_array_ref, $Message );
+        if ($Message->{Attributes} > 0) {
+            my $compression = $Message->{Attributes} & $COMPRESSION_CODEC_MASK;
+            my $decompressed;
+            if ($compression == $COMPRESSION_GZIP) {
+                gunzip(\$Message->{Value} => \$decompressed);
+            } elsif ($compression == $COMPRESSION_SNAPPY) {
+                _decompress_snappy(\$Message->{Value} => \$decompressed);
+            } else {
+                die("Unknown message attribute encountered");
+            }
+            my @data;
+            my $resp = {
+                data => \@data,
+                bin_stream => \$decompressed,
+                stream_offset => 0,
+            };
+            _decode_MessageSet_sized_template($Value_length, $resp );
+            @data = unpack( $resp->{template}, ${$resp->{bin_stream}} );
+            my $i = 0; # i_ref
+            my $size = length( $decompressed );
+            _decode_MessageSet_array(
+                $resp,
+                $size, # message set size
+                \$i, # i ref
+                $MessageSet_array_ref);
+        } else {
+            push( @$MessageSet_array_ref, $Message );
+        }
 
         $MessageSetSize -= 12
                                     # [q] Offset
@@ -1241,8 +1291,6 @@ sub _encode_MessageSet_array {
 sub _decode_MessageSet_template {
     my ( $response ) = @_;
 
-    my $bin_stream_length = length ${ $response->{bin_stream} };
-
     my $MessageSetSize = unpack(
          q{x[}.$response->{stream_offset}
         .q{]l>},                            # MessageSetSize
@@ -1250,6 +1298,13 @@ sub _decode_MessageSet_template {
     );
     $response->{template} .= q{l>};         # MessageSetSize
     $response->{stream_offset} += 4;        # bytes before Offset
+
+    return _decode_MessageSet_sized_template($MessageSetSize, $response);
+}
+
+sub _decode_MessageSet_sized_template {
+    my ($MessageSetSize, $response) = @_;
+    my $bin_stream_length = length ${ $response->{bin_stream} };
 
     my ( $local_template, $MessageSize, $Key_length, $Value_length );
     CREATE_TEMPLATE:
