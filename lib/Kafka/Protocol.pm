@@ -347,8 +347,8 @@ const our $APIVERSION                   => 0;
 
 # According to Apache Kafka documentation:
 # Attributes - Metadata attributes about the message.
-# In particular the last 3 bits contain the compression codec used for the message.
-const our $COMPRESSION_CODEC_MASK       => 0b111;   # Not used now
+# In particular the last 2 bits contain the compression codec used for the message.
+const our $COMPRESSION_CODEC_MASK       => 0b11;
 
 #-- Codec numbers:
 
@@ -360,9 +360,9 @@ None = 0, ...'
 =cut
 const our $COMPRESSION_NONE             => 0;
 # codec number: GZIP = 1
-const our $COMPRESSION_GZIP             => 1;       # Not used now
+const our $COMPRESSION_GZIP             => 1;
 # codec number: Snappy = 2
-const our $COMPRESSION_SNAPPY           => 2;       # Not used now
+const our $COMPRESSION_SNAPPY           => 2;
 
 =head3 C<$CONSUMERS_REPLICAID>
 
