@@ -6,7 +6,7 @@ Kafka::Connection - Object interface to connect to a kafka cluster.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Connection> version 0.8007 .
+This documentation refers to C<Kafka::Connection> version 0.8008 .
 
 =cut
 
@@ -20,7 +20,7 @@ use warnings;
 
 our $DEBUG = 0;
 
-our $VERSION = '0.8007';
+our $VERSION = '0.8008';
 
 use Exporter qw(
     import
@@ -506,13 +506,19 @@ sub is_server_alive {
     return $io->is_alive;
 }
 
-=head3 C<receive_response_to_request( $request )>
+=head3 C<receive_response_to_request( $request, $compression_codec )>
+
+=over 3
+
+=item C<$request>
 
 C<$request> is a reference to the hash representing
 the structure of the request.
 
 This method encodes C<$request>, passes it to the leader of cluster, receives reply, decodes and returns
 it in a form of hash reference.
+
+=back
 
 WARNING:
 
@@ -528,9 +534,25 @@ In order to achieve better performance, this method does not perform arguments v
 
 =back
 
+=over 3
+
+=item C<$compression_codec>
+
+Optional.
+
+C<$compression_codec> sets the required type of C<$messages> compression,
+if the compression is desirable.
+
+Supported codecs:
+L<$COMPRESSION_NONE|Kafka/$COMPRESSION_NONE>,
+L<$COMPRESSION_GZIP|Kafka/$COMPRESSION_GZIP>,
+L<$COMPRESSION_SNAPPY|Kafka/$COMPRESSION_SNAPPY>.
+
+=back
+
 =cut
 sub receive_response_to_request {
-    my ( $self, $request ) = @_;
+    my ( $self, $request, $compression_codec ) = @_;
 
     my $api_key = $request->{ApiKey};
 
@@ -546,7 +568,7 @@ sub receive_response_to_request {
             # FATAL error
             or $self->_error( $ERROR_CANNOT_GET_METADATA, "topic = '$topic_name', partition = $partition" );
     }
-    my $encoded_request = $protocol{ $api_key }->{encode}->( $request );
+    my $encoded_request = $protocol{ $api_key }->{encode}->( $request, $compression_codec );
 
     my $CorrelationId = $request->{CorrelationId} // _get_CorrelationId;
 
@@ -1169,6 +1191,11 @@ A wealth of detail about the Apache Kafka and the Kafka Protocol:
 Main page at L<http://kafka.apache.org/>
 
 Kafka Protocol at L<https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol>
+
+=head1 SOURCE CODE
+
+Kafka package is hosted on GitHub:
+L<https://github.com/TrackingSoft/Kafka>
 
 =head1 AUTHOR
 

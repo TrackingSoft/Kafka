@@ -35,6 +35,7 @@ use Params::Util qw(
 
 use Kafka qw(
     $BLOCK_UNTIL_IS_COMMITTED
+    $COMPRESSION_NONE
     $DEFAULT_MAX_BYTES
     $KAFKA_SERVER_PORT
     $DEFAULT_MAX_NUMBER_OF_OFFSETS
@@ -57,7 +58,6 @@ use Kafka::MockProtocol qw(
     encode_fetch_response
 );
 use Kafka::Protocol qw(
-    $COMPRESSION_NONE
     decode_fetch_response
     decode_metadata_response
     decode_offset_response

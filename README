@@ -1,4 +1,4 @@
-Kafka package version 0.8007
+Kafka package version 0.8008
 ============================
 
 The Kafka package is a set of Perl modules which provides a
@@ -28,27 +28,59 @@ packages that are distributed separately from Perl. We recommend that
 you have the following packages installed before you install
 Kafka:
 
+   Carp
+   Compress::Snappy
    Const::Fast
+   Data::Compare
+   Data::HexDump::Range
    Exception::Class
+   Exporter
+   IO::Compress::Gzip
+   IO::Uncompress::Gunzip
    List::MoreUtils
+   List::Util
    Params::Util
+   Scalar::Util
    Scalar::Util::Numeric
+   Socket
    String::CRC32
    Sys::SigAction
+   Time::HiRes
    Try::Tiny
 
 The Kafka package has the following optional dependencies:
 
    Capture::Tiny
+   Carp
    Clone
    Config::IniFiles
-   Data::Compare
+   Const::Fast
+   Cwd
+   Data::Dumper
+   Exporter
+   File::HomeDir
+   File::Path
+   File::Spec
+   File::Spec::Functions
+   IO::File
+   IO::Socket::INET
+   List::Util
+   Net::EmptyPort
+   Params::Util
    Proc::Daemon
-   Proc::ProcessTable
+   Scalar::Util
+   Scalar::Util::Numeric
+   Socket
    Sub::Install
+   Sys::SigAction
    Test::Deep
    Test::Exception
+   Test::Fixme
+   Test::More
+   Test::NoWarnings
    Test::TCP
+   Time::HiRes
+   Try::Tiny
 
 If the optional modules are missing, some "prereq" tests are skipped.
 

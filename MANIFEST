@@ -38,6 +38,7 @@ t/41_fork.t
 t/42_nonfatal_errors.t
 t/43_competition.t
 t/44_bad_sending.t
+t/45_compression.t
 t/50_debug_level.t
 t/90_mock_io.t
 t/91_mock_usage.t

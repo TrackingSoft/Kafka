@@ -29,6 +29,8 @@ eval {
             :optional
             :experimental
             !has_separate_license_file
+            !prereq_matches_use
+            !build_prereq_matches_use
         )
     );
 };

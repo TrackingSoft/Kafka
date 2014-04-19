@@ -6,7 +6,7 @@ Kafka::Exceptions - Perl Kafka API exception definitions.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Exceptions> version 0.8007 .
+This documentation refers to C<Kafka::Exceptions> version 0.8008 .
 
 =cut
 
@@ -18,7 +18,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.8007';
+our $VERSION = '0.8008';
 
 use Exporter qw(
     import
@@ -46,6 +46,9 @@ use Exception::Class (
         isa     => 'Kafka::Exception',
     },
     'Kafka::Exception::Producer' => {
+        isa     => 'Kafka::Exception',
+    },
+    'Kafka::Exception::Protocol' => {
         isa     => 'Kafka::Exception',
     },
 );
@@ -153,6 +156,10 @@ See L<Kafka::Int64|Kafka::Int64> methods.
 
 See L<Kafka::Producer|Kafka::Producer> methods.
 
+=item C<Kafka::Exception::Protocol>
+
+See L<Kafka::Protocol|Kafka::Protocol> methods.
+
 =back
 
 Authors suggest using of L<Try::Tiny|Try::Tiny>'s C<try> and C<catch> to handle exceptions while
@@ -245,6 +252,11 @@ A wealth of detail about the Apache Kafka and the Kafka Protocol:
 Main page at L<http://kafka.apache.org/>
 
 Kafka Protocol at L<https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol>
+
+=head1 SOURCE CODE
+
+Kafka package is hosted on GitHub:
+L<https://github.com/TrackingSoft/Kafka>
 
 =head1 AUTHOR
 

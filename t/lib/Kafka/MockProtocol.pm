@@ -7,7 +7,7 @@ by the kafka server (in the Apache Kafka's Protocol).
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::MockProtocol> version 0.8007 .
+This documentation refers to C<Kafka::MockProtocol> version 0.8008 .
 
 =cut
 
@@ -19,7 +19,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.8007';
+our $VERSION = '0.8008';
 
 use Exporter qw(
     import
@@ -53,6 +53,7 @@ use Scalar::Util::Numeric qw(
 
 use Kafka qw(
     %ERROR
+    $COMPRESSION_NONE
     $ERROR_MISMATCH_ARGUMENT
     $ERROR_NO_ERROR
     $ERROR_NOT_BINARY_STRING
@@ -66,7 +67,6 @@ use Kafka::Internals qw(
 );
 use Kafka::Protocol qw(
     $APIVERSION
-    $COMPRESSION_NONE
     $CONSUMERS_REPLICAID
     $NULL_BYTES_LENGTH
     $_int64_template
@@ -1040,6 +1040,11 @@ A wealth of detail about the Apache Kafka and the Kafka Protocol:
 Main page at L<http://kafka.apache.org/>
 
 Kafka Protocol at L<https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol>
+
+=head1 SOURCE CODE
+
+Kafka package is hosted on GitHub:
+L<https://github.com/TrackingSoft/Kafka>
 
 =head1 AUTHOR
 

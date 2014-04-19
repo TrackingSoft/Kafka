@@ -6,7 +6,7 @@ Kafka::Producer - Perl interface for Kafka producer client.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Producer> version 0.8007 .
+This documentation refers to C<Kafka::Producer> version 0.8008 .
 
 =cut
 
@@ -18,7 +18,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.8007';
+our $VERSION = '0.8008';
 
 #-- load the modules -----------------------------------------------------------
 
@@ -37,10 +37,14 @@ use Try::Tiny;
 
 use Kafka qw(
     %ERROR
+    $COMPRESSION_GZIP
+    $COMPRESSION_NONE
+    $COMPRESSION_SNAPPY
     $ERROR_MISMATCH_ARGUMENT
     $REQUEST_TIMEOUT
     $WAIT_WRITTEN_TO_LOCAL_LOG
 );
+use Kafka::Connection;
 use Kafka::Exceptions;
 use Kafka::Internals qw(
     $APIKEY_PRODUCE
@@ -50,7 +54,6 @@ use Kafka::Internals qw(
     $PRODUCER_ANY_OFFSET
     _get_CorrelationId
 );
-use Kafka::Connection;
 
 #-- declarations ---------------------------------------------------------------
 
@@ -122,11 +125,17 @@ Provides object-oriented API for producing messages.
 
 =item *
 
-Provides Kafka PRODUCE requests (with no support for compression codec).
+Provides Kafka PRODUCE requests.
 
 =back
 
 =cut
+
+my %known_compression_codecs = map { $_ => 1 } (
+    $COMPRESSION_NONE,
+    $COMPRESSION_GZIP,
+    $COMPRESSION_SNAPPY,
+);
 
 #-- constructor ----------------------------------------------------------------
 
@@ -242,7 +251,7 @@ The following methods are defined for the C<Kafka::Producer> class:
 
 #-- public methods -------------------------------------------------------------
 
-=head3 C<send( $topic, $partition, $messages )>
+=head3 C<send( $topic, $partition, $messages, $key, $compression_codec )>
 
 Sends a messages on a L<Kafka::Connection|Kafka::Connection> object.
 
@@ -272,11 +281,23 @@ The C<$key> is an optional message key, must be a string.
 C<$key> may used in the producer for partitioning with each message,
 so the consumer knows the partitioning key.
 
+=item C<$compression_codec>
+
+Optional.
+
+C<$compression_codec> sets the required type of C<$messages> compression,
+if the compression is desirable.
+
+Supported codecs:
+L<$COMPRESSION_NONE|Kafka/$COMPRESSION_NONE>,
+L<$COMPRESSION_GZIP|Kafka/$COMPRESSION_GZIP>,
+L<$COMPRESSION_SNAPPY|Kafka/$COMPRESSION_SNAPPY>.
+
 =back
 
 =cut
 sub send {
-    my ( $self, $topic, $partition, $messages, $key ) = @_;
+    my ( $self, $topic, $partition, $messages, $key, $compression_codec ) = @_;
 
     $key //= q{};
 
@@ -288,6 +309,8 @@ sub send {
         unless defined( _STRING( $messages ) ) || _ARRAY0( $messages );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, '$key' )
         unless ( $key eq q{} || defined( _STRING( $key ) ) ) && !utf8::is_utf8( $key );
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, '$compression_codec' )
+        unless ( !defined( $compression_codec ) || $known_compression_codecs{ $compression_codec } );
 
     $messages = [ $messages ] unless ref( $messages );
     foreach my $message ( @$messages ) {
@@ -323,7 +346,7 @@ sub send {
         };
     }
 
-    return $self->{Connection}->receive_response_to_request( $request );
+    return $self->{Connection}->receive_response_to_request( $request, $compression_codec );
 }
 
 #-- private attributes ---------------------------------------------------------
@@ -429,6 +452,11 @@ A wealth of detail about the Apache Kafka and the Kafka Protocol:
 Main page at L<http://kafka.apache.org/>
 
 Kafka Protocol at L<https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol>
+
+=head1 SOURCE CODE
+
+Kafka package is hosted on GitHub:
+L<https://github.com/TrackingSoft/Kafka>
 
 =head1 AUTHOR
 

@@ -1,5 +1,14 @@
 Revision history for Kafka package
 
+0.8008 Tue Apr  22 2014
+    - Support for GZIP and Snappy compression
+      (thanks to Colin Blower).
+    - 'Kafka' module extended with the following constants:
+      $COMPRESSION_NONE, $COMPRESSION_GZIP, $COMPRESSION_SNAPPY,
+      $ERROR_COMPRESSION, $ERROR_METADATA_ATTRIBUTES.
+    - Removed $ERROR_COMPRESSED_PAYLOAD constant.
+    - Added test 't/45_compression.t'.
+
 0.8007 Fri Mar  14 2014
     CHANGES:
     - Kafka::Cluster adapted for kafka 0.8.1 .

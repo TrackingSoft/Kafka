@@ -9,7 +9,7 @@ Kafka - Apache Kafka interface for Perl.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka> package version 0.8007 .
+This documentation refers to C<Kafka> package version 0.8008 .
 
 =cut
 
@@ -21,7 +21,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.8007';
+our $VERSION = '0.8008';
 
 use Exporter qw(
     import
@@ -30,6 +30,9 @@ use Exporter qw(
 our @EXPORT_OK = qw(
     $BITS64
     $BLOCK_UNTIL_IS_COMMITTED
+    $COMPRESSION_GZIP
+    $COMPRESSION_NONE
+    $COMPRESSION_SNAPPY
     $DEFAULT_MAX_BYTES
     $DEFAULT_MAX_NUMBER_OF_OFFSETS
     $DEFAULT_MAX_WAIT_TIME
@@ -39,7 +42,8 @@ our @EXPORT_OK = qw(
     $ERROR_CANNOT_GET_METADATA
     $ERROR_CANNOT_RECV
     $ERROR_CANNOT_SEND
-    $ERROR_COMPRESSED_PAYLOAD
+    $ERROR_COMPRESSION
+    $ERROR_METADATA_ATTRIBUTES
     $ERROR_LEADER_NOT_FOUND
     $ERROR_INVALID_MESSAGE
     $ERROR_INVALID_MESSAGE_SIZE
@@ -167,8 +171,7 @@ Supports parsing the Apache Kafka protocol.
 
 Supports the Apache Kafka Requests and Responses. Within this package the
 following implements of Kafka's protocol are implemented: PRODUCE, FETCH,
-OFFSETS, and METADATA. Note that PRODUCE and FETCH do not support compression
-at this point.
+OFFSETS, and METADATA.
 
 =item *
 
@@ -425,8 +428,7 @@ C<valid> A message entry is valid.
 
 =item *
 
-C<error> A description of the message inconsistence (currently only for
-compressed message).
+C<error> A description of the message inconsistence.
 
 =item *
 
@@ -464,12 +466,10 @@ working with Kafka module.
 
 None by default.
 
+=head2 Additional constants
+
 Additional constants are available for import, which can be used to define some
 type of parameters, and to identify various error cases.
-
-=cut
-
-=pod
 
 =over
 
@@ -612,6 +612,8 @@ const our $DEFAULT_MAX_WAIT_TIME                => 100;
 
 26 - size of protocol overhead (data added by protocol) for each message.
 
+=back
+
 =cut
 # Look at the structure of 'Message sets'
 # https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-Messagesets
@@ -622,20 +624,51 @@ const our $DEFAULT_MAX_WAIT_TIME                => 100;
 # Message => Crc MagicByte Attributes Key Value
 #   8d:c7:95:a2:                    # Crc => int32
 #   00:                             # MagicByte => int8
-#   00:                             # Attributes => int8 (the last 3 bits - Compression None)
+#   00:                             # Attributes => int8 (the lowest 2 bits - Compression None)
 #   ff:ff:ff:ff:                    # Key => bytes (a length -1 = null bytes)
 #   00:00:00:06:                    # Value => bytes (a length 0x6 = 6 bytes)
 const our $MESSAGE_SIZE_OVERHEAD                => 26;
 
+#-- Codec numbers:
+
+=pod
+
+=head2 Compression
+
+According to Apache Kafka documentation:
+
+Kafka currently supports two compression codecs with the following codec numbers:
+
+=over
+
+=item C<$COMPRESSION_NONE>
+
+None = 0
+
+=cut
+const our $COMPRESSION_NONE             => 0;
+
+=item C<$COMPRESSION_GZIP>
+
+GZIP = 1
+
+=cut
+const our $COMPRESSION_GZIP             => 1;
+
+=item C<$COMPRESSION_SNAPPY>
+
+Snappy = 2
+
+=cut
+const our $COMPRESSION_SNAPPY           => 2;
+
 =back
+
+=head2 Error codes
 
 Possible error codes (complies with a hash of descriptions C<$ERROR>):
 
 =over
-
-=cut
-
-#-- Errors fixed by Kafka package
 
 =item C<$ERROR_MISMATCH_ARGUMENT>
 
@@ -672,12 +705,12 @@ const our $ERROR_CANNOT_RECV                    => -1003;
 =cut
 const our $ERROR_CANNOT_BIND                    => -1004;
 
-=item C<$ERROR_COMPRESSED_PAYLOAD>
+=item C<$ERROR_METADATA_ATTRIBUTES>
 
--1005 - Compressed payload
+-1005 - Unknown metadata attributes
 
 =cut
-const our $ERROR_COMPRESSED_PAYLOAD             => -1005;
+const our $ERROR_METADATA_ATTRIBUTES            => -1005;
 
 =item C<$ERROR_UNKNOWN_APIKEY>
 
@@ -741,6 +774,13 @@ const our $ERROR_PARTITION_DOES_NOT_MATCH       => -1013;
 
 =cut
 const our $ERROR_NOT_BINARY_STRING              => -1014;
+
+=item C<$ERROR_COMPRESSION>
+
+-1014 - Compression error
+
+=cut
+const our $ERROR_COMPRESSION                    => -1015;
 
 =back
 
@@ -887,7 +927,7 @@ our %ERROR = (
     $ERROR_SEND_NO_ACK                      => q{No acknowledgement for sent request},
     $ERROR_CANNOT_RECV                      => q{Can't recv},
     $ERROR_CANNOT_BIND                      => q{Can't bind},
-    $ERROR_COMPRESSED_PAYLOAD               => q{Compressed payload},
+    $ERROR_METADATA_ATTRIBUTES              => q{Unknown metadata attributes},
     $ERROR_UNKNOWN_APIKEY                   => q{Unknown ApiKey},
     $ERROR_CANNOT_GET_METADATA              => q{Can't get metadata},
     $ERROR_LEADER_NOT_FOUND                 => q{Leader not found},
@@ -897,6 +937,7 @@ our %ERROR = (
     $ERROR_TOPIC_DOES_NOT_MATCH             => q{Topic does not match the requested},
     $ERROR_PARTITION_DOES_NOT_MATCH         => q{Partition does not match the requested},
     $ERROR_NOT_BINARY_STRING                => q{Not binary string},
+    $ERROR_COMPRESSION                      => q{Compression error},
 
     #-- The Protocol Error Messages
     # https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-ErrorCodes
@@ -1089,8 +1130,7 @@ See documentation for a particular module for explanation of various debug level
 
 =head1 BUGS AND LIMITATIONS
 
-Currently, the package does not implement send and response of compressed
-messages. L<Producer|Kafka::Producer> and L<Consumer|Kafka::Consumer> methods
+L<Producer|Kafka::Producer> and L<Consumer|Kafka::Consumer> methods
 only work with one topic and one partition at a time.
 Also module does not implement the Offset Commit/Fetch API.
 
@@ -1158,6 +1198,11 @@ A wealth of detail about the Apache Kafka and the Kafka Protocol:
 Main page at L<http://kafka.apache.org/>
 
 Kafka Protocol at L<https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol>
+
+=head1 SOURCE CODE
+
+Kafka package is hosted on GitHub:
+L<https://github.com/TrackingSoft/Kafka>
 
 =head1 AUTHOR
 

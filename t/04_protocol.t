@@ -28,12 +28,10 @@ plan 'no_plan';
 #-- load the modules -----------------------------------------------------------
 
 use Kafka qw(
+    $COMPRESSION_NONE
     $DEFAULT_MAX_BYTES
     $DEFAULT_MAX_NUMBER_OF_OFFSETS
     $DEFAULT_MAX_WAIT_TIME
-    %ERROR
-    $ERROR_MISMATCH_ARGUMENT
-    $ERROR_NO_ERROR
     $MIN_BYTES_RESPOND_IMMEDIATELY
     $NOT_SEND_ANY_RESPONSE
     $RECEIVE_LATEST_OFFSET
@@ -43,63 +41,16 @@ use Kafka::Internals qw(
     $PRODUCER_ANY_OFFSET
 );
 use Kafka::Protocol qw(
-    $COMPRESSION_NONE
     decode_fetch_response
-    decode_metadata_response
-    decode_offset_response
-    decode_produce_response
-    encode_fetch_request
-    encode_metadata_request
-    encode_offset_request
-    encode_produce_request
-);
-use Kafka::MockProtocol qw(
-    decode_fetch_request
-    decode_metadata_request
-    decode_offset_request
-    decode_produce_request
-    encode_fetch_response
-    encode_metadata_response
-    encode_offset_response
-    encode_produce_response
-);
-use Kafka::TestInternals qw(
-    @not_array
-    @not_empty_string
-    @not_hash
-    @not_isint
-    @not_string
 );
 
 #-- setting up facilities ------------------------------------------------------
 
 #-- declarations ---------------------------------------------------------------
 
-my ( @decode_functions, @encode_functions, $request, $encoded_response, $decoded );
+my ( $request, $encoded_response, $decoded );
 
 #-- Global data ----------------------------------------------------------------
-
-@decode_functions = qw(
-    decode_fetch_response
-    decode_metadata_response
-    decode_offset_response
-    decode_produce_response
-    decode_fetch_request
-    decode_metadata_request
-    decode_offset_request
-    decode_produce_request
-);
-
-@encode_functions = qw(
-    encode_fetch_request
-    encode_metadata_request
-    encode_offset_request
-    encode_produce_request
-    encode_fetch_response
-    encode_metadata_response
-    encode_offset_response
-    encode_produce_response
-);
 
 # INSTRUCTIONS -----------------------------------------------------------------
 

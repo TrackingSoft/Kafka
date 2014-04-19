@@ -41,6 +41,9 @@ use Sub::Install;
 
 use Kafka qw(
     $BLOCK_UNTIL_IS_COMMITTED
+    $COMPRESSION_GZIP
+    $COMPRESSION_NONE
+    $COMPRESSION_SNAPPY
     $ERROR_MISMATCH_ARGUMENT
     $NOT_SEND_ANY_RESPONSE
     $REQUEST_TIMEOUT
@@ -88,7 +91,7 @@ sub new_ERROR_MISMATCH_ARGUMENT {
 }
 
 sub send_ERROR_MISMATCH_ARGUMENT {
-    my ( $topic, $partition, $messages, $key ) = @_;
+    my ( $topic, $partition, $messages, $key, $compression_codec ) = @_;
 
     $producer = Kafka::Producer->new(
         Connection  => $connect,
@@ -100,6 +103,7 @@ sub send_ERROR_MISMATCH_ARGUMENT {
             $partition,
             $messages,
             $key,
+            $compression_codec,
         );
     } 'Kafka::Exception', 'error thrown';
 }
@@ -219,6 +223,11 @@ sub testing {
 # key
     send_ERROR_MISMATCH_ARGUMENT( $topic, $partition, 'Some value', $_ )
         foreach @not_empty_string;
+
+# compression_codec
+    send_ERROR_MISMATCH_ARGUMENT( $topic, $partition, 'Some value', 'Some key', $_ )
+        foreach ( @not_isint, $COMPRESSION_NONE - 1, $COMPRESSION_SNAPPY + 1 );
+# Valid values for $compression_codec checked in the test *_consumer.t
 
 #-- ProduceRequest
 

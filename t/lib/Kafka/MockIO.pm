@@ -7,7 +7,7 @@ server via socket.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::MockIO> version 0.8007 .
+This documentation refers to C<Kafka::MockIO> version 0.8008 .
 
 =cut
 
@@ -19,7 +19,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.8007';
+our $VERSION = '0.8008';
 
 #-- load the modules -----------------------------------------------------------
 
@@ -41,6 +41,7 @@ use Scalar::Util qw(
 use Sub::Install;
 
 use Kafka qw(
+    $COMPRESSION_NONE
     $ERROR_MISMATCH_ARGUMENT
     $ERROR_NO_ERROR
     $ERROR_NOT_BINARY_STRING
@@ -57,9 +58,6 @@ use Kafka::Internals qw(
     $MAX_SOCKET_REQUEST_BYTES
 );
 use Kafka::IO;
-use Kafka::Protocol qw(
-    $COMPRESSION_NONE
-);
 use Kafka::MockProtocol qw(
     decode_fetch_request
     decode_metadata_request
@@ -728,6 +726,11 @@ A wealth of detail about the Apache Kafka and the Kafka Protocol:
 Main page at L<http://kafka.apache.org/>
 
 Kafka Protocol at L<https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol>
+
+=head1 SOURCE CODE
+
+Kafka package is hosted on GitHub:
+L<https://github.com/TrackingSoft/Kafka>
 
 =head1 AUTHOR
 

@@ -40,6 +40,9 @@ use Params::Util qw(
 use Sub::Install;
 
 use Kafka qw(
+    $COMPRESSION_GZIP
+    $COMPRESSION_NONE
+    $COMPRESSION_SNAPPY
     $DEFAULT_MAX_BYTES
     $DEFAULT_MAX_NUMBER_OF_OFFSETS
     $DEFAULT_MAX_WAIT_TIME
@@ -282,16 +285,26 @@ sub testing {
     my $producer = Kafka::Producer->new(
         Connection      => $connect,
     );
-    # Sending a series of messages
-    $producer->send(
-        $topic,
-        $partition,
-        [                           # messages
-            'The first message',
-            'The second message',
-            'The third message',
-        ]
-    );
+
+    foreach my $compression_codec (
+            $COMPRESSION_GZIP,
+            $COMPRESSION_NONE,
+            $COMPRESSION_SNAPPY,
+        )
+    {
+        # Sending a series of messages
+        $producer->send(
+            $topic,
+            $partition,
+            [                           # messages
+                'The first message',
+                'The second message',
+                'The third message',
+            ],
+            undef,
+            $compression_codec,
+        );
+    }
 
     $consumer = Kafka::Consumer->new(
         Connection  => $connect,

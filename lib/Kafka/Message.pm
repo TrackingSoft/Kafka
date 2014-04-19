@@ -6,7 +6,7 @@ Kafka::Message - Interface to the Kafka message properties.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Message> version 0.8007 .
+This documentation refers to C<Kafka::Message> version 0.8008 .
 
 =cut
 
@@ -18,7 +18,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.8007';
+our $VERSION = '0.8008';
 
 #-- load the modules -----------------------------------------------------------
 
@@ -132,7 +132,7 @@ The main features of the C<Kafka::Message> class are:
 
 =item *
 
-Represents Apache Kafka Message structure (no support for compression codec attribute now). Description of the structure
+Represents Apache Kafka Message structure. Description of the structure
 is available at L<https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-Messagesets>
 
 =back
@@ -162,7 +162,7 @@ Boolean value: indicates whether received message is valid or not.
 
 =head3 C<error>
 
-A description why message is invalid (currently happens only when message is compressed).
+A description why message is invalid.
 
 =head3 C<offset>
 
@@ -175,7 +175,7 @@ The offset of the next message in the Apache Kafka server.
 =head3 C<Attributes>
 
 This holds metadata attributes about the message.
-The last 3 bits contain the compression codec used for the message.
+The lowest 2 bits contain the compression codec used for the message.
 The other bits are currently unused.
 
 =head3 C<HighwaterMarkOffset>
@@ -225,6 +225,11 @@ A wealth of detail about the Apache Kafka and the Kafka Protocol:
 Main page at L<http://kafka.apache.org/>
 
 Kafka Protocol at L<https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol>
+
+=head1 SOURCE CODE
+
+Kafka package is hosted on GitHub:
+L<https://github.com/TrackingSoft/Kafka>
 
 =head1 AUTHOR
 

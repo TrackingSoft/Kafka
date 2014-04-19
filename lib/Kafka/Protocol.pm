@@ -6,7 +6,7 @@ Kafka::Protocol - Functions to process messages in the Apache Kafka protocol.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Protocol> version 0.8007 .
+This documentation refers to C<Kafka::Protocol> version 0.8008 .
 
 =cut
 
@@ -18,7 +18,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.8007';
+our $VERSION = '0.8008';
 
 use Exporter qw(
     import
@@ -41,7 +41,7 @@ our @EXPORT_OK = qw(
     _verify_string
     $APIVERSION
     $BAD_OFFSET
-    $COMPRESSION_NONE
+    $COMPRESSION_CODEC_MASK
     $CONSUMERS_REPLICAID
     $NULL_BYTES_LENGTH
     $_int64_template
@@ -49,7 +49,16 @@ our @EXPORT_OK = qw(
 
 #-- load the modules -----------------------------------------------------------
 
+use Compress::Snappy;
 use Const::Fast;
+use IO::Compress::Gzip qw(
+    gzip
+    $GzipError
+);
+use IO::Uncompress::Gunzip qw(
+    gunzip
+    $GunzipError
+);
 use Params::Util qw(
     _ARRAY
     _HASH
@@ -64,8 +73,12 @@ use String::CRC32;
 use Kafka qw(
     $BITS64
     $BLOCK_UNTIL_IS_COMMITTED
+    $COMPRESSION_GZIP
+    $COMPRESSION_NONE
+    $COMPRESSION_SNAPPY
     $DEFAULT_MAX_WAIT_TIME
     %ERROR
+    $ERROR_COMPRESSION
     $ERROR_MISMATCH_ARGUMENT
     $ERROR_NOT_BINARY_STRING
     $ERROR_REQUEST_OR_RESPONSE
@@ -74,6 +87,7 @@ use Kafka qw(
     $RECEIVE_LATEST_OFFSET
     $WAIT_WRITTEN_TO_LOCAL_LOG
 );
+use Kafka::Exceptions;
 use Kafka::Internals qw(
     $APIKEY_FETCH
     $APIKEY_METADATA
@@ -92,6 +106,7 @@ use Kafka::Internals qw(
 
     use Data::Compare;
     use Kafka qw(
+        $COMPRESSION_NONE
         $ERROR_NO_ERROR
         $REQUEST_TIMEOUT
         $WAIT_WRITTEN_TO_LOCAL_LOG
@@ -100,7 +115,6 @@ use Kafka::Internals qw(
         $PRODUCER_ANY_OFFSET
     );
     use Kafka::Protocol qw(
-        $COMPRESSION_NONE
         decode_produce_response
         encode_produce_request
     );
@@ -180,8 +194,8 @@ Supports parsing the Apache Kafka protocol.
 
 =item *
 
-Supports Apache Kafka Requests and Responses (PRODUCE and FETCH with
-no compression codec attribute now). Within this package we currently support
+Supports Apache Kafka Requests and Responses (PRODUCE and FETCH with).
+Within this package we currently support
 access to PRODUCE, FETCH, OFFSET, METADATA Requests and Responses.
 
 =item *
@@ -223,7 +237,7 @@ Support for working with 64 bit elements of the Kafka protocol on 32 bit systems
 # ApiVersion => int16             This is a numeric version number for this api.
 #                                Currently the supported version for all APIs is 0.
 # Attributes => int8              Metadata attributes about the message.
-#                                 In particular the last 3 bits contain the compression codec used for the message.
+#                                 The lowest 2 bits contain the compression codec used for the message.
 # ClientId => string              This is a user supplied identifier for the client application.
 # CorrelationId => int32          This is a user-supplied integer.
 #                                 It will be passed back in the response by the server, unmodified.
@@ -345,22 +359,8 @@ const our $APIVERSION                   => 0;
 
 # According to Apache Kafka documentation:
 # Attributes - Metadata attributes about the message.
-# In particular the last 3 bits contain the compression codec used for the message.
-const our $COMPRESSION_CODEC_MASK       => 0b111;   # Not used now
-
-#-- Codec numbers:
-
-=head3 C<$COMPRESSION_NONE>
-
-According to Apache Kafka documentation: 'Kafka currently supports two compression codecs for message sets with the following codec numbers:
-None = 0, ...'
-
-=cut
-const our $COMPRESSION_NONE             => 0;
-# codec number: GZIP = 1
-const our $COMPRESSION_GZIP             => 1;       # Not used now
-# codec number: Snappy = 2
-const our $COMPRESSION_SNAPPY           => 2;       # Not used now
+# The lowest 2 bits contain the compression codec used for the message.
+const our $COMPRESSION_CODEC_MASK       => 0b11;
 
 =head3 C<$CONSUMERS_REPLICAID>
 
@@ -465,7 +465,7 @@ The following functions are available for C<Kafka::MockProtocol> module.
 
 # PRODUCE Request --------------------------------------------------------------
 
-=head3 C<encode_produce_request( $Produce_Request )>
+=head3 C<encode_produce_request( $Produce_Request, $compression_codec )>
 
 Encodes the argument and returns a reference to the encoded binary string
 representing a Request buffer.
@@ -479,11 +479,23 @@ This function take argument. The following argument is currently recognized:
 C<$Produce_Request> is a reference to the hash representing
 the structure of the PRODUCE Request (examples see C<t/*_decode_encode.t>).
 
+=item C<$compression_codec>
+
+Optional.
+
+C<$compression_codec> sets the required type of C<$messages> compression,
+if the compression is desirable.
+
+Supported codecs:
+L<$COMPRESSION_NONE|Kafka/$COMPRESSION_NONE>,
+L<$COMPRESSION_GZIP|Kafka/$COMPRESSION_GZIP>,
+L<$COMPRESSION_SNAPPY|Kafka/$COMPRESSION_SNAPPY>.
+
 =back
 
 =cut
 sub encode_produce_request {
-    my ( $Produce_Request ) = @_;
+    my ( $Produce_Request, $compression_codec ) = @_;
 
     my @data;
     my $request = {
@@ -522,7 +534,7 @@ sub encode_produce_request {
             $request->{template}    .= q{l>};                               # Partition
             $request->{len}         += 4;
 
-            _encode_MessageSet_array( $request, $partition->{MessageSet} );
+            _encode_MessageSet_array( $request, $partition->{MessageSet}, $compression_codec );
         }
     }
 
@@ -1157,7 +1169,50 @@ sub _decode_MessageSet_array {
         $Value_length                                                =  $data->[ $$i_ref++ ];   # Value length
         $Message->{Value} = $Value_length == $NULL_BYTES_LENGTH ? q{} : $data->[ $$i_ref++ ];   # Value
 
-        push( @$MessageSet_array_ref, $Message );
+        if ( my $compression_codec = $Message->{Attributes} & $COMPRESSION_CODEC_MASK ) {
+            my $decompressed;
+            if ( $compression_codec == $COMPRESSION_GZIP ) {
+                gunzip( \$Message->{Value} => \$decompressed )
+                    or _error( $ERROR_COMPRESSION, "gunzip failed: $GunzipError" );
+            } elsif ( $compression_codec == $COMPRESSION_SNAPPY ) {
+                my ( $header, $x_version, $x_compatversion, undef ) = unpack( q{a[8]L>L>L>}, $Message->{Value} );   # undef - $x_length
+
+                # Special thanks to Colin Blower
+                if ( $header eq "\x82SNAPPY\x00" ) {
+                    # Found a xerial header.... nonstandard snappy compression header, remove the header
+                    if ( $x_compatversion == 1 && $x_version == 1 ) {
+                        $Message->{Value} = substr( $Message->{Value}, 20 );    # 20 = q{a[8]L>L>L>}
+                    } else {
+                        #warn("V $x_version and comp $x_compatversion");
+                        _error( $ERROR_COMPRESSION, "Snappy compression with incompatible xerial header version found (x_version = $x_version, x_compatversion = $x_compatversion)" );
+                    }
+                }
+
+                $decompressed = Compress::Snappy::decompress( $Message->{Value} )
+                    // _error( $ERROR_COMPRESSION, 'Unable to decompress snappy compressed data' );
+            } else {
+                _error( $ERROR_COMPRESSION, "Unknown compression codec $compression_codec" );
+            }
+            my @data;
+            my $Value_length = length $decompressed;
+            my $resp = {
+                data            => \@data,
+                bin_stream      => \$decompressed,
+                stream_offset   => 0,
+            };
+            _decode_MessageSet_sized_template( $Value_length, $resp );
+            @data = unpack( $resp->{template}, ${ $resp->{bin_stream} } );
+            my $i = 0;  # i_ref
+            my $size = length( $decompressed );
+            _decode_MessageSet_array(
+                $resp,
+                $size,  # message set size
+                \$i,    # i_ref
+                $MessageSet_array_ref,
+            );
+        } else {
+            push( @$MessageSet_array_ref, $Message );
+        }
 
         $MessageSetSize -= 12
                                     # [q] Offset
@@ -1169,7 +1224,56 @@ sub _decode_MessageSet_array {
 
 # Generates a template to encrypt MessageSet
 sub _encode_MessageSet_array {
-    my ( $request, $MessageSet_array_ref ) = @_;
+    my ( $request, $MessageSet_array_ref, $compression_codec ) = @_;
+
+    my ( $MessageSize, $Key, $Value, $key_length, $value_length, $message_body, $message_set );
+
+    if ( $compression_codec ) {
+        foreach my $MessageSet ( @$MessageSet_array_ref ) {
+            $key_length   = length( $Key    = $MessageSet->{Key} );
+            $value_length = length( $Value  = $MessageSet->{Value} );
+
+            $message_body = pack(
+                    q{ccl>}                                         # MagicByte
+                                                                    # Attributes
+                                                                    # Key length
+                    .( $key_length   ? qq{a[$key_length]}   : q{} ) # Key
+                    .q{l>}                                          # Value length
+                    .( $value_length ? qq{a[$value_length]} : q{} ) # Value
+                ,
+                0,
+                $COMPRESSION_NONE,  # According to Apache Kafka documentation:
+                                    # The lowest 2 bits contain the compression codec used for the message.
+                                    # The other bits should be set to 0.
+                $key_length     ? ( $key_length,    $Key )    : ( $NULL_BYTES_LENGTH ),
+                $value_length   ? ( $value_length,  $Value )  : ( $NULL_BYTES_LENGTH ),
+            );
+
+            $message_set .= pack( qq(x[8]l>l>),     # 8 Offset ($PRODUCER_ANY_OFFSET)
+                length( $message_body ) + 4,        # [l] MessageSize ( $message_body + Crc )
+                crc32( $message_body )              # [l] Crc
+            ).$message_body;
+        }
+
+        $MessageSet_array_ref = [
+            {
+                Offset  => $PRODUCER_ANY_OFFSET,
+                Key     => $Key,
+            }
+        ];
+
+        # Compression
+        if ( $compression_codec == $COMPRESSION_GZIP ) {
+            $MessageSet_array_ref->[0]->{Value} = q{};
+            gzip( \$message_set => \$MessageSet_array_ref->[0]->{Value} )
+                or _error( $ERROR_COMPRESSION, "gzip failed: $GzipError" );
+        } elsif ( $compression_codec == $COMPRESSION_SNAPPY ) {
+            $MessageSet_array_ref->[0]->{Value} = Compress::Snappy::compress( $message_set )
+                // _error( $ERROR_COMPRESSION, 'Unable to compress snappy data' );
+        } else {
+             _error( $ERROR_COMPRESSION, "Unknown compression codec $compression_codec" );
+        }
+    }
 
     my $data = $request->{data};
     my $MessageSetSize = 0;
@@ -1193,7 +1297,6 @@ sub _encode_MessageSet_array {
     $request->{template}    .= q{l>};                                       # MessageSetSize
     $request->{len}         += 4;
 
-    my ( $MessageSize, $Key, $key_length, $Value, $value_length, $message_body );
     foreach my $MessageSet ( @$MessageSet_array_ref ) {
         push( @$data,
             _pack64( $MessageSet->{Offset} ),                               # Offset (It may be $PRODUCER_ANY_OFFSET)
@@ -1214,11 +1317,11 @@ sub _encode_MessageSet_array {
                 .( $value_length ? qq{a[$value_length]} : q{} ) # Value
             ,
             0,
-            $COMPRESSION_NONE,  # According to Apache Kafka documentation:
-                                # last 3 bits contain the compression codec
-                                # The other bits are not described in the documentation
-            $key_length     ? ( $key_length,    $Key )    : ( -1 ),
-            $value_length   ? ( $value_length,  $Value )  : ( -1 ),
+            $compression_codec // $COMPRESSION_NONE,    # According to Apache Kafka documentation:
+                                # The lowest 2 bits contain the compression codec used for the message.
+                                # The other bits should be set to 0.
+            $key_length     ? ( $key_length,    $Key )    : ( $NULL_BYTES_LENGTH ),
+            $value_length   ? ( $value_length,  $Value )  : ( $NULL_BYTES_LENGTH ),
         );
 
         push( @$data, crc32( $message_body ), $message_body );
@@ -1241,8 +1344,6 @@ sub _encode_MessageSet_array {
 sub _decode_MessageSet_template {
     my ( $response ) = @_;
 
-    my $bin_stream_length = length ${ $response->{bin_stream} };
-
     my $MessageSetSize = unpack(
          q{x[}.$response->{stream_offset}
         .q{]l>},                            # MessageSetSize
@@ -1250,6 +1351,14 @@ sub _decode_MessageSet_template {
     );
     $response->{template} .= q{l>};         # MessageSetSize
     $response->{stream_offset} += 4;        # bytes before Offset
+
+    return _decode_MessageSet_sized_template($MessageSetSize, $response);
+}
+
+sub _decode_MessageSet_sized_template {
+    my ( $MessageSetSize, $response ) = @_;
+
+    my $bin_stream_length = length ${ $response->{bin_stream} };
 
     my ( $local_template, $MessageSize, $Key_length, $Value_length );
     CREATE_TEMPLATE:
@@ -1360,6 +1469,11 @@ sub _encode_string {
     }
 }
 
+# Handler for errors
+sub _error {
+    Kafka::Exception::Protocol->throw( throw_args( @_ ) );
+}
+
 1;
 
 __END__
@@ -1402,6 +1516,11 @@ A wealth of detail about the Apache Kafka and the Kafka Protocol:
 Main page at L<http://kafka.apache.org/>
 
 Kafka Protocol at L<https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol>
+
+=head1 SOURCE CODE
+
+Kafka package is hosted on GitHub:
+L<https://github.com/TrackingSoft/Kafka>
 
 =head1 AUTHOR
 
