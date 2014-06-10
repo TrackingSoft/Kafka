@@ -9,7 +9,7 @@ Kafka - Apache Kafka interface for Perl.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka> package version 0.8008 .
+This documentation refers to C<Kafka> package version 0.8008_1 .
 
 =cut
 
@@ -21,7 +21,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.8008';
+our $VERSION = '0.8008_1';
 
 use Exporter qw(
     import
@@ -61,6 +61,7 @@ our @EXPORT_OK = qw(
     $ERROR_REPLICA_NOT_AVAILABLE
     $ERROR_REQUEST_OR_RESPONSE
     $ERROR_REQUEST_TIMED_OUT
+    $ERROR_RESPOSEMESSAGE_NOT_RECEIVED
     $ERROR_SEND_NO_ACK
     $ERROR_STALE_CONTROLLER_EPOCH_CODE
     $ERROR_TOPIC_DOES_NOT_MATCH
@@ -777,10 +778,17 @@ const our $ERROR_NOT_BINARY_STRING              => -1014;
 
 =item C<$ERROR_COMPRESSION>
 
--1014 - Compression error
+-1015 - Compression error
 
 =cut
 const our $ERROR_COMPRESSION                    => -1015;
+
+=item C<$ERROR_RESPOSE_BODY_NOT_RECEIVED>
+
+-1016 - 'ResponseMessage' not received
+
+=cut
+const our $ERROR_RESPOSEMESSAGE_NOT_RECEIVED    => -1016;
 
 =back
 
@@ -938,6 +946,7 @@ our %ERROR = (
     $ERROR_PARTITION_DOES_NOT_MATCH         => q{Partition does not match the requested},
     $ERROR_NOT_BINARY_STRING                => q{Not binary string},
     $ERROR_COMPRESSION                      => q{Compression error},
+    $ERROR_RESPOSEMESSAGE_NOT_RECEIVED      => q{'ResponseMessage' not received},
 
     #-- The Protocol Error Messages
     # https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-ErrorCodes

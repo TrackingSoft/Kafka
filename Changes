@@ -1,6 +1,10 @@
 Revision history for Kafka package
 
-0.8008 Tue Apr  22 2014
+0.8008_1 Tue Jun  10 2014
+    CHANGES:
+    - Added error $ERROR_RESPOSEMESSAGE_NOT_RECEIVED .
+
+0.8008 Tue Apr  29 2014
     - Support for GZIP and Snappy compression
       (thanks to Colin Blower).
     - 'Kafka' module extended with the following constants:

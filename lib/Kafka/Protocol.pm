@@ -6,7 +6,7 @@ Kafka::Protocol - Functions to process messages in the Apache Kafka protocol.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Protocol> version 0.8008 .
+This documentation refers to C<Kafka::Protocol> version 0.8008_1 .
 
 =cut
 
@@ -18,7 +18,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.8008';
+our $VERSION = '0.8008_1';
 
 use Exporter qw(
     import
@@ -194,7 +194,7 @@ Supports parsing the Apache Kafka protocol.
 
 =item *
 
-Supports Apache Kafka Requests and Responses (PRODUCE and FETCH with).
+Supports Apache Kafka Requests and Responses (PRODUCE and FETCH).
 Within this package we currently support
 access to PRODUCE, FETCH, OFFSET, METADATA Requests and Responses.
 

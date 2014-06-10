@@ -6,7 +6,7 @@ Kafka::Connection - Object interface to connect to a kafka cluster.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Connection> version 0.8008 .
+This documentation refers to C<Kafka::Connection> version 0.8008_1 .
 
 =cut
 
@@ -20,7 +20,7 @@ use warnings;
 
 our $DEBUG = 0;
 
-our $VERSION = '0.8008';
+our $VERSION = '0.8008_1';
 
 use Exporter qw(
     import
@@ -85,6 +85,7 @@ use Kafka qw(
     $ERROR_MISMATCH_ARGUMENT
     $ERROR_MISMATCH_CORRELATIONID
     $ERROR_NO_KNOWN_BROKERS
+    $ERROR_RESPOSEMESSAGE_NOT_RECEIVED
     $ERROR_SEND_NO_ACK
     $ERROR_UNKNOWN_APIKEY
     $KAFKA_SERVER_PORT
@@ -190,12 +191,6 @@ my %protocol = (
         decode                  => \&decode_metadata_response,
         encode                  => \&encode_metadata_request,
     },
-);
-
-my %known_api_keys = map { $_ => 1 } (
-    $APIKEY_FETCH,
-    $APIKEY_OFFSET,
-    $APIKEY_PRODUCE,
 );
 
 =head2 EXPORT
@@ -633,7 +628,11 @@ sub receive_response_to_request {
                             last REQUEST;   # go to the next attempt
                         }
                     }
-                    $response = $protocol{ $api_key }->{decode}->( $encoded_response_ref );
+                    if ( length( $$encoded_response_ref ) > 4 ) {   # MessageSize => int32
+                        $response = $protocol{ $api_key }->{decode}->( $encoded_response_ref );
+                    } else {
+                        $self->_error( $ERROR_RESPOSEMESSAGE_NOT_RECEIVED );
+                    }
                 }
 
                 $response->{CorrelationId} == $CorrelationId

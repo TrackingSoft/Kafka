@@ -46,6 +46,7 @@ use Kafka qw(
     $DEFAULT_MAX_BYTES
     $DEFAULT_MAX_WAIT_TIME
     $ERROR_MISMATCH_ARGUMENT
+    $ERROR_RESPOSEMESSAGE_NOT_RECEIVED
     $KAFKA_SERVER_PORT
     $MIN_BYTES_RESPOND_IMMEDIATELY
     $MIN_BYTES_RESPOND_HAS_DATA
@@ -379,6 +380,60 @@ sub communication_error {
         code    => $method,
         into    => 'Kafka::IO',
         as      => 'send',
+    } );
+
+#-- $ERROR_RESPOSEMESSAGE_NOT_RECEIVED
+
+    $method = \&Kafka::IO::receive;
+
+    Sub::Install::reinstall_sub( {
+        code    => sub {
+            my ( $self, $length ) = @_;
+            my $only_MessageSize;
+            if ( $length == 4 ) {
+                $only_MessageSize = pack( q{l>}, 0 );
+            } else {
+                $only_MessageSize = q{};
+            }
+            return \$only_MessageSize;
+        },
+        into    => 'Kafka::IO',
+        as      => 'receive',
+    } );
+
+#    $connect = Kafka::Connection->new(
+#        host        => 'localhost',
+#        port        => $port,
+#    );
+
+    $request = {
+        ApiKey                              => $APIKEY_FETCH,
+        CorrelationId                       => 0,
+        ClientId                            => 'consumer',
+        MaxWaitTime                         => $DEFAULT_MAX_WAIT_TIME,
+        MinBytes                            => $MIN_BYTES_RESPOND_IMMEDIATELY,
+        topics                              => [
+            {
+                TopicName                   => $topic,
+                partitions                  => [
+                    {
+                        Partition           => 0,
+                        FetchOffset         => 0,
+                        MaxBytes            => $DEFAULT_MAX_BYTES,
+                    },
+                ],
+            },
+        ],
+    };
+
+    eval { $response = $connect->receive_response_to_request( $request ); };
+    isa_ok( $@, 'Kafka::Exception' );
+    is $@->code, $ERROR_RESPOSEMESSAGE_NOT_RECEIVED, '$ERROR_RESPOSEMESSAGE_NOT_RECEIVED OK';
+
+    Sub::Install::reinstall_sub( {
+        code    => $method,
+        into    => 'Kafka::IO',
+        as      => 'receive',
     } );
 
     Kafka::MockIO::restore();

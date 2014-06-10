@@ -6,7 +6,7 @@ Kafka::Producer - Perl interface for Kafka producer client.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Producer> version 0.8008 .
+This documentation refers to C<Kafka::Producer> version 0.8008_1 .
 
 =cut
 
@@ -18,7 +18,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.8008';
+our $VERSION = '0.8008_1';
 
 #-- load the modules -----------------------------------------------------------
 
@@ -289,9 +289,10 @@ C<$compression_codec> sets the required type of C<$messages> compression,
 if the compression is desirable.
 
 Supported codecs:
-L<$COMPRESSION_NONE|Kafka/$COMPRESSION_NONE>,
-L<$COMPRESSION_GZIP|Kafka/$COMPRESSION_GZIP>,
-L<$COMPRESSION_SNAPPY|Kafka/$COMPRESSION_SNAPPY>.
+C<$COMPRESSION_NONE>,
+C<$COMPRESSION_GZIP>,
+C<$COMPRESSION_SNAPPY>.
+(the defaults that can be imported from the L<Kafka|Kafka> module.
 
 =back
 
