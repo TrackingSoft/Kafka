@@ -49,7 +49,7 @@ use Sub::Install;
 use Sys::SigAction qw(
     set_sig_handler
 );
-use Time::HiRes;
+use Time::HiRes qw();
 
 use Kafka qw(
     $KAFKA_SERVER_PORT

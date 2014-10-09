@@ -3,8 +3,8 @@
    "author" : [
       "TrackingSoft LLC <sgladkov@trackingsoft.com>"
    ],
-   "dynamic_config" : 1,
-   "generated_by" : "ExtUtils::MakeMaker version 6.8, CPAN::Meta::Converter version 2.132830",
+   "dynamic_config" : 0,
+   "generated_by" : "ExtUtils::MakeMaker version 6.8, CPAN::Meta::Converter version 2.132830, CPAN::Meta::Converter version 2.142690",
    "license" : [
       "perl_5"
    ],
@@ -24,36 +24,7 @@
    "prereqs" : {
       "build" : {
          "requires" : {
-            "Capture::Tiny" : "0.24",
-            "Carp" : "1.3301",
-            "Clone" : "0.36",
-            "Config::IniFiles" : "2.83",
-            "Const::Fast" : "0.014",
-            "Cwd" : "3.40",
-            "Data::Dumper" : "2.151",
-            "Exporter" : "5.70",
-            "File::HomeDir" : "1.00",
-            "File::Path" : "2.09",
-            "File::Spec" : "3.40",
-            "File::Spec::Functions" : "3.40",
-            "IO::File" : "1.16",
-            "IO::Socket::INET" : "1.33",
-            "List::Util" : "1.38",
-            "Net::EmptyPort" : "0.0",
-            "Params::Util" : "1.07",
-            "Proc::Daemon" : "0.14",
-            "Scalar::Util" : "1.38",
-            "Scalar::Util::Numeric" : "0.22",
-            "Socket" : "2.013",
-            "Sub::Install" : "0.927",
-            "Sys::SigAction" : "0.21",
-            "Test::Deep" : "0.112",
-            "Test::Exception" : "0.32",
-            "Test::More" : "1.001003",
-            "Test::NoWarnings" : "1.04",
-            "Test::TCP" : "2.02" ,
-            "Time::HiRes" : "1.9726",
-            "Try::Tiny" : "0.21",
+            "ExtUtils::MakeMaker" : "0"
          }
       },
       "configure" : {
@@ -84,50 +55,91 @@
             "Try::Tiny" : "0.21",
             "perl" : "5.010"
          }
+      },
+      "test" : {
+         "requires" : {
+            "Capture::Tiny" : "0.24",
+            "Carp" : "1.3301",
+            "Clone" : "0.36",
+            "Config::IniFiles" : "2.83",
+            "Const::Fast" : "0.014",
+            "Cwd" : "3.40",
+            "Data::Dumper" : "2.151",
+            "Exporter" : "5.70",
+            "File::HomeDir" : "1.00",
+            "File::Path" : "2.09",
+            "File::Spec" : "3.40",
+            "File::Spec::Functions" : "3.40",
+            "IO::File" : "1.16",
+            "IO::Socket::INET" : "1.33",
+            "List::Util" : "1.38",
+            "Net::EmptyPort" : "0.0",
+            "Params::Util" : "1.07",
+            "Proc::Daemon" : "0.14",
+            "Scalar::Util" : "1.38",
+            "Scalar::Util::Numeric" : "0.22",
+            "Socket" : "2.013",
+            "Sub::Install" : "0.927",
+            "Sys::SigAction" : "0.21",
+            "Test::Deep" : "0.112",
+            "Test::Exception" : "0.32",
+            "Test::More" : "1.001003",
+            "Test::NoWarnings" : "1.04",
+            "Test::TCP" : "2.02",
+            "Time::HiRes" : "1.9726",
+            "Try::Tiny" : "0.21"
+         }
       }
    },
    "provides" : {
       "Kafka" : {
          "file" : "lib/Kafka.pm",
-         "version" : "0.8008_1"
+         "version" : "0.8009"
       },
       "Kafka::Connection" : {
          "file" : "lib/Kafka/Connection.pm",
-         "version" : "0.8008_1"
+         "version" : "0.8009"
       },
       "Kafka::Consumer" : {
          "file" : "lib/Kafka/Consumer.pm",
-         "version" : "0.8008_1"
+         "version" : "0.8009"
       },
       "Kafka::Exceptions" : {
          "file" : "lib/Kafka/Exceptions.pm",
-         "version" : "0.8008_1"
+         "version" : "0.8009"
       },
       "Kafka::IO" : {
          "file" : "lib/Kafka/IO.pm",
-         "version" : "0.8008_1"
+         "version" : "0.8009"
       },
       "Kafka::Int64" : {
          "file" : "lib/Kafka/Int64.pm",
-         "version" : "0.8008_1"
+         "version" : "0.8009"
       },
       "Kafka::Internals" : {
          "file" : "lib/Kafka/Internals.pm",
-         "version" : "0.8008_1"
+         "version" : "0.8009"
       },
       "Kafka::Message" : {
          "file" : "lib/Kafka/Message.pm",
-         "version" : "0.8008_1"
+         "version" : "0.8009"
       },
       "Kafka::Producer" : {
          "file" : "lib/Kafka/Producer.pm",
-         "version" : "0.8008_1"
+         "version" : "0.8009"
       },
       "Kafka::Protocol" : {
          "file" : "lib/Kafka/Protocol.pm",
-         "version" : "0.8008_1"
+         "version" : "0.8009"
       }
    },
-   "release_status" : "testing",
-   "version" : "0.8008_1"
+   "release_status" : "stable",
+   "version" : "0.8009",
+   "resources" : {
+      "repository" : {
+         "type" : "git",
+         "url" : "git://github.com/TrackingSoft/Kafka.git",
+         "web" : "http://github.com/TrackingSoft/Kafka"
+      }
+   }
 }
