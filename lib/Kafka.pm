@@ -192,6 +192,13 @@ Apache Kafka server.
 
 Support for working with 64 bit elements of the Kafka protocol on 32 bit systems.
 
+=item *
+
+Taint mode support.
+Taint mode errors are prevented for internal operations.
+There are no taint checks or clearing of the taint flag for the data being sent or received:
+the calling code is responsible for handling that.
+
 =back
 
 =head1 APACHE KAFKA'S STYLE COMMUNICATION

@@ -1,11 +1,13 @@
 Revision history for Kafka package
 
-0.8009 Thu Oct  10 2014
+0.8009 Tue Jan  13 2014
     CHANGES:
     - Added error $ERROR_RESPOSEMESSAGE_NOT_RECEIVED .
     BUGFIXES:
     - Module Kafka::IO no longer uses sigtrap
       (thanks to Mark Hedges).
+    - Taint mode support
+      (thanks to Hari Sekhon).
 
 0.8008 Tue Apr  29 2014
     - Support for GZIP and Snappy compression

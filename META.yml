@@ -92,6 +92,7 @@ test_requires:
   Net::EmptyPort: '0.0'
   Params::Util: '1.07'
   Proc::Daemon: '0.14'
+  Proc::ProcessTable: '0.51'
   Scalar::Util: '1.38'
   Scalar::Util::Numeric: '0.22'
   Socket: '2.013'

@@ -189,6 +189,10 @@ sub new {
         $self->{ $k } = shift @args if exists $self->{ $k };
     }
 
+    # we trust it: make it untainted
+    ( $self->{host} ) = $self->{host} =~ /\A(.+)\z/;
+    ( $self->{port} ) = $self->{port} =~ /\A(\d+)\z/;
+
     $self->{not_accepted} = 0;
     $self->{socket} = undef;
     try {
@@ -275,6 +279,8 @@ sub receive {
 
     $self->_debug_msg( $message, 'Response from', 'yellow' )
         if $self->debug_level >= 2;
+
+    # returns tainted data
     return \$message;
 }
 

@@ -16,6 +16,7 @@ use 5.010;
 use strict;
 use warnings;
 
+
 # ENVIRONMENT ------------------------------------------------------------------
 
 our $VERSION = '0.8009';
@@ -148,6 +149,8 @@ const my    $START_ZOOKEEPER_ARG            => 'org.apache.zookeeper.server.quor
 const my    $KAFKA_0_8_REF_FILE_MASK        => catfile( 'bin', 'kafka-preferred-replica-election.sh' );
 
 const our   $HOST                           => 'localhost';
+
+const my    $RESTRICTED_PATH                => '/bin:/usr/bin:/usr/local/bin';
 
 my $start_dir;
 
@@ -314,8 +317,11 @@ sub new {
     # Configuring
     my @ini_files;
     find(
-        sub {
-            push( @ini_files, $File::Find::name ) if $_ eq $KAFKA_PROPERTIES_FILE;
+        {
+            wanted  => sub {
+                push( @ini_files, $File::Find::name ) if $_ eq $KAFKA_PROPERTIES_FILE;
+            },
+            untaint => 1,
         },
         $kafka_data_dir
     );
@@ -488,8 +494,8 @@ sub stop {
     my ( $self, $port ) = @_;
 
     unless ( $port ) {
-        my $cwd = getcwd();
-        chdir $self->_data_dir;
+        my $cwd = _clear_cwd();
+        chdir _clear_tainted( $self->_data_dir );
 
         $self->stop( $_ ) for map { /(\d+)/ } glob 'kafka-*.pid';
 
@@ -681,6 +687,20 @@ sub close {
     $_used = 0;
 }
 
+#-- private functions ----------------------------------------------------------
+
+# we know what we do
+sub _clear_tainted {
+    my ( $str ) = @_;
+
+    $str =~ /(.+)/;
+    return $1;
+}
+
+sub _clear_cwd {
+    return _clear_tainted( getcwd() );
+}
+
 #-- private attributes ---------------------------------------------------------
 
 # Returns a reference to a hash with descriptions kafka servers forming the cluster.
@@ -772,8 +792,9 @@ sub _is_kafka_0_8 {
     my ( $self ) = @_;
 
     my $file_mask = catfile( $self->base_dir, $KAFKA_0_8_REF_FILE_MASK );
-    my $cwd = getcwd();
-    chdir $self->_config_dir;
+    my $cwd = _clear_cwd();
+
+    chdir _clear_tainted( $self->_config_dir );
     my $ref_file = ( glob $file_mask )[0];
     chdir $cwd;
 
@@ -837,8 +858,8 @@ sub _remove_log_tree {
     $self->_verify_run_dir;
 
     unless ( $port ) {
-        my $cwd = getcwd();
-        chdir $self->_data_dir;
+        my $cwd = _clear_cwd();
+        chdir _clear_tainted( $self->_data_dir );
 
         $self->_remove_log_tree( $_ ) for map { /(\d+)/ } glob "$KAFKA_LOGS_DIR_MASK*";
 
@@ -947,18 +968,18 @@ sub _create_kafka_log_dir {
 sub _start_server {
     my ( $self, $server_name, $property_file, $arg, $pid_file, $log_dir, $port ) = @_;
 
-    my $cwd = getcwd();
-    chdir $log_dir;
+    my $cwd = _clear_cwd();
+    chdir _clear_tainted( $log_dir );
 
     $ENV{KAFKA_BASE_DIR} = $self->base_dir;
     $ENV{KAFKA_OPTS} = "-Dlog4j.configuration=file:$RELATIVE_LOG4J_PROPERTY_FILE";
 
     my $proc_daemon = Proc::Daemon->new;
-    my $pid = $proc_daemon->Init( {
+    my $pid = _clear_tainted( $proc_daemon->Init( {
         work_dir     => $log_dir,
         child_STDOUT => '>>'.catfile( $log_dir, 'stdout.log' ),
         child_STDERR => '>>'.catfile( $log_dir, 'stderr.log' ),
-    } );
+    } ) );
 
     my $server_start_cmd = catfile(             # we are in the $log_dir, the full directory name may contain spaces
         '..',                                   # $data_dir
@@ -985,7 +1006,8 @@ sub _start_server {
             # signals. Proc::Daemon returns pid of the top-level script and killing it
             # won't work (no signals are trapped there) - actual java process keeps
             # running.
-            if( !( my $real_pid = $proc_daemon->Status( qr/.*java.+$server_name.+\Q$property_file\E.*/ ) ) ) {
+            my $script_pid = _clear_tainted( $proc_daemon->get_pid( qr/.*java.+$server_name.+\Q$property_file\E.*/ ) );
+            if( !( my $real_pid = $proc_daemon->Status( $script_pid ) ) ) {
                 confess 'Could not find server pid' unless $attempts;
             }
             else {
@@ -1006,8 +1028,9 @@ sub _start_server {
         }
     }
     else {
+        local $ENV{PATH} = $RESTRICTED_PATH;
         exec( $server_start_cmd, $arg, $property_file )
-            or confess "Cannot execute `$cmd_str`: $!";
+            or confess "Cannot execute '$cmd_str': $!";
     }
 
     delete $ENV{KAFKA_OPTS};
@@ -1044,7 +1067,7 @@ sub _stop_server {
 
     my $attempt = 0;
     while( -e $pid_file ) {
-        my $pid = $self->_read_pid_file( $pid_file );
+        my $pid = _clear_tainted( $self->_read_pid_file( $pid_file ) );
         sleep 1 if $attempt;    # server is rather slow to respond to signals
         if ( $pid && kill( 0, $pid ) ) {
             confess "Cannot terminate running $server_name server\n" if ++$attempt > $MAX_ATTEMPT;
@@ -1075,8 +1098,8 @@ sub _create_topic {
     my $log_dir = $self->log_dir( $port );
     my $partitions = $self->{kafka}->{partition};
 
-    my $cwd = getcwd();
-    chdir $self->base_dir;
+    my $cwd = _clear_cwd();
+    chdir _clear_tainted( $self->base_dir );
 
     my (
         $KAFKA_TOPICS_CMD_FILE,
@@ -1113,6 +1136,7 @@ sub _create_topic {
         my $out_fh = IO::File->new( catfile( $log_dir, 'kafka-create-topic-stdout.log' ), 'w+' );
         my $err_fh = IO::File->new( catfile( $log_dir, 'kafka-create-topic-stderr.log' ), 'w+' );
 
+        local $ENV{PATH} = $RESTRICTED_PATH;
         capture {
             $exit_status = system( @args );
             $child_error = $?;

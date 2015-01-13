@@ -57,9 +57,10 @@ my %config = (
         'IO::File'                  => '1.16',
         'IO::Socket::INET'          => '1.33',
         'List::Util'                => '1.38',
-        'Net::EmptyPort'            => '0.0',
+        'Net::EmptyPort'            => 0, # does not have version so any version
         'Params::Util'              => '1.07',
         'Proc::Daemon'              => '0.14',
+        'Proc::ProcessTable'        => '0.51',
         'Scalar::Util'              => '1.38',
         'Scalar::Util::Numeric'     => '0.22',
         'Socket'                    => '2.013',
@@ -122,6 +123,14 @@ my %config = (
             'Kafka::Protocol'       => {
                 file                    => 'lib/Kafka/Protocol.pm',
                 version                 => '0.8009'
+            },
+        },
+        'meta-spec'             => { version => 2 },
+        resources               => {
+            repository              => {
+                type                    => 'git',
+                url                     => 'git://github.com/TrackingSoft/Kafka.git',
+                web                     => 'http://github.com/TrackingSoft/Kafka',
             },
         },
     },
