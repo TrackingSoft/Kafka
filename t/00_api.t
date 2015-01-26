@@ -150,10 +150,10 @@ BEGIN {
         $NOT_SEND_ANY_RESPONSE
         $RECEIVE_EARLIEST_OFFSETS
         $RECEIVE_LATEST_OFFSET
-        $RECEIVE_MAX_RETRIES
+        $RECEIVE_MAX_ATTEMPTS
         $REQUEST_TIMEOUT
         $RETRY_BACKOFF
-        $SEND_MAX_RETRIES
+        $SEND_MAX_ATTEMPTS
         $WAIT_WRITTEN_TO_LOCAL_LOG
     ) ];
 
@@ -342,6 +342,7 @@ BEGIN {
         debug_level
         get_known_servers
         is_server_alive
+        is_server_connected
         is_server_known
         new
         nonfatal_errors

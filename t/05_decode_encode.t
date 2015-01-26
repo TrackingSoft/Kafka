@@ -47,7 +47,6 @@ use Kafka qw(
     $COMPRESSION_GZIP
     $COMPRESSION_NONE
     $COMPRESSION_SNAPPY
-    $MIN_BYTES_RESPOND_HAS_DATA
     $RECEIVE_EARLIEST_OFFSETS
     $WAIT_WRITTEN_TO_LOCAL_LOG
 );
@@ -544,7 +543,7 @@ $decoded = {
     CorrelationId                       => 0,
     ClientId                            => 'console-consumer-25555',
     MaxWaitTime                         => 100,
-    MinBytes                            => $MIN_BYTES_RESPOND_HAS_DATA,
+    MinBytes                            => 1,
     topics                              => [
         {
             TopicName                   => 'mytopic',

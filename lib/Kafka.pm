@@ -9,7 +9,7 @@ Kafka - Apache Kafka interface for Perl.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka> package version 0.8009 .
+This documentation refers to C<Kafka> package version 0.8009_1 .
 
 =cut
 
@@ -21,7 +21,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.8009';
+our $VERSION = '0.8009_1';
 
 use Exporter qw(
     import
@@ -75,9 +75,11 @@ our @EXPORT_OK = qw(
     $NOT_SEND_ANY_RESPONSE
     $RECEIVE_EARLIEST_OFFSETS
     $RECEIVE_LATEST_OFFSET
+    $RECEIVE_MAX_ATTEMPTS
     $RECEIVE_MAX_RETRIES
     $REQUEST_TIMEOUT
     $RETRY_BACKOFF
+    $SEND_MAX_ATTEMPTS
     $SEND_MAX_RETRIES
     $WAIT_WRITTEN_TO_LOCAL_LOG
 );
@@ -505,21 +507,23 @@ const our $REQUEST_TIMEOUT                      => 1.5;
 =cut
 const our $DEFAULT_MAX_BYTES                    => 1_000_000;
 
-=item C<$SEND_MAX_RETRIES>
+=item C<$SEND_MAX_ATTEMPTS>
 
 4 - The leader may be unavailable transiently, which can fail the sending of a message.
-This property specifies the number of retries when such failures occur.
+This property specifies the number of attempts to send of a message.
 
 =cut
-const our $SEND_MAX_RETRIES                     => 4;
+const our $SEND_MAX_RETRIES                     => 4;   # legacy, will be removed in future releases
+const our $SEND_MAX_ATTEMPTS                    => 4;
 
-=item C<$RECEIVE_MAX_RETRIES>
+=item C<$RECEIVE_MAX_ATTEMPTS>
 
 4 - The leader may be unavailable transiently, which can fail the receiving of a response.
-This property specifies the number of retries when such failures occur.
+This property specifies the number of attempts to receive of a response.
 
 =cut
-const our $RECEIVE_MAX_RETRIES                  => 4;
+const our $RECEIVE_MAX_RETRIES                  => 4;   # legacy, will be removed in future releases
+const our $RECEIVE_MAX_ATTEMPTS                 => 4;
 
 =item C<$RETRY_BACKOFF>
 
@@ -574,11 +578,12 @@ const our $MIN_BYTES_RESPOND_IMMEDIATELY        => 0;
 
 The minimum number of bytes of messages that must be available to give a response.
 
-1 - the server will respond as soon as at least one partition has at least 1 byte of data
+10 - the server will respond as soon as at least one partition has at least 10 bytes of data
+(Offset => int64 + MessageSize => int32)
 or the specified timeout occurs.
 
 =cut
-const our $MIN_BYTES_RESPOND_HAS_DATA           => 1;
+const our $MIN_BYTES_RESPOND_HAS_DATA           => 10;
 
 =item C<$NOT_SEND_ANY_RESPONSE>
 
@@ -1101,8 +1106,10 @@ packages that are distributed separately from Perl. We recommend that
 you have the following packages installed before you install
 Kafka:
 
+    Compress::Snappy
     Const::Fast
-    Clone
+    Data::Compare
+    Data::HexDump::Range
     Exception::Class
     List::MoreUtils
     Params::Util
@@ -1114,12 +1121,15 @@ Kafka:
 Kafka package has the following optional dependencies:
 
     Capture::Tiny
+    Clone
     Config::IniFiles
-    Data::Compare
+    File::HomeDir
     Proc::Daemon
+    Proc::ProcessTable
     Sub::Install
     Test::Deep
     Test::Exception
+    Test::NoWarnings
     Test::TCP
 
 If the optional modules are missing, some "prereq" tests are skipped.

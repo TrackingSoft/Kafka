@@ -1,6 +1,21 @@
 Revision history for Kafka package
 
-0.8009 Tue Jan  13 2014
+0.8009_1 Tue Feb  03 2015
+    CHANGES:
+    - $RECEIVE_MAX_RETRIES, $SEND_MAX_RETRIES renamed
+      to $RECEIVE_MAX_ATTEMPTS, $SEND_MAX_ATTEMPTS .
+    - Method Kafka::Connection->is_server_alive renamed to is_server_connected .
+    - New Kafka::Connection->is_server_alive method properly checks
+      for availability of Kafka server.
+    - Added method Kafka::Connection->get_metadata .
+    - Added method Kafka::Connection->exists_topic_partition .
+    - $Kafka::MIN_BYTES_RESPOND_HAS_DATA changed to 10.
+    BUGFIXES:
+    - Partititon cannot be negative.
+    - Improved reporting for ERROR_UNKNOWN_TOPIC_OR_PARTITION error.
+    - Receiving metadata for a new topic fixed.
+
+0.8009 Tue Jan  13 2015
     CHANGES:
     - Added error $ERROR_RESPOSEMESSAGE_NOT_RECEIVED .
     BUGFIXES:

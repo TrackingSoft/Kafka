@@ -7,7 +7,7 @@ server via socket.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::MockIO> version 0.8009 .
+This documentation refers to C<Kafka::MockIO> version 0.8009_1 .
 
 =cut
 
@@ -19,7 +19,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.8009';
+our $VERSION = '0.8009_1';
 
 #-- load the modules -----------------------------------------------------------
 
@@ -585,7 +585,9 @@ sub send {
     elsif ( $ApiKey == $APIKEY_METADATA ) {
         my $decoded_metadata_request = decode_metadata_request( \$message )
             or Kafka::IO::_error( $self, $ERROR_MISMATCH_ARGUMENT, $description );
-        my $TopicName = $decoded_metadata_request->{topics}->[0];
+#FIXME:
+#        my $TopicName = $decoded_metadata_request->{topics}->[0];
+        my $TopicName = $decoded_metadata_request->{topics}->[0] // $TOPIC;
         $self->_verify_string( $TopicName, "$description (TopicName)" )
             or return;
         $decoded_metadata_response->{TopicMetadata}->[0]->{TopicName} = $TopicName;

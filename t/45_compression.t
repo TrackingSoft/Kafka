@@ -33,6 +33,7 @@ plan 'no_plan';
 #-- load the modules -----------------------------------------------------------
 
 use Kafka qw(
+    $BLOCK_UNTIL_IS_COMMITTED
     $COMPRESSION_GZIP
     $COMPRESSION_NONE
     $COMPRESSION_SNAPPY
@@ -82,6 +83,8 @@ $connect = Kafka::Connection->new(
 
 $producer = Kafka::Producer->new(
     Connection      => $connect,
+    # Require verification the number of messages sent and recorded
+    RequiredAcks    => $BLOCK_UNTIL_IS_COMMITTED,
 );
 
 $consumer = Kafka::Consumer->new(

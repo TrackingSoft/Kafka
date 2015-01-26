@@ -6,7 +6,7 @@ Kafka::Producer - Perl interface for Kafka producer client.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Producer> version 0.8009 .
+This documentation refers to C<Kafka::Producer> version 0.8009_1 .
 
 =cut
 
@@ -18,7 +18,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.8009';
+our $VERSION = '0.8009_1';
 
 #-- load the modules -----------------------------------------------------------
 
@@ -40,6 +40,7 @@ use Kafka qw(
     $COMPRESSION_GZIP
     $COMPRESSION_NONE
     $COMPRESSION_SNAPPY
+    $ERROR_CANNOT_GET_METADATA
     $ERROR_MISMATCH_ARGUMENT
     $REQUEST_TIMEOUT
     $WAIT_WRITTEN_TO_LOCAL_LOG
@@ -302,15 +303,15 @@ sub send {
 
     $key //= q{};
 
-    $self->_error( $ERROR_MISMATCH_ARGUMENT, '$topic' )
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, $topic )
         unless defined( $topic ) && ( $topic eq q{} || defined( _STRING( $topic ) ) ) && !utf8::is_utf8( $topic );
-    $self->_error( $ERROR_MISMATCH_ARGUMENT, '$partition' )
-        unless defined( $partition ) && isint( $partition );
-    $self->_error( $ERROR_MISMATCH_ARGUMENT, '$messages' )
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, $partition )
+        unless defined( $partition ) && isint( $partition ) && $partition >= 0;
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, $messages )
         unless defined( _STRING( $messages ) ) || _ARRAY0( $messages );
-    $self->_error( $ERROR_MISMATCH_ARGUMENT, '$key' )
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, $key )
         unless ( $key eq q{} || defined( _STRING( $key ) ) ) && !utf8::is_utf8( $key );
-    $self->_error( $ERROR_MISMATCH_ARGUMENT, '$compression_codec' )
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, $compression_codec )
         unless ( !defined( $compression_codec ) || $known_compression_codecs{ $compression_codec } );
 
     $messages = [ $messages ] unless ref( $messages );

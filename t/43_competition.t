@@ -317,6 +317,8 @@ sub create_client {
         if ( $client_type eq 'producer' ) {
             $producer = Kafka::Producer->new(
                 Connection  => $connection,
+                # Require verification the number of messages sent and recorded
+                RequiredAcks    => $BLOCK_UNTIL_IS_COMMITTED,
             );
         } elsif ( $client_type eq 'consumer' ) {
             $consumer = Kafka::Consumer->new(
@@ -404,7 +406,7 @@ $connection = Kafka::Connection->new(
 );
 $producer = Kafka::Producer->new(
     Connection      => $connection,
-    # For sure the next verifying the number of messages sent and recorded
+    # Require verification the number of messages sent and recorded
     RequiredAcks    => $BLOCK_UNTIL_IS_COMMITTED,
 );
 $consumer = Kafka::Consumer->new(

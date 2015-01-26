@@ -6,7 +6,7 @@ Kafka::Consumer - Perl interface for Kafka consumer client.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Consumer> version 0.8009 .
+This documentation refers to C<Kafka::Consumer> version 0.8009_1 .
 
 =cut
 
@@ -18,7 +18,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.8009';
+our $VERSION = '0.8009_1';
 
 #-- load the modules -----------------------------------------------------------
 
@@ -40,6 +40,7 @@ use Kafka qw(
     $DEFAULT_MAX_NUMBER_OF_OFFSETS
     $DEFAULT_MAX_WAIT_TIME
     %ERROR
+    $ERROR_CANNOT_GET_METADATA
     $ERROR_METADATA_ATTRIBUTES
     $ERROR_MISMATCH_ARGUMENT
     $ERROR_PARTITION_DOES_NOT_MATCH
@@ -357,7 +358,7 @@ sub fetch {
     $self->_error( $ERROR_MISMATCH_ARGUMENT, '$topic' )
         unless defined( $topic ) && ( $topic eq q{} || defined( _STRING( $topic ) ) ) && !utf8::is_utf8( $topic );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, '$partition' )
-        unless defined( $partition ) && isint( $partition );
+        unless defined( $partition ) && isint( $partition ) && $partition >= 0;
     $self->_error( $ERROR_MISMATCH_ARGUMENT, '$offset' )
         unless defined( $start_offset ) && ( ( _isbig( $start_offset ) && $start_offset >= 0 ) || defined( _NONNEGINT( $start_offset ) ) );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, "\$max_size ($max_size)" )
@@ -480,7 +481,7 @@ sub offsets {
     $self->_error( $ERROR_MISMATCH_ARGUMENT, '$topic' )
         unless defined( $topic) && ( $topic eq q{} || defined( _STRING( $topic ) ) ) && !utf8::is_utf8( $topic );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, '$partition' )
-        unless defined( $partition ) && isint( $partition );
+        unless defined( $partition ) && isint( $partition ) && $partition >= 0;
     $self->_error( $ERROR_MISMATCH_ARGUMENT, '$time' )
         unless defined( $time ) && ( _isbig( $time ) || isint( $time ) ) && $time >= $RECEIVE_EARLIEST_OFFSETS;
     $self->_error( $ERROR_MISMATCH_ARGUMENT, "\$max_number ($max_number)" )

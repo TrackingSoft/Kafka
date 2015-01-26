@@ -54,6 +54,7 @@ use Params::Util qw(
 );
 
 use Kafka qw(
+    $BLOCK_UNTIL_IS_COMMITTED
     $DEFAULT_MAX_BYTES
     $RECEIVE_LATEST_OFFSET
 );
@@ -165,7 +166,9 @@ for my $auto_create_topics_enable ( 'true', 'false' ) {
             AutoCreateTopicsEnable  => $AutoCreateTopicsEnable,
         );
         $producer = Kafka::Producer->new(
-            Connection  => $connection,
+            Connection      => $connection,
+            # Require verification of the number of messages sent and recorded
+            RequiredAcks    => $BLOCK_UNTIL_IS_COMMITTED,
         );
         $consumer = Kafka::Consumer->new(
             Connection  => $connection,
@@ -174,8 +177,14 @@ for my $auto_create_topics_enable ( 'true', 'false' ) {
         # Sending a single message
         undef $response;
         if ( $auto_create_topics_enable eq 'true' && $AutoCreateTopicsEnable ) {
+            ok $connection->exists_topic_partition( $topic, $partition ), 'existing topic';
+            my $next_topic = $topic;
+            ++$next_topic;
+            ok !$connection->exists_topic_partition( $next_topic, $partition ), 'not yet existing topic';
             lives_ok    { $response = sending() } 'expecting to live';
             ok _HASH( $response ), 'response is received';
+            $connection->get_metadata( $topic );
+            ok $connection->exists_topic_partition( $next_topic, $partition ), 'autocreated topic';
         } else {
             dies_ok     { $response = sending() } 'expecting to die';
             ok !defined( $response ), 'response is not received';

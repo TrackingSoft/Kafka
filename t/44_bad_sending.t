@@ -136,7 +136,7 @@ sub next_offset {
                 );
         };
         my $error = $@;
-        my $error_message = $ERROR{$ERROR_SEND_NO_ACK};
+        my $error_message = $ERROR{ $ERROR_SEND_NO_ACK };
         like $error->message, qr/$error_message/, "'send' FATAL error";
 
         Sub::Install::reinstall_sub(
@@ -205,7 +205,7 @@ sub next_offset {
                 );
         };
         my $error = $@;
-        my $error_message = $ERROR{$ERROR_SEND_NO_ACK};
+        my $error_message = $ERROR{ $ERROR_SEND_NO_ACK };
         like $error->message, qr/$error_message/, "'send' FATAL error";
 
         Sub::Install::reinstall_sub(
@@ -246,7 +246,7 @@ sub next_offset {
                 );
         };
         my $error = $@;
-        my $error_message = $ERROR{$ERROR_SEND_NO_ACK};
+        my $error_message = $ERROR{ $ERROR_SEND_NO_ACK };
         like $error->message, qr/$error_message/, "'send' FATAL error";
 
         Sub::Install::reinstall_sub(
@@ -309,7 +309,7 @@ $connection = Kafka::Connection->new(
 );
 $producer = Kafka::Producer->new(
     Connection      => $connection,
-    # For sure that all messages sent and recorded
+    # Ensure that all messages sent and recorded
     RequiredAcks    => $BLOCK_UNTIL_IS_COMMITTED,
 );
 $consumer = Kafka::Consumer->new(

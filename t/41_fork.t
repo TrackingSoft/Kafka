@@ -43,6 +43,7 @@ use Clone qw(
 use Const::Fast;
 
 use Kafka qw(
+    $BLOCK_UNTIL_IS_COMMITTED
     $RECEIVE_LATEST_OFFSET
 );
 use Kafka::Cluster qw(
@@ -190,7 +191,9 @@ $connection = Kafka::Connection->new(
     port    => $port,
 );
 $producer = Kafka::Producer->new(
-    Connection  => $connection,
+    Connection      => $connection,
+    # Ensure that all messages sent and recorded
+    RequiredAcks    => $BLOCK_UNTIL_IS_COMMITTED,
 );
 $consumer = Kafka::Consumer->new(
     Connection  => $connection,
@@ -209,6 +212,8 @@ is_deeply( $connection, $clone_connection, 'connection is not destroyed' );
 # recreating clients
 $producer = Kafka::Producer->new(
     Connection  => $connection,
+    # Ensure that all messages sent and recorded
+    RequiredAcks    => $BLOCK_UNTIL_IS_COMMITTED,
 );
 $consumer = Kafka::Consumer->new(
     Connection  => $connection,
@@ -245,6 +250,8 @@ if ( $pid = fork ) {                # herein the parent
     # connection destroyed in the child
     $producer = Kafka::Producer->new(
         Connection  => $connection, # potentially destroyed connection
+        # Ensure that all messages sent and recorded
+        RequiredAcks    => $BLOCK_UNTIL_IS_COMMITTED,
     );
     $consumer = Kafka::Consumer->new(
         Connection  => $connection,
@@ -320,6 +327,8 @@ if ( $pid = fork ) {                # herein the parent
     # connection destroyed in the parent
     $producer = Kafka::Producer->new(
         Connection  => $connection, # potentially destroyed connection
+        # Ensure that all messages sent and recorded
+        RequiredAcks    => $BLOCK_UNTIL_IS_COMMITTED,
     );
     $consumer = Kafka::Consumer->new(
         Connection  => $connection,

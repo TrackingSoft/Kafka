@@ -18,10 +18,10 @@ use Test::More;
 
 #-- verify load the module
 
-BEGIN {
-    eval 'use Test::NoWarnings';    ## no critic
-    plan skip_all => 'because Test::NoWarnings required for testing' if $@;
-}
+#BEGIN {
+#    eval 'use Test::NoWarnings';    ## no critic
+#    plan skip_all => 'because Test::NoWarnings required for testing' if $@;
+#}
 
 BEGIN {
     eval 'use Test::Exception';     ## no critic
@@ -53,10 +53,10 @@ use Kafka qw(
     $NOT_SEND_ANY_RESPONSE
     $RECEIVE_EARLIEST_OFFSETS
     $RECEIVE_LATEST_OFFSET
-    $RECEIVE_MAX_RETRIES
+    $RECEIVE_MAX_ATTEMPTS
     $REQUEST_TIMEOUT
     $RETRY_BACKOFF
-    $SEND_MAX_RETRIES
+    $SEND_MAX_ATTEMPTS
     $WAIT_WRITTEN_TO_LOCAL_LOG
 );
 use Kafka::Cluster;
@@ -101,8 +101,8 @@ sub new_ERROR_MISMATCH_ARGUMENT {
                 host                => 'localhost',
                 port                => $port,
                 CorrelationId       => undef,
-                SEND_MAX_RETRIES    => $SEND_MAX_RETRIES,
-                RECEIVE_MAX_RETRIES => $RECEIVE_MAX_RETRIES,
+                SEND_MAX_ATTEMPTS   => $SEND_MAX_ATTEMPTS,
+                RECEIVE_MAX_ATTEMPTS => $RECEIVE_MAX_ATTEMPTS,
                 RETRY_BACKOFF       => $RETRY_BACKOFF,
                 $field              => $bad_value,
             );
@@ -158,7 +158,7 @@ sub testing {
     ( $server ) = $connect->get_known_servers();
     ok $connect->is_server_known( $server ), 'known server';
     # requests to the server has not yet been
-    ok !$connect->is_server_alive( $server ), 'server is not alive';
+    ok !$connect->is_server_connected( $server ), 'server is not alive';
 
     undef $connect;
     ok !$connect, 'connection object is destroyed';
@@ -181,11 +181,29 @@ sub testing {
 # CorrelationId
     new_ERROR_MISMATCH_ARGUMENT( 'CorrelationId', @not_isint );
 
-# SEND_MAX_RETRIES
-    new_ERROR_MISMATCH_ARGUMENT( 'SEND_MAX_RETRIES', @not_posint );
+# SEND_MAX_ATTEMPTS
+    new_ERROR_MISMATCH_ARGUMENT( 'SEND_MAX_ATTEMPTS', @not_posint );
 
-# RECEIVE_MAX_RETRIES
-    new_ERROR_MISMATCH_ARGUMENT( 'RECEIVE_MAX_RETRIES', @not_posint );
+    lives_ok {
+        $connect = Kafka::Connection->new(
+            host                => 'localhost',
+            port                => $port,
+            # legacy, will be removed in future releases
+            SEND_MAX_RETRIES    => 5,
+        );
+    } 'SEND_MAX_RETRIES OK';
+
+# RECEIVE_MAX_ATTEMPTS
+    new_ERROR_MISMATCH_ARGUMENT( 'RECEIVE_MAX_ATTEMPTS', @not_posint );
+
+    lives_ok {
+        $connect = Kafka::Connection->new(
+            host                => 'localhost',
+            port                => $port,
+            # legacy, will be removed in future releases
+            RECEIVE_MAX_RETRIES => 5,
+        );
+    } 'RECEIVE_MAX_RETRIES OK';
 
 # RETRY_BACKOFF
     new_ERROR_MISMATCH_ARGUMENT( 'RETRY_BACKOFF', @not_posint );
@@ -205,6 +223,7 @@ sub testing {
             $NOT_SEND_ANY_RESPONSE,
             $WAIT_WRITTEN_TO_LOCAL_LOG,
             $BLOCK_UNTIL_IS_COMMITTED,
+            99999,
         ) {
 
         $request = {
@@ -305,15 +324,48 @@ sub testing {
 #-- get_known_servers
     ok scalar( $connect->get_known_servers() ), 'Known some servers';
 
-#-- is_server_alive
+#-- is_server_connected
     foreach my $server ( $connect->get_known_servers() ) {
-        if ( $connect->is_server_alive( $server ) ) {
-            ok $connect->is_server_alive( $server ), 'server is alive';
+        if ( $connect->is_server_connected( $server ) ) {
+            ok $connect->is_server_connected( $server ), 'server is connected';
             ok $connect->close_connection( $server ), 'close connection';
-            ok !$connect->is_server_alive( $server ), 'server is not alive';
+            ok !$connect->is_server_connected( $server ), 'server is not connected';
         }
     }
+    is_ERROR_MISMATCH_ARGUMENT( 'is_server_connected' );
+
+#-- is_server_alive
+    foreach my $server ( $connect->get_known_servers() ) {
+        ok $connect->is_server_alive( $server ), 'server is alive';
+        ok $connect->close_connection( $server ), 'close connection';
+        ok $connect->is_server_alive( $server ), 'server is alive';
+    }
     is_ERROR_MISMATCH_ARGUMENT( 'is_server_alive' );
+    throws_ok { $connect->is_server_alive( 'nothing:9999' ) } 'Kafka::Exception::Connection', 'error thrown';
+
+#-- get_metadata
+    my $metadata = $connect->get_metadata( $topic );
+    ok $metadata, 'metadata received';
+    ok scalar( keys %$metadata ) == 1 && exists( $metadata->{ $topic } ), "metadata for '$topic' only";
+    if ( $kafka_base_dir ) {
+        $metadata = $connect->get_metadata();
+        ok $metadata, 'metadata received (all topics)';
+        ok scalar( keys %$metadata ) > 1 && exists( $metadata->{ $topic } ), 'metadata for all topics';
+        $metadata = $connect->get_metadata( $topic );
+        ok $metadata, 'metadata received';
+        ok scalar( keys %$metadata ) == 1 && exists( $metadata->{ $topic } ), "metadata for '$topic' only";
+        ok scalar( keys %{ $connect->{_metadata} } ) > 1 && exists( $connect->{_metadata}->{ $topic } ), 'metadata for all topics present';
+        delete $connect->{_metadata}->{ $topic };
+        $metadata = $connect->get_metadata( $topic );
+        ok scalar( keys %{ $connect->{_metadata} } ) > 1 && exists( $connect->{_metadata}->{ $topic } ), 'metadata for all topics';
+        ok $metadata, 'metadata received';
+        throws_ok { $connect->get_metadata( '' ) } 'Kafka::Exception::Connection', 'error thrown';
+    }
+
+#-- exists_topic_partition
+    ok $connect->exists_topic_partition( $topic, 0 ), 'existing topic';
+    ok !$connect->exists_topic_partition( 99999, 0 ), 'not yet existing topic';
+    ok !$connect->exists_topic_partition( $topic, 99999 ), 'not yet existing topic';
 
 #-- is_server_known
     is_ERROR_MISMATCH_ARGUMENT( 'is_server_known' );
@@ -329,15 +381,15 @@ sub testing {
     $connect->receive_response_to_request( $request );
     $tmp = 0;
     foreach my $server ( $connect->get_known_servers() ) {
-        ++$tmp if $connect->is_server_alive( $server );
+        ++$tmp if $connect->is_server_connected( $server );
     }
     ok( $tmp, 'server is alive' );
     $connect->close;
     $tmp = 0;
     foreach my $server ( $connect->get_known_servers() ) {
-        ++$tmp if $connect->is_server_alive( $server );
+        ++$tmp if $connect->is_server_connected( $server );
     }
-    ok !$tmp, 'server is not alive';
+    ok !$tmp, 'server is not connected';
 
 #-- finish
     Kafka::MockIO::restore()

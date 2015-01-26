@@ -6,7 +6,7 @@ Kafka::Connection - Object interface to connect to a kafka cluster.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Connection> version 0.8009 .
+This documentation refers to C<Kafka::Connection> version 0.8009_1 .
 
 =cut
 
@@ -20,7 +20,7 @@ use warnings;
 
 our $DEBUG = 0;
 
-our $VERSION = '0.8009';
+our $VERSION = '0.8009_1';
 
 use Exporter qw(
     import
@@ -53,6 +53,9 @@ use Scalar::Util qw(
 );
 use Scalar::Util::Numeric qw(
     isint
+);
+use Storable qw(
+    dclone
 );
 use Time::HiRes qw(
     sleep
@@ -90,10 +93,10 @@ use Kafka qw(
     $ERROR_UNKNOWN_APIKEY
     $KAFKA_SERVER_PORT
     $NOT_SEND_ANY_RESPONSE
-    $RECEIVE_MAX_RETRIES
+    $RECEIVE_MAX_ATTEMPTS
     $REQUEST_TIMEOUT
     $RETRY_BACKOFF
-    $SEND_MAX_RETRIES
+    $SEND_MAX_ATTEMPTS
 );
 use Kafka::Exceptions;
 use Kafka::Internals qw(
@@ -297,22 +300,22 @@ in request.
 
 If C<CorrelationId> is not provided, it is set to a random negative integer.
 
-=item C<SEND_MAX_RETRIES =E<gt> $retries>
+=item C<SEND_MAX_ATTEMPTS =E<gt> $attempts>
 
-Optional, int32 signed integer, default = C<$Kafka::SEND_MAX_RETRIES> .
+Optional, int32 signed integer, default = C<$Kafka::SEND_MAX_ATTEMPTS> .
 
 In some circumstances (leader is temporarily unavailable, outdated metadata, etc) we may fail to send a message.
 This property specifies the maximum number of attempts to send a message.
-The C<$retries> should be an integer number.
+The C<$attempts> should be an integer number.
 
-=item C<RECEIVE_MAX_RETRIES =E<gt> $retries>
+=item C<RECEIVE_MAX_ATTEMPTS =E<gt> $attempts>
 
-Optional, int32 signed integer, default = C<$Kafka::RECEIVE_MAX_RETRIES> .
+Optional, int32 signed integer, default = C<$Kafka::RECEIVE_MAX_ATTEMPTS> .
 
 In some circumstances (temporarily network issues, server high load, socket error, etc) we may fail to
 receive a response.
 This property specifies the maximum number of attempts to receive a message.
-The C<$retries> should be an integer number.
+The C<$attempts> should be an integer number.
 
 =item C<RETRY_BACKOFF =E<gt> $backoff>
 
@@ -333,7 +336,7 @@ the first access to non-existent topic produces an exception;
 however, the topic is created and next attempts to access it will succeed.
 
 If I<AutoCreateTopicsEnable> is true, this module waits
-(according to the C<SEND_MAX_RETRIES> and C<RETRY_BACKOFF> properties)
+(according to the C<SEND_MAX_ATTEMPTS> and C<RETRY_BACKOFF> properties)
 until the topic is created,
 to avoid errors on the first access to non-existent topic.
 
@@ -363,8 +366,8 @@ sub new {
         broker_list             => [],
         timeout                 => $REQUEST_TIMEOUT,
         CorrelationId           => undef,
-        SEND_MAX_RETRIES        => $SEND_MAX_RETRIES,
-        RECEIVE_MAX_RETRIES     => $RECEIVE_MAX_RETRIES,
+        SEND_MAX_ATTEMPTS       => $SEND_MAX_ATTEMPTS,
+        RECEIVE_MAX_ATTEMPTS    => $RECEIVE_MAX_ATTEMPTS,
         RETRY_BACKOFF           => $RETRY_BACKOFF,
         AutoCreateTopicsEnable  => 0,
         MaxLoggedErrors         => 100,
@@ -372,6 +375,16 @@ sub new {
 
     while ( @args ) {
         my $k = shift @args;
+
+        # legacy, will be removed in future releases
+        if ( $k eq 'SEND_MAX_RETRIES' ) {
+            carp "Parameter 'SEND_MAX_RETRIES' is deprecated, use 'SEND_MAX_ATTEMPTS' instead";
+            $k = 'SEND_MAX_ATTEMPTS';
+        } elsif ( $k eq 'RECEIVE_MAX_RETRIES' ) {
+            $k = 'RECEIVE_MAX_ATTEMPTS';
+            carp "Parameter 'RECEIVE_MAX_ATTEMPTS' is deprecated, use 'RECEIVE_MAX_ATTEMPTS' instead";
+        }
+
         $self->{ $k } = shift @args if exists $self->{ $k };
     }
 
@@ -387,10 +400,10 @@ sub new {
         unless _ARRAY0( $self->{broker_list} );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'CorrelationId ('.( $self->{CorrelationId} // '<undef>' ).')' )
         unless isint( $self->{CorrelationId} ) && $self->{CorrelationId} <= $MAX_CORRELATIONID;
-    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'SEND_MAX_RETRIES' )
-        unless _POSINT( $self->{SEND_MAX_RETRIES} );
-    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'RECEIVE_MAX_RETRIES' )
-        unless _POSINT( $self->{RECEIVE_MAX_RETRIES} );
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'SEND_MAX_ATTEMPTS' )
+        unless _POSINT( $self->{SEND_MAX_ATTEMPTS} );
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'RECEIVE_MAX_ATTEMPTS' )
+        unless _POSINT( $self->{RECEIVE_MAX_ATTEMPTS} );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'RETRY_BACKOFF' )
         unless _POSINT( $self->{RETRY_BACKOFF} );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'MaxLoggedErrors' )
@@ -467,6 +480,56 @@ sub get_known_servers {
     return keys %{ $self->{_IO_cache} };
 }
 
+=head3 C<get_metadata( $topic )>
+
+If C<$topic> is present, it must be a non-false string of non-zero length.
+
+If  C<$topic> is absent, this method returns metadata for all topics.
+
+Updates kafka cluster's metadata description and returns the hash reference to metadata,
+which can be schematically described as:
+
+    {
+        TopicName => {
+            Partition   => {
+                'Leader'    => ...,
+                'Replicas'  => [
+                    ...,
+                ],
+                'Isr'       => [
+                    ...,
+                ],
+            },
+            ...,
+        },
+        ...,
+    }
+
+Consult Kafka "Wire protocol" documentation for more details about metadata structure.
+
+=cut
+sub get_metadata {
+    my ( $self, $topic ) = @_;
+
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, '$topic' )
+        unless !defined( $topic ) || ( ( $topic eq q{} || defined( _STRING( $topic ) ) ) && !utf8::is_utf8( $topic ) );
+
+    $self->_update_metadata( $topic )
+        # FATAL error
+        or $self->_error( $ERROR_CANNOT_GET_METADATA, "topic = '".( $topic // '<undef>' )."'" );
+
+    my $clone;
+    if( defined $topic ) {
+        $clone = {
+            $topic => dclone( $self->{_metadata}->{ $topic } )
+        };
+    } else {
+        $clone = dclone( $self->{_metadata} );
+    }
+
+    return $clone;
+}
+
 =head3 C<is_server_known( $server )>
 
 Returns true, if C<$server> (host:port) is known in cluster.
@@ -483,10 +546,34 @@ sub is_server_known {
 
 =head3 C<is_server_alive( $server )>
 
-Returns true, if successful connection is established with C<$server> (host:port).
+Returns true, if known C<$server> (host:port) is accessible.
+Checks the accessibility of the server.
 
 =cut
 sub is_server_alive {
+    my ( $self, $server ) = @_;
+
+    $self->_error( $ERROR_MISMATCH_ARGUMENT )
+        unless $self->_is_like_server( $server );
+
+    $self->_error( $ERROR_NO_KNOWN_BROKERS, 'has not yet received the metadata?' )
+        unless $self->get_known_servers;
+
+    my $io_cache = $self->{_IO_cache};
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, "Unknown server '$server' (is not found in the metadata)" )
+        unless exists( $io_cache->{ $server } );
+
+    my $io = $self->_connectIO( $server );
+
+    return $io->is_alive;
+}
+
+=head3 C<is_server_connected( $server )>
+
+Returns true, if successful connection is established with C<$server> (host:port).
+
+=cut
+sub is_server_connected {
     my ( $self, $server ) = @_;
 
     $self->_error( $ERROR_MISMATCH_ARGUMENT )
@@ -558,19 +645,22 @@ sub receive_response_to_request {
     my $topic_name  = $topic_data->{TopicName};
     my $partition   = $topic_data->{partitions}->[0]->{Partition};
 
-    unless ( %{ $self->{_metadata} } ) {    # the first request
+    if (
+           !%{ $self->{_metadata} }         # the first request
+        || ( !$self->{AutoCreateTopicsEnable} && defined( $topic_name ) && !exists( $self->{_metadata}->{ $topic_name } ) )
+    ) {
         $self->_update_metadata( $topic_name )  # hash metadata could be updated
             # FATAL error
-            or $self->_error( $ERROR_CANNOT_GET_METADATA, "topic = '$topic_name', partition = $partition" );
+            or $self->_error( $ERROR_CANNOT_GET_METADATA, "topic = '$topic_name'" );
     }
     my $encoded_request = $protocol{ $api_key }->{encode}->( $request, $compression_codec );
 
     my $CorrelationId = $request->{CorrelationId} // _get_CorrelationId;
 
-    my $retries = $self->{SEND_MAX_RETRIES};
+    my $attempts = $self->{SEND_MAX_ATTEMPTS};
     my ( $ErrorCode, $partition_data, $server );
     ATTEMPTS:
-    while ( $retries-- ) {
+    while ( $attempts-- ) {
         REQUEST:
         {
             $ErrorCode = $ERROR_NO_ERROR;
@@ -657,7 +747,7 @@ sub receive_response_to_request {
         say STDERR sprintf( '[%s] sleeping for %d ms before making request attempt #%d (%s)',
                 scalar( localtime ),
                 $self->{RETRY_BACKOFF},
-                $self->{SEND_MAX_RETRIES} - $retries + 1,
+                $self->{SEND_MAX_ATTEMPTS} - $attempts + 1,
                 $ErrorCode == $ERROR_NO_ERROR ? 'refreshing metadata' : "ErrorCode ${ErrorCode}",
             ) if $self->debug_level;
         sleep $self->{RETRY_BACKOFF} / 1000;
@@ -668,7 +758,48 @@ sub receive_response_to_request {
     }
 
     # FATAL error
-    $self->_error( $ErrorCode, "topic = '".$topic_data->{TopicName}."'".( $partition_data ? ", partition = ".$partition_data->{Partition} : q{} ) );
+    if ( $ErrorCode ) {
+        $self->_error( $ErrorCode, "topic = '".$topic_data->{TopicName}."'".( $partition_data ? ", partition = ".$partition_data->{Partition} : q{} ) );
+    }
+    else
+    {
+        $self->_error( $ERROR_UNKNOWN_TOPIC_OR_PARTITION, "topic = '$topic_name', partition = $partition" );
+    }
+}
+
+=head3 C<exists_topic_partition( $topic, $partition )>
+
+Returns true if the metadata contains information about specified combination of topic and partition.
+Otherwise returns false.
+
+C<exists_topic_partition()> takes the following arguments:
+
+=over 3
+
+=item C<$topic>
+
+The C<$topic> must be a normal non-false string of non-zero length.
+
+=item C<$partition>
+
+=back
+
+=cut
+sub exists_topic_partition {
+    my ( $self, $topic, $partition ) = @_;
+
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, $topic )
+        unless defined( $topic ) && ( $topic eq q{} || defined( _STRING( $topic ) ) ) && !utf8::is_utf8( $topic );
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, $partition )
+        unless defined( $partition ) && isint( $partition ) && $partition >= 0;
+
+    unless ( %{ $self->{_metadata} } ) {    # the first request
+        $self->_update_metadata( $topic )   # hash metadata could be updated
+            # FATAL error
+            or $self->_error( $ERROR_CANNOT_GET_METADATA, "topic = '$topic'" );
+    }
+
+    return exists $self->{_metadata}->{ $topic }->{ $partition };
 }
 
 =head3 C<close_connection( $server )>
@@ -836,7 +967,7 @@ sub _update_metadata {
             CorrelationId   => $CorrelationId,
             ClientId        => q{},
             topics          => [
-                $topic,
+                $topic // (),
             ],
         } );
 
@@ -856,13 +987,13 @@ sub _update_metadata {
     }
 
     my $decoded_response = $protocol{ $APIKEY_METADATA }->{decode}->( $encoded_response_ref );
-    $decoded_response->{CorrelationId} == $CorrelationId
+    ( defined( $decoded_response->{CorrelationId} ) && $decoded_response->{CorrelationId} == $CorrelationId )
         # FATAL error
         or $self->_error( $ERROR_MISMATCH_CORRELATIONID );
 
     unless ( _ARRAY( $decoded_response->{Broker} ) ) {
         if ( $self->{AutoCreateTopicsEnable} ) {
-            return $self->_retry_update_metadata( $is_recursive_call, $topic, undef, $ERROR_NO_KNOWN_BROKERS );
+            return $self->_attempt_update_metadata( $is_recursive_call, $topic, undef, $ERROR_NO_KNOWN_BROKERS );
         } else {
             # FATAL error
             $self->_error( $ERROR_NO_KNOWN_BROKERS, "topic = '$topic'" );
@@ -917,7 +1048,7 @@ sub _update_metadata {
     }
     if ( $ErrorCode != $ERROR_NO_ERROR ) {
         if ( $RETRY_ON_ERRORS{ $ErrorCode } ) {
-            return $self->_retry_update_metadata( $is_recursive_call, $TopicName, $partition, $ErrorCode );
+            return $self->_attempt_update_metadata( $is_recursive_call, $TopicName, $partition, $ErrorCode );
         } else {
             # FATAL error
             $self->_error( $ErrorCode, "topic = '$TopicName'", defined( $partition ) ? ", partition = $partition" : () );
@@ -936,19 +1067,19 @@ sub _update_metadata {
 }
 
 # trying to get the metadata without error
-sub _retry_update_metadata {
+sub _attempt_update_metadata {
     my ( $self, $is_recursive_call, $topic, $partition, $error_code ) = @_;
 
     return if $is_recursive_call;
     $self->_remember_nonfatal_error( $error_code, $ERROR{ $error_code }, undef, $topic, $partition );
 
-    my $retries = $self->{SEND_MAX_RETRIES};
+    my $attempts = $self->{SEND_MAX_ATTEMPTS};
     ATTEMPTS:
-    while ( $retries-- ) {
+    while ( $attempts-- ) {
         say STDERR sprintf( '[%s] sleeping for %d ms before making update metadata attempt #%d',
                 scalar( localtime ),
                 $self->{RETRY_BACKOFF},
-                $self->{RECEIVE_MAX_RETRIES} - $retries + 1,
+                $self->{RECEIVE_MAX_ATTEMPTS} - $attempts + 1,
             ) if $self->debug_level;
         sleep $self->{RETRY_BACKOFF} / 1000;
         return( 1 ) if $self->_update_metadata( $topic, 1 );
@@ -1025,9 +1156,9 @@ sub _receiveIO {
     my $response_ref;
 
     my $error;
-    my $retries = $self->{RECEIVE_MAX_RETRIES};
+    my $attempts = $self->{RECEIVE_MAX_ATTEMPTS};
     ATTEMPTS:
-    while ( $retries-- ) {
+    while ( $attempts-- ) {
         $error = undef;
         try {
             my $io = $server_data->{IO};
@@ -1041,7 +1172,7 @@ sub _receiveIO {
         say STDERR sprintf( "[%s] sleeping for %d ms before making receive attempt #%d (error '%s')",
                 scalar( localtime ),
                 $self->{RETRY_BACKOFF},
-                $self->{RECEIVE_MAX_RETRIES} - $retries + 1,
+                $self->{RECEIVE_MAX_ATTEMPTS} - $attempts + 1,
                 $error,
             ) if $self->debug_level;
         sleep $self->{RETRY_BACKOFF} / 1000;
