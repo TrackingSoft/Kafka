@@ -1,6 +1,6 @@
 Revision history for Kafka package
 
-0.8009_1 Tue Feb  03 2015
+0.8010 Fri Feb  06 2015
     CHANGES:
     - $RECEIVE_MAX_RETRIES, $SEND_MAX_RETRIES renamed
       to $RECEIVE_MAX_ATTEMPTS, $SEND_MAX_ATTEMPTS .
@@ -10,6 +10,7 @@ Revision history for Kafka package
     - Added method Kafka::Connection->get_metadata .
     - Added method Kafka::Connection->exists_topic_partition .
     - $Kafka::MIN_BYTES_RESPOND_HAS_DATA changed to 10.
+    - Testing supports Kafka version 0.8.2 .
     BUGFIXES:
     - Partititon cannot be negative.
     - Improved reporting for ERROR_UNKNOWN_TOPIC_OR_PARTITION error.

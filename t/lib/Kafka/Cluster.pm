@@ -6,7 +6,7 @@ Kafka::Cluster - object interface to manage a test kafka cluster.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Cluster> version 0.8009_1 .
+This documentation refers to C<Kafka::Cluster> version 0.8010 .
 
 =cut
 
@@ -19,7 +19,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.8009_1';
+our $VERSION = '0.8010';
 
 use Exporter qw(
     import
@@ -135,7 +135,8 @@ Used topic name.
 const our   $DEFAULT_TOPIC                  => 'mytopic';
 const our   $DEFAULT_REPLICATION_FACTOR     => 3;       # The cluster contains 3 servers
 
-const my    $MAX_ATTEMPT                    => 5;
+const my    $MAX_START_ATTEMPT              => 10;
+const my    $MAX_STOP_ATTEMPT               => 25;
 const my    $INI_SECTION                    => 'GENERAL';
 const my    $RELATIVE_LOG4J_PROPERTY_FILE   => catfile( '..', '..', 'config', 'log4j.properties' );
 const my    $ZOOKEEPER_PROPERTIES_FILE      => 'zookeeper.properties';
@@ -561,7 +562,7 @@ sub start {
     );
 
     # Try sending request to make sure that Kafka server is really, really working now
-    my $attempts = $MAX_ATTEMPT * 2;
+    my $attempts = $MAX_START_ATTEMPT;
     while( $attempts-- ) {
         my $error;
         try {
@@ -992,7 +993,7 @@ sub _start_server {
     if( $pid ) {
         say '[', scalar( localtime ), "] Starting $server_name: port = ", $port, ", pid = $pid";
 
-        my $attempts = $MAX_ATTEMPT * 2;
+        my $attempts = $MAX_START_ATTEMPT;
         while( $attempts-- ) {
             sleep 1;    # give it some time to warm up
 
@@ -1020,7 +1021,7 @@ sub _start_server {
         }
 
         # Expect to port is ready
-        $attempts = $MAX_ATTEMPT * 2;
+        $attempts = $MAX_START_ATTEMPT;
         while( $attempts-- ) {
             # The simplified test as readiness for operation will be evaluated on the Kafka server availability
             last if check_port( $port );
@@ -1070,7 +1071,7 @@ sub _stop_server {
         my $pid = _clear_tainted( $self->_read_pid_file( $pid_file ) );
         sleep 1 if $attempt;    # server is rather slow to respond to signals
         if ( $pid && kill( 0, $pid ) ) {
-            confess "Cannot terminate running $server_name server\n" if ++$attempt > $MAX_ATTEMPT;
+            confess "Cannot terminate running $server_name server\n" if ++$attempt > $MAX_STOP_ATTEMPT;
             $self->_kill_pid( $pid, $server_name, 'TERM' );
             next;
         }

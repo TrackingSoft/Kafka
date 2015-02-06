@@ -6,7 +6,7 @@ Kafka::Connection - Object interface to connect to a kafka cluster.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Connection> version 0.8009_1 .
+This documentation refers to C<Kafka::Connection> version 0.8010 .
 
 =cut
 
@@ -20,7 +20,7 @@ use warnings;
 
 our $DEBUG = 0;
 
-our $VERSION = '0.8009_1';
+our $VERSION = '0.8010';
 
 use Exporter qw(
     import
@@ -329,6 +329,7 @@ The C<$backoff> should be an integer number.
 
 Optional, default value is 0 (false).
 
+Kafka BUG "[KAFKA-1124]" (Fixed in Kafka 0.8.2):
 I<AutoCreateTopicsEnable> controls how this module handles the first access to non-existent topic
 when C<auto.create.topics.enable> in server configuration is C<true>.
 If I<AutoCreateTopicsEnable> is false (default),
@@ -382,7 +383,7 @@ sub new {
             $k = 'SEND_MAX_ATTEMPTS';
         } elsif ( $k eq 'RECEIVE_MAX_RETRIES' ) {
             $k = 'RECEIVE_MAX_ATTEMPTS';
-            carp "Parameter 'RECEIVE_MAX_ATTEMPTS' is deprecated, use 'RECEIVE_MAX_ATTEMPTS' instead";
+            carp "Parameter 'RECEIVE_MAX_RETRIES' is deprecated, use 'RECEIVE_MAX_ATTEMPTS' instead";
         }
 
         $self->{ $k } = shift @args if exists $self->{ $k };

@@ -6,7 +6,7 @@ Kafka::Consumer - Perl interface for Kafka consumer client.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Consumer> version 0.8009_1 .
+This documentation refers to C<Kafka::Consumer> version 0.8010 .
 
 =cut
 
@@ -18,7 +18,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.8009_1';
+our $VERSION = '0.8010';
 
 #-- load the modules -----------------------------------------------------------
 

@@ -186,8 +186,12 @@ for my $auto_create_topics_enable ( 'true', 'false' ) {
             $connection->get_metadata( $topic );
             ok $connection->exists_topic_partition( $next_topic, $partition ), 'autocreated topic';
         } else {
-            dies_ok     { $response = sending() } 'expecting to die';
-            ok !defined( $response ), 'response is not received';
+# Kafka BUG "[KAFKA-1124] - Sending to a new topic (with auto.create.topics.enable) returns ERROR "
+# (Fixed in Kafka 0.8.2):
+            if ( $auto_create_topics_enable ne 'true' ) {
+                dies_ok     { $response = sending() } 'expecting to die';
+                ok !defined( $response ), 'response is not received';
+            }
         }
 
         # Get a list of valid offsets up max_number before the given time
@@ -196,8 +200,12 @@ for my $auto_create_topics_enable ( 'true', 'false' ) {
             lives_ok    { $offsets = getting_offsets() } 'expecting to live';
             ok _ARRAY( $offsets ), 'offsets are received';
         } else {
-            dies_ok     { $offsets = getting_offsets() } 'expecting to die';
-            ok !defined( $offsets ), 'offsets are not received';
+# Kafka BUG "[KAFKA-1124] - Sending to a new topic (with auto.create.topics.enable) returns ERROR "
+# (Fixed in Kafka 0.8.2):
+            if ( $auto_create_topics_enable ne 'true' ) {
+                dies_ok     { $offsets = getting_offsets() } 'expecting to die';
+                ok !defined( $offsets ), 'offsets are not received';
+            }
         }
 
         # Consuming messages
@@ -206,8 +214,12 @@ for my $auto_create_topics_enable ( 'true', 'false' ) {
             lives_ok    { $messages = fetching() } 'expecting to live';
             ok _ARRAY0( $messages ), 'messages are received';
         } else {
-            dies_ok     { $messages = fetching() } 'expecting to die';
-            ok !defined( $messages ), 'messages are not received';
+# Kafka BUG "[KAFKA-1124] - Sending to a new topic (with auto.create.topics.enable) returns ERROR "
+# (Fixed in Kafka 0.8.2):
+            if ( $auto_create_topics_enable ne 'true' ) {
+                dies_ok     { $messages = fetching() } 'expecting to die';
+                ok !defined( $messages ), 'messages are not received';
+            }
         }
     }
 
