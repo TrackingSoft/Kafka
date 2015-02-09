@@ -143,11 +143,12 @@ use Kafka::Protocol qw(
     try {
         $connection = Kafka::Connection->new( host => 'localhost' );
     } catch {
-        if ( blessed( $_ ) && $_->isa( 'Kafka::Exception' ) ) {
-            warn $_->message, "\n", $_->trace->as_string, "\n";
+        my $error = $_;
+        if ( blessed( $error ) && $error->isa( 'Kafka::Exception' ) ) {
+            warn $error->message, "\n", $error->trace->as_string, "\n";
             exit;
         } else {
-            die $_;
+            die $error;
         }
     };
 
@@ -564,9 +565,11 @@ sub is_server_alive {
     $self->_error( $ERROR_MISMATCH_ARGUMENT, "Unknown server '$server' (is not found in the metadata)" )
         unless exists( $io_cache->{ $server } );
 
-    my $io = $self->_connectIO( $server );
-
-    return $io->is_alive;
+    if ( my $io = $self->_connectIO( $server ) ) {
+        return $io->is_alive;
+    } else {
+        return;
+    }
 }
 
 =head3 C<is_server_connected( $server )>
@@ -1127,7 +1130,8 @@ sub _connectIO {
             $server_data->{error}   = undef;
         } catch {
             # NOTE: it is possible to repeat the operation here
-            $self->_on_io_error( $server_data, $_ );
+            my $error = $_;
+            $self->_on_io_error( $server_data, $error );
             return;
         };
     }
@@ -1144,7 +1148,8 @@ sub _sendIO {
         $sent = $server_data->{IO}->send( $encoded_request );
     } catch {
         # NOTE: it is possible to repeat the operation here
-        $self->_on_io_error( $server_data, $_ );
+        my $error = $_;
+        $self->_on_io_error( $server_data, $error );
     };
     return $sent;
 }
@@ -1178,7 +1183,7 @@ sub _receiveIO {
             ) if $self->debug_level;
         sleep $self->{RETRY_BACKOFF} / 1000;
     }
-    $self->_on_io_error( $server_data, $_ )
+    $self->_on_io_error( $server_data, $error )
         if $error;
 
     return $response_ref;

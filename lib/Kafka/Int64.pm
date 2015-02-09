@@ -81,11 +81,12 @@ use Kafka::Exceptions;
             : Kafka::Int64::intsum( $offset, 1 );
 
     } catch {
-        if ( blessed( $_ ) && $_->isa( 'Kafka::Exception' ) ) {
-            warn 'Error: (', $_->code, ') ',  $_->message, "\n";
+        my $error = $_;
+        if ( blessed( $error ) && $error->isa( 'Kafka::Exception' ) ) {
+            warn 'Error: (', $error->code, ') ',  $error->message, "\n";
             exit;
         } else {
-            die $_;
+            die $error;
         }
     };
 

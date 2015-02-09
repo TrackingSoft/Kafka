@@ -84,11 +84,12 @@ use Kafka::Internals qw(
     try {
         $io = Kafka::IO->new( host => 'localhost' );
     } catch {
-        if ( blessed( $_ ) && $_->isa( 'Kafka::Exception' ) ) {
-            warn 'Error: (', $_->code, ') ',  $_->message, "\n";
+        my $error = $_;
+        if ( blessed( $error ) && $error->isa( 'Kafka::Exception' ) ) {
+            warn 'Error: (', $error->code, ') ',  $error->message, "\n";
             exit;
         } else {
-            die $_;
+            die $error;
         }
     };
 
@@ -198,7 +199,8 @@ sub new {
     try {
         $self->_connect();
     } catch {
-        $self->_error( $ERROR_CANNOT_BIND, "->new - $_" );
+        my $error = $_;
+        $self->_error( $ERROR_CANNOT_BIND, "->new - $error" );
     };
 
     return $self;
@@ -395,11 +397,11 @@ sub _connect {
     $_ = select( $connection ); $| = 1; select $_;
 
     # Set FD_CLOEXEC.
-    $_ = fcntl( $connection, F_GETFL, 0 ) or die "fcntl: $!\n";
-    fcntl( $connection, F_SETFL, $_ | FD_CLOEXEC ) or die "fnctl: $!\n";
+    my $flags = fcntl( $connection, F_GETFL, 0 ) or die "fcntl: $!\n";
+    fcntl( $connection, F_SETFL, $flags | FD_CLOEXEC ) or die "fnctl: $!\n";
 
-    $_ = fcntl( $connection, F_GETFL, 0 ) or die "fcntl F_GETFL: $!\n"; # 0 for error, 0e0 for 0.
-    fcntl( $connection, F_SETFL, $_ | O_NONBLOCK ) or die "fcntl F_SETFL O_NONBLOCK: $!\n"; # 0 for error, 0e0 for 0.
+    $flags = fcntl( $connection, F_GETFL, 0 ) or die "fcntl F_GETFL: $!\n"; # 0 for error, 0e0 for 0.
+    fcntl( $connection, F_SETFL, $flags | O_NONBLOCK ) or die "fcntl F_SETFL O_NONBLOCK: $!\n"; # 0 for error, 0e0 for 0.
 
     # Connect returns immediately because of O_NONBLOCK.
     connect( $connection, pack_sockaddr_in( $port, inet_aton( $ip ) ) ) || $!{EINPROGRESS} || die( "connect ${ip}:${port} (${name}): $!\n" );
@@ -408,8 +410,8 @@ sub _connect {
     $self->{_select}    = undef;
 
     # Reset O_NONBLOCK.
-    $_ = fcntl( $connection, F_GETFL, 0 ) or die "fcntl F_GETFL: $!\n";  # 0 for error, 0e0 for 0.
-    fcntl( $connection, F_SETFL, $_ & ~ O_NONBLOCK ) or die "fcntl F_SETFL not O_NONBLOCK: $!\n";  # 0 for error, 0e0 for 0.
+    $flags = fcntl( $connection, F_GETFL, 0 ) or die "fcntl F_GETFL: $!\n";  # 0 for error, 0e0 for 0.
+    fcntl( $connection, F_SETFL, $flags & ~ O_NONBLOCK ) or die "fcntl F_SETFL not O_NONBLOCK: $!\n";  # 0 for error, 0e0 for 0.
 
     # Use select() to poll for completion or error. When connect succeeds we can write.
     my $vec = q{};

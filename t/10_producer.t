@@ -34,7 +34,7 @@ plan 'no_plan';
 
 use Const::Fast;
 use Params::Util qw(
-    _ARRAY
+    _ARRAY0
     _HASH
 );
 use Sub::Install;
@@ -214,10 +214,10 @@ sub testing {
 
 # messages
     foreach my $bad_message (
-            grep( { !_ARRAY( $_ ) } @not_empty_string ),
+            grep( { !_ARRAY0( $_ ) } @not_empty_string ),
             @not_string_array,
         ) {
-        send_ERROR_MISMATCH_ARGUMENT( $topic, $partition, $_, 'Some key' );
+        send_ERROR_MISMATCH_ARGUMENT( $topic, $partition, $bad_message, 'Some key' );
     }
 
 # key

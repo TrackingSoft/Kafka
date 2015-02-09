@@ -136,7 +136,7 @@ const our   $DEFAULT_TOPIC                  => 'mytopic';
 const our   $DEFAULT_REPLICATION_FACTOR     => 3;       # The cluster contains 3 servers
 
 const my    $MAX_START_ATTEMPT              => 10;
-const my    $MAX_STOP_ATTEMPT               => 25;
+const my    $MAX_STOP_ATTEMPT               => 30;
 const my    $INI_SECTION                    => 'GENERAL';
 const my    $RELATIVE_LOG4J_PROPERTY_FILE   => catfile( '..', '..', 'config', 'log4j.properties' );
 const my    $ZOOKEEPER_PROPERTIES_FILE      => 'zookeeper.properties';

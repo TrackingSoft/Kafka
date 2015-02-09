@@ -78,16 +78,17 @@ use Kafka qw(
     try {
         $connection = Kafka::Connection->new( host => 'localhost' );
     } catch {
-        if ( blessed( $_ ) && $_->isa( 'Kafka::Exception' ) ) {
-            if ( $_->isa( 'Kafka::Exception::Connection' ) ) {
+        my $error = $_;
+        if ( blessed( $error ) && $error->isa( 'Kafka::Exception' ) ) {
+            if ( $error->isa( 'Kafka::Exception::Connection' ) ) {
                 # Specific treatment for 'Kafka::Connection' class error
-            } elsif ( $_->isa( 'Kafka::Exception::IO' ) ) {
+            } elsif ( $error->isa( 'Kafka::Exception::IO' ) ) {
                 # Specific treatment for 'Kafka::IO' class error
             }
-            warn ref( $_ ), " error:\n", $_->message, "\n", $_->trace->as_string, "\n";
+            warn ref( $error ), " error:\n", $error->message, "\n", $error->trace->as_string, "\n";
             exit;
         } else {
-            die $_;
+            die $error;
         }
     };
 
