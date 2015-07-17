@@ -6,7 +6,7 @@ Kafka::Consumer - Perl interface for Kafka consumer client.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Consumer> version 0.8010 .
+This documentation refers to C<Kafka::Consumer> version 0.8011 .
 
 =cut
 
@@ -18,7 +18,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.8010';
+our $VERSION = '0.8011';
 
 #-- load the modules -----------------------------------------------------------
 
@@ -139,6 +139,7 @@ if ( !$BITS64 ) { eval 'use Kafka::Int64; 1;' or die "Cannot load Kafka::Int64 :
 
     # Closes the consumer and cleans up
     undef $consumer;
+    $connection->close;
     undef $connection;
 
 =head1 DESCRIPTION

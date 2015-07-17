@@ -9,7 +9,7 @@ Kafka - Apache Kafka interface for Perl.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka> package version 0.8010 .
+This documentation refers to C<Kafka> package version 0.8011 .
 
 =cut
 
@@ -21,7 +21,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.8010';
+our $VERSION = '0.8011';
 
 use Exporter qw(
     import
@@ -136,6 +136,7 @@ use Const::Fast;
     # cleaning up
     undef $consumer;
     undef $producer;
+    $connection->close;
     undef $connection;
 
     # another brief code example of the Kafka package
@@ -198,9 +199,8 @@ Support for working with 64 bit elements of the Kafka protocol on 32 bit systems
 =item *
 
 Taint mode support.
-Taint mode errors are prevented for internal operations.
-There are no taint checks or clearing of the taint flag for the data being sent or received:
-the calling code is responsible for handling that.
+The input data is not checked for tainted.
+Returns untainted data.
 
 =back
 
@@ -1098,6 +1098,7 @@ __END__
     # Closes and cleans up
     undef $consumer;
     undef $producer;
+    $connection->close;
     undef $connection;
 
 =head1 DEPENDENCIES

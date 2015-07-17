@@ -168,6 +168,7 @@ while (1) {
 # Closes and cleans up
 
 undef $producer;
+$connect->close;
 undef $connect;
 
 # Statistics

@@ -207,4 +207,5 @@ print STDERR "\n";
 
 # POSTCONDITIONS ---------------------------------------------------------------
 
+$connect->close;
 $connect = $consumer = $producer = undef;

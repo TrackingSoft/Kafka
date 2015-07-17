@@ -18,15 +18,15 @@ use Test::More;
 
 #-- verify load the module
 
-#BEGIN {
-#    eval 'use Test::NoWarnings';    ## no critic
-#    plan skip_all => 'because Test::NoWarnings required for testing' if $@;
-#}
-
 BEGIN {
     eval 'use Test::Exception';     ## no critic
     plan skip_all => "because Test::Exception required for testing" if $@;
 }
+
+#BEGIN {
+#    eval 'use Test::NoWarnings';    ## no critic
+#    plan skip_all => 'because Test::NoWarnings required for testing' if $@;
+#}
 
 plan 'no_plan';
 
@@ -95,6 +95,7 @@ sub new_ERROR_MISMATCH_ARGUMENT {
     my ( $field, @bad_values ) = @_;
 
     foreach my $bad_value ( @bad_values ) {
+        $connect->close if $connect;
         undef $connect;
         throws_ok {
             $connect = Kafka::Connection->new(
@@ -160,6 +161,7 @@ sub testing {
     # requests to the server has not yet been
     ok !$connect->is_server_connected( $server ), 'server is not alive';
 
+    $connect->close;
     undef $connect;
     ok !$connect, 'connection object is destroyed';
 

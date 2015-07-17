@@ -70,7 +70,7 @@ my %config = (
         'Test::Exception'           => '0.32',
         'Test::More'                => '1.001003',
         'Test::NoWarnings'          => '1.04',
-        'Test::TCP'                 => '2.02',
+        'Test::TCP'                 => '2.11',
         'Time::HiRes'               => '1.9726',
         'Try::Tiny'                 => '0.21',
     },
@@ -86,43 +86,43 @@ my %config = (
         provides                => {
             'Kafka'                 => {
                 file                    => 'lib/Kafka.pm',
-                version                 => '0.8010'
+                version                 => '0.8011'
             },
             'Kafka::Connection'     => {
                 file                    => 'lib/Kafka/Connection.pm',
-                version                 => '0.8010'
+                version                 => '0.8011'
             },
             'Kafka::Consumer'       => {
                 file                    => 'lib/Kafka/Consumer.pm',
-                version                 => '0.8010'
+                version                 => '0.8011'
             },
             'Kafka::Exceptions'     => {
                 file                    => 'lib/Kafka/Exceptions.pm',
-                version                 => '0.8010'
+                version                 => '0.8011'
             },
             'Kafka::IO'             => {
                 file                    => 'lib/Kafka/IO.pm',
-                version                 => '0.8010'
+                version                 => '0.8011'
             },
             'Kafka::Int64'          => {
                 file                    => 'lib/Kafka/Int64.pm',
-                version                 => '0.8010'
+                version                 => '0.8011'
             },
             'Kafka::Internals'      => {
                 file                    => 'lib/Kafka/Internals.pm',
-                version                 => '0.8010'
+                version                 => '0.8011'
             },
             'Kafka::Message'        => {
                 file                    => 'lib/Kafka/Message.pm',
-                version                 => '0.8010'
+                version                 => '0.8011'
             },
             'Kafka::Producer'       => {
                 file                    => 'lib/Kafka/Producer.pm',
-                version                 => '0.8010'
+                version                 => '0.8011'
             },
             'Kafka::Protocol'       => {
                 file                    => 'lib/Kafka/Protocol.pm',
-                version                 => '0.8010'
+                version                 => '0.8011'
             },
         },
         'meta-spec'             => { version => 2 },

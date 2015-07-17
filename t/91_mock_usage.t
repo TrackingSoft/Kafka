@@ -19,13 +19,13 @@ use Test::More;
 #-- verify load the module
 
 BEGIN {
-    eval 'use Test::NoWarnings';    ## no critic
-    plan skip_all => 'because Test::NoWarnings required for testing' if $@;
+    eval 'use Test::Exception';     ## no critic
+    plan skip_all => "because Test::Exception required for testing" if $@;
 }
 
 BEGIN {
-    eval 'use Test::Exception';     ## no critic
-    plan skip_all => "because Test::Exception required for testing" if $@;
+    eval 'use Test::NoWarnings';    ## no critic
+    plan skip_all => 'because Test::NoWarnings required for testing' if $@;
 }
 
 plan 'no_plan';
@@ -133,6 +133,7 @@ $connect->close;
 
 #-- Consumer
 
+$connect->close;
 undef $connect;
 unless ( $connect = Kafka::Connection->new(
     host    => 'localhost',

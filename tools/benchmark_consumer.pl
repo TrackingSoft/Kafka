@@ -214,6 +214,7 @@ INFINITE:                                       # an infinite loop
 # Closes and cleans up
 
 undef $consumer;
+$connect->close;
 undef $connect;
 
 # Statistics

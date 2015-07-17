@@ -24,13 +24,13 @@ BEGIN {
 #-- verify load the module
 
 BEGIN {
-    eval 'use Test::NoWarnings';    ## no critic
-    plan skip_all => 'because Test::NoWarnings required for testing' if $@;
+    eval 'use Test::Exception';     ## no critic
+    plan skip_all => "because Test::Exception required for testing" if $@;
 }
 
 BEGIN {
-    eval 'use Test::Exception';     ## no critic
-    plan skip_all => "because Test::Exception required for testing" if $@;
+    eval 'use Test::NoWarnings';    ## no critic
+    plan skip_all => 'because Test::NoWarnings required for testing' if $@;
 }
 
 plan 'no_plan';
@@ -273,6 +273,7 @@ if ( $pid = fork ) {                # herein the parent
     kill 'USR1' => $ppid;
 
     wait_until_ready( 1, $ppid );   # expect readiness of the parent process
+    $connection->close;
     undef $connection;
     kill 'USR1' => $ppid;
 
@@ -296,6 +297,7 @@ if ( $pid = fork ) {                # herein the parent
     kill 'USR1' => $pid;
 
     wait_until_ready( 2, $pid );    # expect readiness of the child process
+    $connection->close;
     undef $connection;
     kill 'USR1' => $pid;
 

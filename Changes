@@ -1,5 +1,11 @@
 Revision history for Kafka package
 
+0.8011 ??? ???  ?? 2015
+    CHANGES:
+    - Kafka::Connection connection is closed only when explicitly call
+      $connection->close method.
+    - Kafka::IO object destruction do not close socket.
+
 0.8010 Fri Feb  06 2015
     CHANGES:
     - $RECEIVE_MAX_RETRIES, $SEND_MAX_RETRIES renamed
