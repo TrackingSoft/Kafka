@@ -34,6 +34,7 @@ use Scalar::Util qw(
     dualvar
 );
 use Socket qw(
+    IPPROTO_TCP
     PF_INET
     SOCK_STREAM
     SOL_SOCKET
@@ -309,10 +310,14 @@ The method verifies whether we are connected to Kafka server.
 sub is_alive {
     my ( $self ) = @_;
 
-    return unless $self->{socket};
-    return unless defined( my $packed = getsockopt( $self->{socket}, SOL_SOCKET, SO_ERROR ) );
+    my $socket = $self->{socket};
+    return unless $socket;
 
-    return !unpack( q{L}, $packed );
+    socket( my $tmp_socket, PF_INET, SOCK_STREAM, IPPROTO_TCP );
+    my $is_alive = connect( $tmp_socket, getpeername( $socket ) );
+    CORE::close( $tmp_socket );
+
+    return $is_alive;
 }
 
 #-- private attributes ---------------------------------------------------------

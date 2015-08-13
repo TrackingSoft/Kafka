@@ -1,10 +1,19 @@
 Revision history for Kafka package
 
-0.8011 ??? ???  ?? 2015
+0.8011 Mon Aug  18 2015
     CHANGES:
-    - Kafka::Connection connection is closed only when explicitly call
-      $connection->close method.
+    - Kafka::Connection connection is closed only when $connection->close method is called
+      explicitly.
     - Kafka::IO object destruction do not close socket.
+    BUGFIXES:
+    - Added Apache Kafka server error codes:
+      $ERROR_LOAD_IN_PROGRESS_CODE,
+      $ERROR_CONSUMER_COORDINATOR_NOT_AVAILABLE_CODE,
+      $ERROR_NOT_COORDINATOR_FOR_CONSUMER_CODE
+    - $ERROR_REPLICA_NOT_AVAILABLE
+      error ignored according to Apache Kafka documentation
+      (reported by Shabnam Shamaei).
+    - Kafka::IO->is_alive method correctly determines server availability.
 
 0.8010 Fri Feb  06 2015
     CHANGES:
@@ -29,7 +38,7 @@ Revision history for Kafka package
     - Module Kafka::IO no longer uses sigtrap
       (thanks to Mark Hedges).
     - Taint mode support
-      (thanks to Hari Sekhon).
+      (reported by Hari Sekhon).
 
 0.8008 Tue Apr  29 2014
     - Support for GZIP and Snappy compression

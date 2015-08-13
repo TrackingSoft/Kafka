@@ -43,18 +43,21 @@ our @EXPORT_OK = qw(
     $ERROR_CANNOT_RECV
     $ERROR_CANNOT_SEND
     $ERROR_COMPRESSION
-    $ERROR_METADATA_ATTRIBUTES
-    $ERROR_LEADER_NOT_FOUND
+    $ERROR_CONSUMER_COORDINATOR_NOT_AVAILABLE_CODE
     $ERROR_INVALID_MESSAGE
     $ERROR_INVALID_MESSAGE_SIZE
     $ERROR_LEADER_NOT_AVAILABLE
+    $ERROR_LEADER_NOT_FOUND
+    $ERROR_LOAD_IN_PROGRESS_CODE
     $ERROR_MESSAGE_SIZE_TOO_LARGE
+    $ERROR_METADATA_ATTRIBUTES
     $ERROR_MISMATCH_ARGUMENT
     $ERROR_MISMATCH_CORRELATIONID
     $ERROR_NO_ERROR
     $ERROR_NO_KNOWN_BROKERS
     $ERROR_NOT_BINARY_STRING
     $ERROR_NOT_LEADER_FOR_PARTITION
+    $ERROR_NOT_COORDINATOR_FOR_CONSUMER_CODE
     $ERROR_OFFSET_METADATA_TOO_LARGE_CODE
     $ERROR_OFFSET_OUT_OF_RANGE
     $ERROR_PARTITION_DOES_NOT_MATCH
@@ -818,14 +821,14 @@ of Apache Kafka Wire Format protocol response.
 
 0 - C<q{}>
 
-No error
+No error - it worked!
 
 =cut
 const our $ERROR_NO_ERROR                       => 0;
 
 =item C<$ERROR_UNKNOWN>
 
--1 - An unexpected server error
+-1 - An unexpected server error.
 
 =cut
 const our $ERROR_UNKNOWN                        => -1;
@@ -833,28 +836,28 @@ const our $ERROR_UNKNOWN                        => -1;
 =item C<$ERROR_OFFSET_OUT_OF_RANGE>
 
 1 - The requested offset is outside the range of offsets available at the server
-for the given topic/partition
+for the given topic/partition.
 
 =cut
 const our $ERROR_OFFSET_OUT_OF_RANGE            => 1;
 
 =item C<$ERROR_INVALID_MESSAGE>
 
-2 - Message contents does not match its control sum
+2 - This indicates that a message contents does not match its CRC.
 
 =cut
 const our $ERROR_INVALID_MESSAGE                => 2;
 
 =item C<$ERROR_UNKNOWN_TOPIC_OR_PARTITION>
 
-3 - Unknown topic or partition
+3 - This request is for a topic or partition that does not exist on this broker.
 
 =cut
 const our $ERROR_UNKNOWN_TOPIC_OR_PARTITION     => 3;
 
 =item C<$ERROR_INVALID_MESSAGE_SIZE>
 
-4 - Message has invalid size
+4 - Message has invalid size.
 
 =cut
 const our $ERROR_INVALID_MESSAGE_SIZE           => 4;
@@ -873,8 +876,8 @@ const our $ERROR_LEADER_NOT_AVAILABLE           => 5;
 
 6 - Server is not a leader for partition
 
-Client attempts to send messages to a replica that is not the leader for given partition.
-It usually indicates that client's metadata is out of date.
+This error is thrown if the client attempts to send messages to a replica that is not the leader for some partition.
+It indicates that the clients metadata is out of date.
 
 =cut
 const our $ERROR_NOT_LEADER_FOR_PARTITION       => 6;
@@ -883,7 +886,7 @@ const our $ERROR_NOT_LEADER_FOR_PARTITION       => 6;
 
 7 - Request time-out
 
-Request exceeds the user-specified time limit for the request.
+This error is thrown if the request exceeds the user-specified time limit in the request.
 
 =cut
 const our $ERROR_REQUEST_TIMED_OUT              => 7;
@@ -892,7 +895,7 @@ const our $ERROR_REQUEST_TIMED_OUT              => 7;
 
 8 - Broker is not available
 
-This is not a client facing error and is used only internally by intra-cluster broker communication.
+This is not a client facing error and is used mostly by tools when a broker is not alive.
 
 =cut
 const our $ERROR_BROKER_NOT_AVAILABLE           => 8;
@@ -901,7 +904,7 @@ const our $ERROR_BROKER_NOT_AVAILABLE           => 8;
 
 9 - Replica not available
 
-According to Apache Kafka documentation: 'What is the difference between this and LeaderNotAvailable?'
+If replica is expected on a broker, but is not (this can be safely ignored).
 
 =cut
 const our $ERROR_REPLICA_NOT_AVAILABLE          => 9;
@@ -911,7 +914,7 @@ const our $ERROR_REPLICA_NOT_AVAILABLE          => 9;
 10 - Message is too big
 
 The server has a configurable maximum message size to avoid unbounded memory allocation.
-This error is thrown when client attempts to produce a message larger than possible maximum size.
+This error is thrown if the client attempt to produce a message larger than this maximum.
 
 =cut
 const our $ERROR_MESSAGE_SIZE_TOO_LARGE         => 10;
@@ -920,7 +923,8 @@ const our $ERROR_MESSAGE_SIZE_TOO_LARGE         => 10;
 
 11 - Stale Controller Epoch Code
 
-According to Apache Kafka documentation: '???'
+According to Apache Kafka documentation:
+Internal error code for broker-to-broker communication.
 
 =cut
 const our $ERROR_STALE_CONTROLLER_EPOCH_CODE    => 11;
@@ -934,6 +938,30 @@ If you specify a value larger than configured maximum for offset metadata.
 =cut
 const our $ERROR_OFFSET_METADATA_TOO_LARGE_CODE => 12;
 
+=item C<$ERROR_LOAD_IN_PROGRESS_CODE>
+
+14 - The broker returns this error code for an offset fetch request
+if it is still loading offsets (after a leader change for that offsets topic partition).
+
+=cut
+const our $ERROR_LOAD_IN_PROGRESS_CODE          => 14;
+
+=item C<$ERROR_CONSUMER_COORDINATOR_NOT_AVAILABLE_CODE>
+
+15 - The broker returns this error code for consumer metadata requests
+or offset commit requests if the offsets topic has not yet been created.
+
+=cut
+const our $ERROR_CONSUMER_COORDINATOR_NOT_AVAILABLE_CODE    => 15;
+
+=item C<$ERROR_NOT_COORDINATOR_FOR_CONSUMER_CODE>
+
+16 - The broker returns this error code if it receives an offset fetch or commit request
+for a consumer group that it is not a coordinator for.
+
+=cut
+const our $ERROR_NOT_COORDINATOR_FOR_CONSUMER_CODE  => 16;
+
 =item C<%ERROR>
 
 Contains the descriptions for possible error codes.
@@ -943,40 +971,43 @@ Contains the descriptions for possible error codes.
 =cut
 our %ERROR = (
     # Errors fixed by Kafka package
-    $ERROR_MISMATCH_ARGUMENT                => q{Invalid argument},
-    $ERROR_CANNOT_SEND                      => q{Can't send},
-    $ERROR_SEND_NO_ACK                      => q{No acknowledgement for sent request},
-    $ERROR_CANNOT_RECV                      => q{Can't recv},
-    $ERROR_CANNOT_BIND                      => q{Can't bind},
-    $ERROR_METADATA_ATTRIBUTES              => q{Unknown metadata attributes},
-    $ERROR_UNKNOWN_APIKEY                   => q{Unknown ApiKey},
-    $ERROR_CANNOT_GET_METADATA              => q{Can't get metadata},
-    $ERROR_LEADER_NOT_FOUND                 => q{Leader not found},
-    $ERROR_MISMATCH_CORRELATIONID           => q{Mismatch CorrelationId},
-    $ERROR_NO_KNOWN_BROKERS                 => q{There are no known brokers},
-    $ERROR_REQUEST_OR_RESPONSE              => q{Bad request or response element},
-    $ERROR_TOPIC_DOES_NOT_MATCH             => q{Topic does not match the requested},
-    $ERROR_PARTITION_DOES_NOT_MATCH         => q{Partition does not match the requested},
-    $ERROR_NOT_BINARY_STRING                => q{Not binary string},
-    $ERROR_COMPRESSION                      => q{Compression error},
-    $ERROR_RESPOSEMESSAGE_NOT_RECEIVED      => q{'ResponseMessage' not received},
+    $ERROR_MISMATCH_ARGUMENT                        => q{Invalid argument},
+    $ERROR_CANNOT_SEND                              => q{Can't send},
+    $ERROR_SEND_NO_ACK                              => q{No acknowledgement for sent request},
+    $ERROR_CANNOT_RECV                              => q{Can't recv},
+    $ERROR_CANNOT_BIND                              => q{Can't bind},
+    $ERROR_METADATA_ATTRIBUTES                      => q{Unknown metadata attributes},
+    $ERROR_UNKNOWN_APIKEY                           => q{Unknown ApiKey},
+    $ERROR_CANNOT_GET_METADATA                      => q{Can't get metadata},
+    $ERROR_LEADER_NOT_FOUND                         => q{Leader not found},
+    $ERROR_MISMATCH_CORRELATIONID                   => q{Mismatch CorrelationId},
+    $ERROR_NO_KNOWN_BROKERS                         => q{There are no known brokers},
+    $ERROR_REQUEST_OR_RESPONSE                      => q{Bad request or response element},
+    $ERROR_TOPIC_DOES_NOT_MATCH                     => q{Topic does not match the requested},
+    $ERROR_PARTITION_DOES_NOT_MATCH                 => q{Partition does not match the requested},
+    $ERROR_NOT_BINARY_STRING                        => q{Not binary string},
+    $ERROR_COMPRESSION                              => q{Compression error},
+    $ERROR_RESPOSEMESSAGE_NOT_RECEIVED              => q{'ResponseMessage' not received},
 
     #-- The Protocol Error Messages
     # https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-ErrorCodes
-    $ERROR_NO_ERROR                         => q{}, # 'No error--it worked!',
-    $ERROR_UNKNOWN                          => q{An unexpected server error},
-    $ERROR_OFFSET_OUT_OF_RANGE              => q{The requested offset is outside the range of offsets maintained by the server for the given topic/partition},
-    $ERROR_INVALID_MESSAGE                  => q{Message contents does not match its CRC},
-    $ERROR_UNKNOWN_TOPIC_OR_PARTITION       => q{Unknown topic or partition},
-    $ERROR_INVALID_MESSAGE_SIZE             => q{Message has invalid size},
-    $ERROR_LEADER_NOT_AVAILABLE             => q{Unable to write due to ongoing Kafka leader selection},
-    $ERROR_NOT_LEADER_FOR_PARTITION         => q{Server is not a leader for partition},
-    $ERROR_REQUEST_TIMED_OUT                => q{Request time-out},
-    $ERROR_BROKER_NOT_AVAILABLE             => q{Broker is not available},
-    $ERROR_REPLICA_NOT_AVAILABLE            => q{Replica not available},
-    $ERROR_MESSAGE_SIZE_TOO_LARGE           => q{Message is too big},
-    $ERROR_STALE_CONTROLLER_EPOCH_CODE      => q{Stale Controller Epoch Code},
-    $ERROR_OFFSET_METADATA_TOO_LARGE_CODE   => q{Specified metadata offset is too big},
+    $ERROR_NO_ERROR                                 => q{}, # 'No error--it worked!',
+    $ERROR_UNKNOWN                                  => q{An unexpected server error},
+    $ERROR_OFFSET_OUT_OF_RANGE                      => q{The requested offset is outside the range of offsets maintained by the server for the given topic/partition},
+    $ERROR_INVALID_MESSAGE                          => q{Message contents does not match its CRC},
+    $ERROR_UNKNOWN_TOPIC_OR_PARTITION               => q{Unknown topic or partition},
+    $ERROR_INVALID_MESSAGE_SIZE                     => q{Message has invalid size},
+    $ERROR_LEADER_NOT_AVAILABLE                     => q{Unable to write due to ongoing Kafka leader selection},
+    $ERROR_NOT_LEADER_FOR_PARTITION                 => q{Server is not a leader for partition},
+    $ERROR_REQUEST_TIMED_OUT                        => q{Request time-out},
+    $ERROR_BROKER_NOT_AVAILABLE                     => q{Broker is not available},
+    $ERROR_REPLICA_NOT_AVAILABLE                    => q{Replica not available},
+    $ERROR_MESSAGE_SIZE_TOO_LARGE                   => q{Message is too big},
+    $ERROR_STALE_CONTROLLER_EPOCH_CODE              => q{Stale Controller Epoch Code},
+    $ERROR_OFFSET_METADATA_TOO_LARGE_CODE           => q{Specified metadata offset is too big},
+    $ERROR_LOAD_IN_PROGRESS_CODE                    => q{Still loading offsets},
+    $ERROR_CONSUMER_COORDINATOR_NOT_AVAILABLE_CODE  => q{Topic has not yet been created},
+    $ERROR_NOT_COORDINATOR_FOR_CONSUMER_CODE        => q{Request for a consumer group that it is not a coordinator for},
 );
 
 =over

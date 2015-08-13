@@ -49,6 +49,7 @@ use Params::Util qw(
 use Time::HiRes qw(
     gettimeofday
 );
+use Try::Tiny;
 
 use Kafka qw(
     $RECEIVE_LATEST_OFFSET
@@ -79,6 +80,7 @@ const my $KAFKA_BASE_DIR    => $ENV{KAFKA_BASE_DIR} || File::Spec->catdir( File:
 
 const my $topic             => $Kafka::Cluster::DEFAULT_TOPIC;
 const my $partition         => 0;
+const my $attempts          => 200;
 
 #-- Global data ----------------------------------------------------------------
 
@@ -120,6 +122,8 @@ my %bench;
 unless ( $connect = Kafka::Connection->new(
     host    => 'localhost',
     port    => $port,
+    SEND_MAX_ATTEMPTS       => $attempts,
+    RECEIVE_MAX_ATTEMPTS    => $attempts,
     ) ) {
     BAIL_OUT 'connection is not created';
 }
@@ -168,7 +172,18 @@ sub send_messages {
 
     my ( $time_before, $time_after );
     $time_before = gettimeofday;
-    my $response = $producer->send( $topic, $partition, $messages );
+    my $response;
+    {
+        my $error;
+        try {
+            $response = $producer->send( $topic, $partition, $messages );
+        } catch {
+            $error = $_;
+            diag "send ERROR: $error";
+            sleep 1;
+        };
+        redo if $error;
+    }
     $time_after = gettimeofday;
     if ( $response ) {
         ok( _HASH( $response ), 'sent a series of messages' ) if $#{ $messages };
@@ -185,7 +200,18 @@ sub fetch_messages {
 
     my ( $time_before, $time_after );
     $time_before = gettimeofday;
-    my $messages = $consumer->fetch( $topic, $partition, $offset, $max_size );
+    my $messages;
+    {
+        my $error;
+        try {
+            $messages = $consumer->fetch( $topic, $partition, $offset, $max_size );
+        } catch {
+            $error = $_;
+            diag "fetch ERROR: $error";
+            sleep 1;
+        };
+        redo if $error;
+    }
     $time_after = gettimeofday;
     if ( $messages ) {
         ok( _ARRAY0( $messages ), 'messages are received' ) if $is_package;
@@ -296,6 +322,12 @@ sub report {
 $in_package = $number_of_package;
 
 foreach my $mode ( $BLOCK_UNTIL_IS_COMMITTED, $WAIT_WRITTEN_TO_LOCAL_LOG, $NOT_SEND_ANY_RESPONSE ) {
+
+my $mode_name;
+if      ( $mode == $NOT_SEND_ANY_RESPONSE )     { $mode_name = 'NOT_SEND_ANY_RESPONSE' }
+elsif   ( $mode == $WAIT_WRITTEN_TO_LOCAL_LOG ) { $mode_name = 'WAIT_WRITTEN_TO_LOCAL_LOG' }
+elsif   ( $mode == $BLOCK_UNTIL_IS_COMMITTED )   { $mode_name = 'BLOCK_UNTIL_IS_COMMITTED' }
+note "mode: $mode_name";
 
 $producer = Kafka::Producer->new(
     Connection      => $connect,

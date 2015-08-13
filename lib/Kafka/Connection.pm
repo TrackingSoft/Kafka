@@ -79,6 +79,7 @@ use Kafka qw(
     $ERROR_MESSAGE_SIZE_TOO_LARGE
     $ERROR_STALE_CONTROLLER_EPOCH_CODE
     $ERROR_OFFSET_METADATA_TOO_LARGE_CODE
+    $ERROR_CONSUMER_COORDINATOR_NOT_AVAILABLE_CODE
 
     $ERROR_CANNOT_BIND
     $ERROR_CANNOT_GET_METADATA
@@ -226,6 +227,9 @@ const our %RETRY_ON_ERRORS => (
 #   $ERROR_MESSAGE_SIZE_TOO_LARGE           => 1,   # 10 - Message is too big
     $ERROR_STALE_CONTROLLER_EPOCH_CODE      => 1,   # 11 - Stale Controller Epoch Code
 #   $ERROR_OFFSET_METADATA_TOO_LARGE_CODE   => 1,   # 12 - Specified metadata offset is too big
+#    $ERROR_LOAD_IN_PROGRESS_CODE            => 1,   # 14 - Still loading offsets
+    $ERROR_CONSUMER_COORDINATOR_NOT_AVAILABLE_CODE  => 1,   # 15 - Topic has not yet been created
+#    $ERROR_NOT_COORDINATOR_FOR_CONSUMER_CODE    => 1,   # 16 - Request for a consumer group that it is not a coordinator for
 );
 
 #-- constructor ----------------------------------------------------------------
@@ -1041,7 +1045,9 @@ sub _update_metadata {
         foreach my $partition_metadata ( @{ $topic_metadata->{PartitionMetadata} } ) {
             $partition = $partition_metadata->{Partition};
             last METADATA_CREATION
-                if ( $ErrorCode = $partition_metadata->{ErrorCode} ) != $ERROR_NO_ERROR;
+                if ( $ErrorCode = $partition_metadata->{ErrorCode} ) != $ERROR_NO_ERROR
+                    && $ErrorCode != $ERROR_REPLICA_NOT_AVAILABLE;
+            $ErrorCode = $ERROR_NO_ERROR;
 
             my $received_partition_data = $received_metadata->{ $TopicName }->{ $partition } = {};
             my $leader = $received_partition_data->{Leader} = $partition_metadata->{Leader};
