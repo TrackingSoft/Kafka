@@ -106,6 +106,8 @@ use Const::Fast;
         $BITS64
     );
     use Kafka::Connection;
+    use Kafka::Producer;
+    use Kafka::Consumer;
 
     # A simple example of Kafka usage
 
