@@ -1,5 +1,10 @@
 Revision history for Kafka package
 
+0.8012 ??? ???  ?? 201?
+    BUGFIXES:
+    - Fix MANIFEST.
+    - Error analysis is improved in Kafka::Connection .
+
 0.8011 Mon Aug  18 2015
     CHANGES:
     - Kafka::Connection connection is closed only when $connection->close method is called

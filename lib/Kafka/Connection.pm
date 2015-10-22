@@ -1058,7 +1058,7 @@ sub _update_metadata {
         }
     }
     if ( $ErrorCode != $ERROR_NO_ERROR ) {
-        if ( $RETRY_ON_ERRORS{ $ErrorCode } ) {
+        if ( exists $RETRY_ON_ERRORS{ $ErrorCode } ) {
             return $self->_attempt_update_metadata( $is_recursive_call, $TopicName, $partition, $ErrorCode );
         } else {
             # FATAL error
