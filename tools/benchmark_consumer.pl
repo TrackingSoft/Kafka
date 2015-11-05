@@ -196,8 +196,7 @@ INFINITE:                                       # an infinite loop
             );
             if ( ( $cnt += scalar @$fetched ) < 200_000 ) {
                 print STDERR "\r";
-            }
-            else {
+            } else {
                 print STDERR "\n";
                 $cnt = 0;
             }

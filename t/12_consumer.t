@@ -198,8 +198,7 @@ sub testing {
     if ( $kafka_base_dir ) {
         #-- Connecting to the Kafka server port (for example for node_id = 0)
         ( $port ) =  Kafka::Cluster->new( kafka_dir => $KAFKA_BASE_DIR, does_not_start => 1 )->servers;
-    }
-    else {
+    } else {
         $port = $Kafka::MockIO::KAFKA_MOCK_SERVER_PORT;
         Kafka::MockIO::override();
     }
@@ -331,7 +330,7 @@ sub testing {
         $DEFAULT_MAX_NUMBER_OF_OFFSETS, # max_number
     );
     ok _ARRAY( $offsets ), 'offsets are received';
-    if( $offsets ) {
+    if ( $offsets ) {
         foreach my $offset ( @$offsets ) {
             note "Received offset: $offset";
         }
@@ -350,7 +349,7 @@ sub testing {
     if ( $messages ) {
         foreach my $message ( @$messages ) {
 #            note '--------------------';
-            if( $message->valid ) {
+            if ( $message->valid ) {
 #                note 'key                : ', $message->key;
 #                note 'payload            : ', $message->payload;
 #                note 'offset             : ', $message->offset;

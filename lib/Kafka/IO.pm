@@ -25,6 +25,13 @@ our $VERSION = '0.8011';
 #-- load the modules -----------------------------------------------------------
 
 use Carp;
+use Data::Validate::Domain qw(
+    is_hostname
+);
+use Data::Validate::IP qw(
+    is_ipv4
+    is_ipv6
+);
 use Errno;
 use Fcntl;
 use POSIX qw(
@@ -34,16 +41,20 @@ use Scalar::Util qw(
     dualvar
 );
 use Socket qw(
+    AF_INET
+    AF_INET6
     IPPROTO_TCP
     PF_INET
+    PF_INET6
     SOCK_STREAM
     SOL_SOCKET
     SO_ERROR
     SO_RCVTIMEO
     SO_SNDTIMEO
-    inet_aton
-    inet_ntoa
+    inet_pton
+    inet_ntop
     pack_sockaddr_in
+    pack_sockaddr_in6
 );
 use Sys::SigAction qw(
     set_sig_handler
@@ -138,7 +149,7 @@ C<new()> takes arguments in key-value pairs. The following arguments are current
 =item C<host =E<gt> $host>
 
 C<$host> is an Apache Kafka host to connect to. It can be a hostname or the
-IP-address in the "xx.xx.xx.xx" form.
+IP-address in the IPv4 or IPv6 form (for example '127.0.0.1', '0:0:0:0:0:0:0:1' or '::1').
 
 =item C<port =E<gt> $port>
 
@@ -182,8 +193,11 @@ sub new {
 
     my $self = bless {
         host        => q{},
-        port        => $KAFKA_SERVER_PORT,
         timeout     => $REQUEST_TIMEOUT,
+        port        => $KAFKA_SERVER_PORT,
+        af          => '',  # Address family constant
+        pf          => '',  # Protocol family constant
+        ip          => '',  # Human-readable textual representation of the ip address
     }, $class;
 
     while ( @args ) {
@@ -193,7 +207,7 @@ sub new {
 
     # we trust it: make it untainted
     ( $self->{host} ) = $self->{host} =~ /\A(.+)\z/;
-    ( $self->{port} ) = $self->{port} =~ /\A(\d+)\z/;
+    ( $self->{port} ) = $self->{port} =~ /\A(.+)\z/;
 
     $self->{not_accepted} = 0;
     $self->{socket} = undef;
@@ -290,16 +304,20 @@ sub receive {
 =head3 C<close>
 
 Closes connection to Kafka server.
+Returns true if those operations succeed and if no error was reported by any PerlIO layer.
 
 =cut
 sub close {
     my ( $self ) = @_;
 
+    my $ret = 1;
     if ( $self->{socket} ) {
         $self->{_select} = undef;
-        CORE::close( $self->{socket} );
+        $ret = CORE::close( $self->{socket} );
         $self->{socket} = undef;
     }
+
+    return $ret;
 }
 
 =head3 C<is_alive>
@@ -313,7 +331,7 @@ sub is_alive {
     my $socket = $self->{socket};
     return unless $socket;
 
-    socket( my $tmp_socket, PF_INET, SOCK_STREAM, IPPROTO_TCP );
+    socket( my $tmp_socket, $self->{pf}, SOCK_STREAM, IPPROTO_TCP );
     my $is_alive = connect( $tmp_socket, getpeername( $socket ) );
     CORE::close( $tmp_socket );
 
@@ -335,8 +353,11 @@ sub _connect {
     my $port    = $self->{port};
     my $timeout = $self->{timeout};
 
-    my $ip;
-    if( $name =~ /[a-zA-Z]/s ) {
+    my $ip = '';
+    if ( is_ipv4( $name ) || is_ipv6( $name ) ) {
+        $self->_get_family( $name );
+        $ip = $self->{ip} = $name;
+    } else {
         if ( defined $timeout ) {
             my $remaining;
             my $start = time();
@@ -361,11 +382,11 @@ sub _connect {
             my $error = $@;
             undef $h;
 
-            $self->_debug_msg( "_connect: ip = '".( defined( $ip ) ? inet_ntoa( $ip ) : '<undef>' ).", error = '$error', \$? = $?, \$! = '$!'" )
+            $self->_debug_msg( "_connect: ip = '".( $ip || '<undef>' ).", error = '$error', \$? = $?, \$! = '$!'" )
                 if $self->debug_level;
 
             die $error if $error;
-            die( "gethostbyname $name: \$? = '$?', \$! = '$!'\n" ) unless defined $ip;
+            die( "gethostbyname $name: \$? = '$?', \$! = '$!'\n" ) unless $ip;
 
             my $elapsed = time() - $start;
             # $SIG{ALRM} restored automatically, but we need to restart previous alarm manually
@@ -387,16 +408,12 @@ sub _connect {
                     if $self->debug_level;
             }
         } else {
-            $ip = gethostbyname( $name );
+            $ip = $self->_gethostbyname( $name );
         }
-        $ip = inet_ntoa( $ip );
-    }
-    else {
-        $ip = $name;
     }
 
     # Create socket.
-    socket( my $connection, PF_INET, SOCK_STREAM, getprotobyname( 'tcp' ) ) or die( "socket: $!\n" );
+    socket( my $connection, $self->{pf}, SOCK_STREAM, getprotobyname( 'tcp' ) ) or die( "socket: $!\n" );
 
     # Set autoflushing.
     $_ = select( $connection ); $| = 1; select $_;
@@ -409,7 +426,11 @@ sub _connect {
     fcntl( $connection, F_SETFL, $flags | O_NONBLOCK ) or die "fcntl F_SETFL O_NONBLOCK: $!\n"; # 0 for error, 0e0 for 0.
 
     # Connect returns immediately because of O_NONBLOCK.
-    connect( $connection, pack_sockaddr_in( $port, inet_aton( $ip ) ) ) || $!{EINPROGRESS} || die( "connect ${ip}:${port} (${name}): $!\n" );
+    my $sockaddr = $self->{af} eq AF_INET
+        ? pack_sockaddr_in(  $port, inet_pton( $self->{af}, $ip ) )
+        : pack_sockaddr_in6( $port, inet_pton( $self->{af}, $ip ) )
+    ;
+    connect( $connection, $sockaddr ) || $!{EINPROGRESS} || die( "connect ip = $ip, port = $port: $!\n" );
 
     $self->{socket}     = $connection;
     $self->{_select}    = undef;
@@ -422,15 +443,15 @@ sub _connect {
     my $vec = q{};
     vec( $vec, fileno( $connection ), 1 ) = 1;
     select( undef, $vec, undef, $timeout // $REQUEST_TIMEOUT );
-    unless( vec( $vec, fileno( $connection ), 1 ) ) {
+    unless ( vec( $vec, fileno( $connection ), 1 ) ) {
         # If no response yet, impose our own timeout.
         $! = Errno::ETIMEDOUT();
-        die( "connect ${ip}:${port} (${name}): $!\n" );
+        die( "connect ip = $ip, port = $port: $!\n" );
     }
 
     # This is how we see whether it connected or there was an error. Document Unix, are you kidding?!
     $! = unpack( q{L}, getsockopt( $connection, SOL_SOCKET, SO_ERROR ) );
-    die( "connect ${ip}:${port} (${name}): $!\n" ) if $!;
+    die( "connect ip = $ip, port = $port: $!\n" ) if $!;
 
     # Set timeout on all reads and writes.
     #
@@ -451,11 +472,28 @@ sub _connect {
     return $connection;
 }
 
-# NOTE: to facilitate testing
 sub _gethostbyname {
     my ( $self, $name ) = @_;
 
-    return gethostbyname( $name );
+    $self->_get_family( $name );
+    my $ipaddr = gethostbyname( $name );
+    $self->{ip} = $ipaddr ? inet_ntop( $self->{af}, $ipaddr ) : '';
+
+    return $self->{ip};
+}
+
+sub _get_family {
+    my ( $self, $name ) = @_;
+
+    if ( is_ipv6( $name ) ) {
+        $self->{af} = AF_INET6;
+        $self->{pf} = PF_INET6;
+    } else {
+        $self->{af} = AF_INET;
+        $self->{pf} = PF_INET;
+    }
+
+    return;
 }
 
 # Show additional debugging information
@@ -501,6 +539,8 @@ sub _debug_msg {
     } else {
         say STDERR '[', scalar( localtime ), ' ] ', $message;
     }
+
+    return;
 }
 
 # Handler for errors
@@ -508,6 +548,8 @@ sub _error {
     my $self = shift;
 
     Kafka::Exception::IO->throw( throw_args( @_ ) );
+
+    return;
 }
 
 #-- Closes and cleans up -------------------------------------------------------

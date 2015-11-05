@@ -115,7 +115,7 @@ sub next_offset {
     };
     fail "offsets are not received: $@" if $@;
 
-    if( $offsets ) {
+    if ( $offsets ) {
         return $offsets->[0];
     } else {
         return;

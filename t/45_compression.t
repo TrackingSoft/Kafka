@@ -119,7 +119,7 @@ $offsets = $consumer->offsets(
     $RECEIVE_LATEST_OFFSET,         # time
     $DEFAULT_MAX_NUMBER_OF_OFFSETS, # max_number
 );
-if( $offsets ) {
+if ( $offsets ) {
     foreach my $offset ( @$offsets ) {
         note "Received offset: $offset";
     }
@@ -141,7 +141,7 @@ foreach my $return_all ( 0, 1 ) {
             note '--------------------';
             note "Start offset = $start_offset, return_all = $return_all, codec when sending = ".$compession_codecs[ $compression_codec ]->[1];
             foreach my $message ( @$messages ) {
-                if( $message->valid ) {
+                if ( $message->valid ) {
                     note 'consumed offset: ', $message->offset;
                 } else {
                     diag 'error          : ', $message->error;

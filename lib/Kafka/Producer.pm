@@ -362,6 +362,8 @@ sub _error {
     my $self = shift;
 
     Kafka::Exception::Producer->throw( throw_args( @_ ) );
+
+    return;
 }
 
 #-- Closes and cleans up -------------------------------------------------------

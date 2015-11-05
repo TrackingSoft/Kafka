@@ -942,6 +942,8 @@ sub _decode_produce_request_template {
 
         _decode_MessageSet_template( $request );
     }
+
+    return;
 }
 
 # Verifies that the argument is a reference to a string
@@ -972,6 +974,7 @@ sub _protocol_error {
     my ( $error_code, $description ) = @_;
 
     $_package_error = dualvar $error_code, $ERROR{ $error_code }.( $description ? ': '.$description : q{} );
+
     return;
 }
 

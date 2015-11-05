@@ -101,7 +101,7 @@ const my $REPLICATION_FACTOR    => 3;
 
 const my $KAFKA_BASE_DIR        => $ENV{KAFKA_BASE_DIR};    # WARNING: must match the settings of your system
 const my $TOPIC                 => $Kafka::MockIO::TOPIC;
-const my $HOST                  => $Kafka::Cluster::HOST;
+const my $HOST                  => 'localhost';
 
 const my $INI_SECTION           => 'GENERAL';
 
@@ -129,8 +129,7 @@ sub setup {
         my $error = q{};
         map { $error .= "\n$_" } @Config::IniFiles::errors;
         BAIL_OUT "$properties_file error: $error";
-    }
-    else {
+    } else {
         $cfg->setval( $INI_SECTION, 'auto.create.topics.enable'     => $AUTO_CREATE_TOPICS );
         $cfg->setval( $INI_SECTION, 'default.replication.factor'    => $REPLICATION_FACTOR );
         $cfg->RewriteConfig( $properties_file );

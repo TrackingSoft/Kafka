@@ -400,7 +400,7 @@ L<Kafka::Message|Kafka::Message> objects.
         $DEFAULT_MAX_BYTES              # Maximum size of MESSAGE(s) to receive
     );
     foreach my $message ( @$messages ) {
-        if( $message->valid ) {
+        if ( $message->valid ) {
             say 'payload    : ', $message->payload;
             say 'key        : ', $message->key;
             say 'offset     : ', $message->offset;
@@ -417,7 +417,7 @@ class methods and arguments.
 
 Kafka message API is implemented by L<Kafka::Message|Kafka::Message> class.
 
-    if( $message->valid ) {
+    if ( $message->valid ) {
         say 'payload    : ', $message->payload;
         say 'key        : ', $message->key;
         say 'offset     : ', $message->offset;
@@ -1091,7 +1091,7 @@ __END__
             $DEFAULT_MAX_NUMBER_OF_OFFSETS  # max_number
         );
 
-        if( @$offsets ) {
+        if ( @$offsets ) {
             say "Received offset: $_" foreach @$offsets;
         } else {
             warn "Error: Offsets are not received\n";
@@ -1107,7 +1107,7 @@ __END__
 
         if ( $messages ) {
             foreach my $message ( @$messages ) {
-                if( $message->valid ) {
+                if ( $message->valid ) {
                     say 'payload    : ', $message->payload;
                     say 'key        : ', $message->key;
                     say 'offset     : ', $message->offset;
@@ -1146,6 +1146,8 @@ Kafka:
     Const::Fast
     Data::Compare
     Data::HexDump::Range
+    Data::Validate::Domain
+    Data::Validate::IP
     Exception::Class
     List::MoreUtils
     Params::Util
@@ -1190,6 +1192,12 @@ See documentation for a particular module for explanation of various debug level
 =cut
 
 =head1 BUGS AND LIMITATIONS
+
+L<Connection|Kafka::Connection> constructor:
+
+Make sure that you always connect to brokers using EXACTLY the same address or host name
+as specified in broker configuration (host.name in server.properties).
+Avoid using default value (when host.name is commented) in server.properties - always use explicit value instead.
 
 L<Producer|Kafka::Producer> and L<Consumer|Kafka::Consumer> methods
 only work with one topic and one partition at a time.

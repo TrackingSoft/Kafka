@@ -62,7 +62,7 @@ STDOUT->autoflush;
 
 const my $KAFKA_BASE_DIR    => $ENV{KAFKA_BASE_DIR};    # WARNING: must match the settings of your system
 const my $TOPIC             => $Kafka::Cluster::DEFAULT_TOPIC;
-const my $HOST              => $Kafka::Cluster::HOST;
+const my $HOST              => 'localhost';
 const my $PARTITION         => 0;
 
 my ( $cluster, $port, $connection, $producer, $consumer, $error );
@@ -168,7 +168,7 @@ sub next_offset {
 
         my $i = 0;
         foreach my $message ( @$messages ) {
-            if( $message->valid ) {
+            if ( $message->valid ) {
                 is $message->payload, $transmitted_messages[ $i++ ], 'message ok';
             } else {
                 fail 'message error: '.$message->error;
@@ -278,7 +278,7 @@ sub next_offset {
 
         my $i = 0;
         foreach my $message ( @$messages ) {
-            if( $message->valid ) {
+            if ( $message->valid ) {
                 is $message->payload, $transmitted_messages[ $i++ ], 'message ok';
             } else {
                 fail 'message error: '.$message->error;

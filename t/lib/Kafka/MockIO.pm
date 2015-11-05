@@ -293,6 +293,8 @@ sub override {
             as      => $method,
         } );
     }
+
+    return;
 }
 
 =head3 C<restore>
@@ -308,6 +310,8 @@ sub restore {
             as      => $method,
         } );
     }
+
+    return;
 }
 
 =head3 C<add_special_case( $cases )>
@@ -344,6 +348,8 @@ sub add_special_case {
     foreach my $encoded_request ( keys %{ $cases } ) {
         $_special_cases{ $encoded_request } = $cases->{ $encoded_request };
     }
+
+    return;
 }
 
 =head3 C<del_special_case( $encoded_request )>
@@ -368,6 +374,8 @@ sub del_special_case {
         and confess 'Do not use a class method as a method of the object';
 
     delete $_special_cases{ $encoded_request };
+
+    return;
 }
 
 =head3 C<special_cases>
@@ -521,8 +529,7 @@ sub send {
                     Key         => $Key,
                     Value       => $Value,
                 };
-            }
-            else {
+            } else {
 # NOTE: not all messages can be returned
                 last;
             }
@@ -567,8 +574,7 @@ sub send {
         }
         elsif ( $Time == $RECEIVE_EARLIEST_OFFSETS ) {
             push @{ $offsets }, 0;
-        }
-        else {
+        } else {
             if ( exists( $_received_data{ $topic }->{ $partition } ) ) {
                 my $max_offset = min $MaxNumberOfOffsets, $#{ $_received_data{ $topic }->{ $partition } };
 # NOTE:
@@ -626,6 +632,7 @@ sub close {
     my ( $self ) = @_;
 
     delete $self->{$_} foreach keys %$self;
+
     return;
 }
 
@@ -659,8 +666,7 @@ sub _decoded_topic_partition {
     $topic_data->{TopicName} = $topic;
     if ( $ApiKey == $APIKEY_OFFSET ) {
         $topic_data->{PartitionOffsets}->[0]->{Partition} = $partition;
-    }
-    else {
+    } else {
         $topic_data->{partitions}->[0]->{Partition} = $partition;
     }
 

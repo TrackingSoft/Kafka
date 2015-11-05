@@ -107,8 +107,7 @@ sub setup {
         my $error = q{};
         map { $error .= "\n$_" } @Config::IniFiles::errors;
         BAIL_OUT "$properties_file error: $error";
-    }
-    else {
+    } else {
         $cfg->setval( $INI_SECTION, 'auto.create.topics.enable'     => $auto_create_topics_mode );
         $cfg->setval( $INI_SECTION, 'default.replication.factor'    => $DEFAULT_REPLICATION_FACTOR );
         $cfg->RewriteConfig( $properties_file );

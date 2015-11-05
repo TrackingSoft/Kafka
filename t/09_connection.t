@@ -23,11 +23,6 @@ BEGIN {
     plan skip_all => "because Test::Exception required for testing" if $@;
 }
 
-#BEGIN {
-#    eval 'use Test::NoWarnings';    ## no critic
-#    plan skip_all => 'because Test::NoWarnings required for testing' if $@;
-#}
-
 plan 'no_plan';
 
 #-- load the modules -----------------------------------------------------------
@@ -140,8 +135,7 @@ sub testing {
     if ( $kafka_base_dir ) {
         #-- Connecting to the Kafka server port (for example for node_id = 0)
         ( $port ) =  Kafka::Cluster->new( kafka_dir => $KAFKA_BASE_DIR, does_not_start => 1 )->servers;
-    }
-    else {
+    } else {
         $port = $Kafka::MockIO::KAFKA_MOCK_SERVER_PORT;
         Kafka::MockIO::override();
     }

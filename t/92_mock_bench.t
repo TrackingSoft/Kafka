@@ -145,7 +145,7 @@ sub next_offset {
         $RECEIVE_LATEST_OFFSET,             # time
         $DEFAULT_MAX_NUMBER_OF_OFFSETS,     # max_number
     );
-    if( $offsets ) {
+    if ( $offsets ) {
         ok( _ARRAY0( $offsets ), 'offsets are obtained' ) if $is_package;
         return $offsets->[0];
     }
@@ -165,8 +165,7 @@ sub send_messages {
     if ( $response ) {
         ok( _HASH( $response ), 'sent a series of messages' ) if $#{ $messages };
         return $time_after - $time_before;
-    }
-    else {
+    } else {
         fail 'response is not received';
         return;
     }
@@ -297,8 +296,7 @@ while (1) {
     if ( $first_offset != next_offset( $consumer, $TOPIC, $PARTITION, 1 ) ) {
         note 'to wait for forcing a flush of previous data to disk';
         $first_offset = next_offset( $consumer, $TOPIC, $PARTITION, 1 );
-    }
-    else {
+    } else {
         last;
     }
 }

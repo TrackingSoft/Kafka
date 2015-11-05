@@ -1,6 +1,8 @@
 Revision history for Kafka package
 
 0.8012 ??? ???  ?? 201?
+    CHANGES:
+    - Support IPv6. IPv6 address in standard form.
     BUGFIXES:
     - Fix MANIFEST.
     - Error analysis is improved in Kafka::Connection .

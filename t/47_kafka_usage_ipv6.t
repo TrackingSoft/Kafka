@@ -16,11 +16,21 @@ use lib qw(
 
 use Test::More;
 
-#-- verify load the module
+BEGIN {
+    plan skip_all => 'Unknown base directory of Kafka server'
+        unless defined $ENV{KAFKA_BASE_DIR};
+}
 
 BEGIN {
     eval 'use Test::Exception';     ## no critic
     plan skip_all => "because Test::Exception required for testing" if $@;
+}
+
+#-- verify load the module
+
+BEGIN {
+    eval 'use Test::TCP';           ## no critic
+    plan skip_all => "because Test::TCP required for testing" if $@;
 }
 
 BEGIN {
@@ -33,69 +43,56 @@ plan 'no_plan';
 #-- load the modules -----------------------------------------------------------
 
 use Const::Fast;
-#use Data::Dumper;
+use Net::EmptyPort qw(
+    can_bind
+);
+use Socket;
 
 use Kafka qw(
     $DEFAULT_MAX_BYTES
     $DEFAULT_MAX_NUMBER_OF_OFFSETS
-    $KAFKA_SERVER_PORT
     $RECEIVE_LATEST_OFFSET
-    $RECEIVE_EARLIEST_OFFSETS
-    $REQUEST_TIMEOUT
 );
+use Kafka::Cluster;
 use Kafka::Connection;
 use Kafka::Consumer;
 use Kafka::Producer;
 
-use Kafka::MockIO;
-
 #-- setting up facilities ------------------------------------------------------
 
-#-- declarations ---------------------------------------------------------------
+if ( eval { Socket::IPV6_V6ONLY } && can_bind( '::1' ) ) {
 
-const my $topic             => 'mytopic';
-# Use Kafka::MockIO only with the following information:
-const my $partition         => $Kafka::MockIO::PARTITION;
+ok 1, 'starting IPv6 test';
+
+my $CLUSTER = Kafka::Cluster->new(
+    kafka_dir               => $ENV{KAFKA_BASE_DIR},    # WARNING: must match the settings of your system
+    replication_factor      => 1,
+    kafka_properties_file   => 'server.properties.ipv6',
+);
 
 #-- Global data ----------------------------------------------------------------
 
-my ( $port, $connect, $producer, $consumer, $response, $offsets );
+#-- Connecting to the Kafka server port (for example for node_id = 0)
+my ( $PORT ) =  $CLUSTER->servers;
+
+my ( $connect, $producer, $consumer, $response, $offsets );
+
+#-- declarations ---------------------------------------------------------------
+
+const my $topic             => $Kafka::Cluster::DEFAULT_TOPIC;
+const my $partition         => 0;
 
 # INSTRUCTIONS -----------------------------------------------------------------
 
-#-- Connecting to the Kafka mocked server port
-
-$port = $KAFKA_SERVER_PORT;
-
-Kafka::MockIO::override();
-
-#-- Connection
-
-dies_ok { $connect = Kafka::Connection->new(
-    host        => 'localhost',
-    port        => $port,
-    timeout     => 'nothing',
-) } 'expecting to die';
-
 $connect = Kafka::Connection->new(
-    host    => 'localhost',
-    port    => $port,
+    host    => '::1',
+    port    => $PORT,
 );
 isa_ok( $connect, 'Kafka::Connection');
 
-#-- Producer
-
-dies_ok { $producer = Kafka::Producer->new(
-    Connection  => "nothing",
-) } 'expecting to die';
-
-undef $producer;
 lives_ok { $producer = Kafka::Producer->new(
     Connection  => $connect,
 ) } 'expecting to live';
-unless ( $producer ) {
-    BAIL_OUT 'producer is not created';
-}
 isa_ok( $producer, 'Kafka::Producer');
 
 # Sending a single message
@@ -104,58 +101,23 @@ if ( !( $response = $producer->send(
     $partition,                 # partition
     'Single message',           # message
     ) ) ) {
-    BAIL_OUT 'response is not received';
-}
-else {
+    fail 'message is not sent';
+} else {
     pass 'message is sent';
 }
 
-# Sending a series of messages
-if ( !( $response = $producer->send(
-    $topic,                     # topic
-    $partition,                 # partition
-    [                           # messages
-        "The first message",
-        "The second message",
-        "The third message",
-    ],
-    ) ) ) {
-    BAIL_OUT 'producer is not created';
-}
-else {
-    pass 'messages sent';
-}
-
-# Closes the connection producer and cleans up
-undef $producer;
-ok( !defined( $producer ), 'the producer object is an empty' );
+# Closes the connection
 $connect->close;
 
 #-- Consumer
-
-$connect->close;
-undef $connect;
-unless ( $connect = Kafka::Connection->new(
-    host    => 'localhost',
-    port    => $port,
-    ) ) {
-    BAIL_OUT 'connection is not created';
-}
-
-dies_ok { $consumer = Kafka::Consumer->new(
-    Connection  => "nothing",
-    ) } 'expecting to die';
 
 lives_ok { $consumer = Kafka::Consumer->new(
     Connection  => $connect,
 ) } 'expecting to live';
 unless ( $consumer ) {
-    BAIL_OUT 'consumer is not created';
+    fail 'consumer is not created';
 }
 isa_ok( $consumer, 'Kafka::Consumer');
-
-# Offsets are monotonically increasing integers unique to a partition.
-# Consumers track the maximum offset they have consumed in each partition.
 
 # Get a list of valid offsets (up max_number) before the given time.
 $offsets = $consumer->offsets(
@@ -163,7 +125,7 @@ $offsets = $consumer->offsets(
     $partition,                     # partition
     $RECEIVE_LATEST_OFFSET,         # time
     $DEFAULT_MAX_NUMBER_OF_OFFSETS, # max_number
-    );
+);
 if ( $offsets ) {
     pass 'received offsets';
     foreach my $offset ( @$offsets ) {
@@ -186,7 +148,7 @@ if ( $messages ) {
     pass 'received messages';
     my $cnt = 0;
     foreach my $m ( @$messages ) {
-        if ( $m->valid ) {
+        if( $m->valid ) {
 #            note "Payload    : ", $m->payload;
 #            note "offset     : ", $m->offset;
 #            note "next_offset: ", $m->next_offset;
@@ -205,9 +167,13 @@ if ( !$messages ) {
     fail 'messages are not received';
 }
 
-# Closes the consumer and cleans up
-undef $consumer;
-ok( !defined( $producer ), 'the consumer object is an empty' );
+# Closes the connection
 $connect->close;
 
 # POSTCONDITIONS ---------------------------------------------------------------
+
+$CLUSTER->close;
+
+} else {
+    diag 'IPv6 not supported';
+}

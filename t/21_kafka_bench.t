@@ -188,8 +188,7 @@ sub send_messages {
     if ( $response ) {
         ok( _HASH( $response ), 'sent a series of messages' ) if $#{ $messages };
         return $time_after - $time_before;
-    }
-    else {
+    } else {
         fail 'response are not received';
         return;
     }
@@ -352,8 +351,7 @@ while (1) {
     if ( $first_offset != next_offset( $consumer, $topic, $partition, 1 ) ) {
         diag 'to wait for forcing a flush of previous data to disk';
         $first_offset = next_offset( $consumer, $topic, $partition, 1 );
-    }
-    else {
+    } else {
         last;
     }
 }

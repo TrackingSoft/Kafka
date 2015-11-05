@@ -43,6 +43,10 @@ use Net::EmptyPort qw(
 );
 use POSIX ':signal_h';
 use Socket qw(
+    AF_INET
+    AF_INET6
+    PF_INET
+    PF_INET6
     inet_aton
 );
 use Sub::Install;
@@ -211,8 +215,15 @@ SKIP: {
     $original = \&Kafka::IO::_gethostbyname;
     Sub::Install::reinstall_sub( {
         code    => sub {
+            my $self = shift;
+
+            $self->{af} = AF_INET;
+            $self->{pf} = PF_INET;
+            $self->{ip} = '127.0.0.1';
+
             debug_msg( '_gethostbyname called (without sleep)' );
-            return $inet_aton;
+
+            return $self->{ip};
         },
         into    => 'Kafka::IO',
         as      => '_gethostbyname',
@@ -258,10 +269,17 @@ SKIP: {
 
     Sub::Install::reinstall_sub( {
         code    => sub {
+            my $self = shift;
+
+            $self->{af} = AF_INET;
+            $self->{pf} = PF_INET;
+            $self->{ip} = '127.0.0.1';
+
             debug_msg( '_gethostbyname called (sleep ', $timer + 5, ')' );
             # 'sleep' should not be interrupted by an external signal
             sleep $timer + 5;
-            return $inet_aton;
+
+            return $self->{ip};
         },
         into    => 'Kafka::IO',
         as      => '_gethostbyname',

@@ -100,7 +100,7 @@ if ( !$BITS64 ) { eval 'use Kafka::Int64; 1;' or die "Cannot load Kafka::Int64 :
             $DEFAULT_MAX_NUMBER_OF_OFFSETS  # max_number
         );
 
-        if( @$offsets ) {
+        if ( @$offsets ) {
             say "Received offset: $_" foreach @$offsets;
         } else {
             warn "Error: Offsets are not received\n";
@@ -116,7 +116,7 @@ if ( !$BITS64 ) { eval 'use Kafka::Int64; 1;' or die "Cannot load Kafka::Int64 :
 
         if ( $messages ) {
             foreach my $message ( @$messages ) {
-                if( $message->valid ) {
+                if ( $message->valid ) {
                     say 'payload    : ', $message->payload;
                     say 'key        : ', $message->key;
                     say 'offset     : ', $message->offset;
@@ -401,8 +401,7 @@ sub fetch {
                 my $next_offset;
                 if ( $BITS64 ) {
                     $next_offset += $offset + 1;
-                }
-                else {
+                } else {
                     $offset = Kafka::Int64::intsum( $offset, 0 );
                     $next_offset = Kafka::Int64::intsum( $offset, 1 );
                 }
@@ -528,6 +527,8 @@ sub _error {
     my $self = shift;
 
     Kafka::Exception::Consumer->throw( throw_args( @_ ) );
+
+    return;
 }
 
 #-- Closes and cleans up -------------------------------------------------------

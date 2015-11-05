@@ -38,8 +38,8 @@ plan 'no_plan';
 #-- load the modules -----------------------------------------------------------
 
 use Const::Fast;
-#use Data::Dumper;
 use File::HomeDir;
+use Socket;
 
 # Usage - Basic functionalities to include a simple Producer and Consumer
 # You need to have access to your Kafka instance and be able to connect through TCP
@@ -51,7 +51,7 @@ use Kafka qw(
     $RECEIVE_LATEST_OFFSET
     $RECEIVE_EARLIEST_OFFSETS
     $REQUEST_TIMEOUT
-    );
+);
 use Kafka::Cluster;
 use Kafka::Connection;
 use Kafka::Consumer;
@@ -172,8 +172,8 @@ $offsets = $consumer->offsets(
     $partition,                     # partition
     $RECEIVE_LATEST_OFFSET,         # time
     $DEFAULT_MAX_NUMBER_OF_OFFSETS, # max_number
-    );
-if( $offsets ) {
+);
+if ( $offsets ) {
     pass 'received offsets';
     foreach my $offset ( @$offsets ) {
         note "Received offset: $offset";
@@ -195,11 +195,11 @@ if ( $messages ) {
     pass 'received messages';
     my $cnt = 0;
     foreach my $m ( @$messages ) {
-        if( $m->valid ) {
+        if ( $m->valid ) {
 #            note "Payload    : ", $m->payload;
 #            note "offset     : ", $m->offset;
 #            note "next_offset: ", $m->next_offset;
-        }  else {
+        } else {
             diag "Message No $cnt, Error: ", $m->error;
             diag 'Payload    : ', $m->payload;
             diag 'offset     : ', $m->offset;

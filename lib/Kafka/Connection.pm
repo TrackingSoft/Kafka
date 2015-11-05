@@ -32,6 +32,13 @@ our @EXPORT = qw(
 #-- load the modules -----------------------------------------------------------
 
 use Carp;
+use Data::Validate::Domain qw(
+    is_hostname
+);
+use Data::Validate::IP qw(
+    is_ipv4
+    is_ipv6
+);
 use Const::Fast;
 use List::MoreUtils qw(
     all
@@ -252,6 +259,12 @@ IP-address in the "xx.xx.xx.xx" form.
 
 Optional. Either C<host> or C<broker_list> must be supplied.
 
+WARNING:
+
+Make sure that you always connect to brokers using EXACTLY the same address or host name
+as specified in broker configuration (host.name in server.properties).
+Avoid using default value (when host.name is commented out) in server.properties - always use explicit value instead.
+
 =item C<port =E<gt> $port>
 
 Optional, default = C<$KAFKA_SERVER_PORT>.
@@ -264,7 +277,7 @@ be imported from the L<Kafka|Kafka> module.
 
 =item C<broker_list =E<gt> $broker_list>
 
-Optional, C<$broker_list> is a reference to array of the host:port strings, defining the list
+Optional, C<$broker_list> is a reference to array of the host:port or [IPv6_host]:port strings, defining the list
 of Kafka servers. This list will be used to locate the new leader if the server specified
 via C<host =E<gt> $host> and C<port =E<gt> $port> arguments becomes unavailable. Either C<host>
 or C<broker_list> must be supplied.
@@ -362,11 +375,6 @@ access those errors.
 sub new {
     my ( $class, @args ) = @_;
 
-# WARNING:
-# Make sure that you always connect to brokers using EXACTLY the same address or host name
-# as specified in broker configuration (host.name in server.properties).
-# Avoid using default value (when host.name is commented out) in server.properties - always use explicit value instead.
-
     my $self = bless {
         host                    => q{},
         port                    => $KAFKA_SERVER_PORT,
@@ -432,11 +440,11 @@ sub new {
                                             #   ...,
                                             # }
     $self->{_leaders} = {};                 # {
-                                            #   NodeId  => host:port,
+                                            #   NodeId  => host:port or [IPv6_host]:port,
                                             #   ...,
                                             # }
     $self->{_nonfatal_errors} = [];
-    my $IO_cache = $self->{_IO_cache} = {}; # host:port => {
+    my $IO_cache = $self->{_IO_cache} = {}; # host:port or [IPv6_host]:port => {
                                             #       'NodeId'    => ...,
                                             #       'IO'        => ...,
                                             #       'timeout'   => ...,
@@ -450,7 +458,7 @@ sub new {
     foreach my $server ( ( $self->{host} ? $self->_build_server_name( $self->{host}, $self->{port} ) : (), @{ $self->{broker_list} } ) ) {
         $self->_error( $ERROR_MISMATCH_ARGUMENT, 'bad host:port or broker_list element' )
             unless $self->_is_like_server( $server );
-        my ( $host, $port ) = split /:/, $server;
+        my ( $host, $port ) = _split_host_port( $server );
         my $correct_server = $self->_build_server_name( $host, $port );
         $IO_cache->{ $correct_server } = {
             NodeId  => undef,
@@ -478,7 +486,7 @@ The following methods are defined for the C<Kafka::Producer> class:
 
 =head3 C<get_known_servers>
 
-Returns the list of known Kafka servers (in host:port format).
+Returns the list of known Kafka servers (in host:port or [IPv6_host]:port format).
 
 =cut
 sub get_known_servers {
@@ -526,7 +534,7 @@ sub get_metadata {
         or $self->_error( $ERROR_CANNOT_GET_METADATA, "topic = '".( $topic // '<undef>' )."'" );
 
     my $clone;
-    if( defined $topic ) {
+    if ( defined $topic ) {
         $clone = {
             $topic => dclone( $self->{_metadata}->{ $topic } )
         };
@@ -539,7 +547,7 @@ sub get_metadata {
 
 =head3 C<is_server_known( $server )>
 
-Returns true, if C<$server> (host:port) is known in cluster.
+Returns true, if C<$server> (host:port  or [IPv6_host]:port) is known in cluster.
 
 =cut
 sub is_server_known {
@@ -553,7 +561,7 @@ sub is_server_known {
 
 =head3 C<is_server_alive( $server )>
 
-Returns true, if known C<$server> (host:port) is accessible.
+Returns true, if known C<$server> (host:port or [IPv6_host]:port) is accessible.
 Checks the accessibility of the server.
 
 =cut
@@ -579,7 +587,7 @@ sub is_server_alive {
 
 =head3 C<is_server_connected( $server )>
 
-Returns true, if successful connection is established with C<$server> (host:port).
+Returns true, if successful connection is established with C<$server> (host:port or [IPv6_host]:port).
 
 =cut
 sub is_server_connected {
@@ -769,11 +777,11 @@ sub receive_response_to_request {
     # FATAL error
     if ( $ErrorCode ) {
         $self->_error( $ErrorCode, "topic = '".$topic_data->{TopicName}."'".( $partition_data ? ", partition = ".$partition_data->{Partition} : q{} ) );
-    }
-    else
-    {
+    } else {
         $self->_error( $ERROR_UNKNOWN_TOPIC_OR_PARTITION, "topic = '$topic_name', partition = $partition" );
     }
+
+    return;
 }
 
 =head3 C<exists_topic_partition( $topic, $partition )>
@@ -813,7 +821,7 @@ sub exists_topic_partition {
 
 =head3 C<close_connection( $server )>
 
-Closes connection with C<$server> (defined as host:port).
+Closes connection with C<$server> (defined as host:port or [IPv6_host]:port).
 
 =cut
 sub close_connection {
@@ -838,13 +846,15 @@ sub close {
     foreach my $server ( $self->get_known_servers ) {
         $self->_closeIO( $server );
     }
+
+    return;
 }
 
 =head3 C<cluster_errors>
 
 Returns a reference to a hash.
 
-Each hash key is the identifier of the server (host:port), and the value is the last communication error
+Each hash key is the identifier of the server (host:port or [IPv6_host]:port), and the value is the last communication error
 with that server.
 
 An empty hash is returned if there were no communication errors.
@@ -860,6 +870,7 @@ sub cluster_errors {
             $errors{ $server } = $error;
         }
     }
+
     return \%errors;
 }
 
@@ -896,6 +907,17 @@ sub clear_nonfatals {
 
 #-- private attributes ---------------------------------------------------------
 
+#-- private functions ----------------------------------------------------------
+
+sub _split_host_port {
+    my ( $server ) = @_;
+
+    my ( $host, $port ) = $server=~ /^(.+):(\d+)$/;
+    $host = $1 if $host && $host =~ /^\[(.+)\]$/;
+
+    return( $host, $port );
+}
+
 #-- private methods ------------------------------------------------------------
 
 # Remember non-fatal error
@@ -924,7 +946,7 @@ sub _remember_nonfatal_error {
     return $msg;
 }
 
-# Returns identifier of the cluster leader (host:port)
+# Returns identifier of the cluster leader (host:port or [IPv6_host]:port)
 sub _find_leader_server {
     my ( $self, $node_id ) = @_;
 
@@ -954,12 +976,10 @@ sub _get_interviewed_servers {
         if ( defined $server_data->{NodeId} ) {
             if ( $server_data->{IO} ) {
                 push @priority, $server;
-            }
-            else {
+            } else {
                 push @secondary, $server;
             }
-        }
-        else {
+        } else {
             push @rest, $server;
         }
     }
@@ -1097,11 +1117,15 @@ sub _attempt_update_metadata {
     }
     # FATAL error
     $self->_error( $error_code, "topic = '$topic'", defined( $partition ) ? ", partition = $partition" : () );
+
+    return;
 }
 
 # forms server identifier using supplied $host, $port
 sub _build_server_name {
     my ( $self, $host, $port ) = @_;
+
+    $host = "[$host]" if is_ipv6( $host );
 
     return "$host:$port";
 }
@@ -1119,9 +1143,11 @@ sub _on_io_error {
 
     $server_data->{error}   = $message;
     $server_data->{IO}      = undef;
+
+    return;
 }
 
-# connects to a server (host:port)
+# connects to a server (host:port or [IPv6_host]:port)
 sub _connectIO {
     my ( $self, $server ) = @_;
 
@@ -1134,7 +1160,7 @@ sub _connectIO {
                 port        => $server_data->{port},
                 timeout     => $self->{timeout},
             );
-            $server_data->{error}   = undef;
+            $server_data->{error} = undef;
         } catch {
             # NOTE: it is possible to repeat the operation here
             my $error = $_;
@@ -1142,6 +1168,7 @@ sub _connectIO {
             return;
         };
     }
+
     return $server_data->{IO};
 }
 
@@ -1158,6 +1185,7 @@ sub _sendIO {
         my $error = $_;
         $self->_on_io_error( $server_data, $error );
     };
+
     return $sent;
 }
 
@@ -1207,18 +1235,24 @@ sub _closeIO {
             $server_data->{IO}      = undef;
         }
     }
+
+    return;
 }
 
-# check validity of an argument (to match host:port format)
+# check validity of an argument to match host:port format
 sub _is_like_server {
     my ( $self, $server ) = @_;
 
     unless (
-           defined( $server )
-        && defined( _STRING( $server ) )
-        && !utf8::is_utf8( $server )
-        && $server =~ /^[^:]+:\d+$/
+               defined( $server )
+            && defined( _STRING( $server ) )
+            && !utf8::is_utf8( $server )
         ) {
+        return;
+    }
+
+    my ( $host, $port ) = _split_host_port( $server );
+    unless ( ( is_hostname( $host ) || is_ipv4( $host ) || is_ipv6( $host ) ) && $port ) {
         return;
     }
 
@@ -1230,6 +1264,8 @@ sub _error {
     my $self = shift;
 
     Kafka::Exception::Connection->throw( throw_args( @_ ) );
+
+    return;
 }
 
 #-- Closes and cleans up -------------------------------------------------------

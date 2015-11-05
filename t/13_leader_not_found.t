@@ -28,10 +28,10 @@ BEGIN {
     plan skip_all => "because Test::Exception required for testing" if $@;
 }
 
-#BEGIN {
-#    eval 'use Test::NoWarnings';    ## no critic
-#    plan skip_all => 'because Test::NoWarnings required for testing' if $@;
-#}
+BEGIN {
+    eval 'use Test::NoWarnings';    ## no critic
+    plan skip_all => 'because Test::NoWarnings required for testing' if $@;
+}
 
 plan 'no_plan';
 
@@ -105,7 +105,7 @@ sub get_leader {
     my $metadata = $connect->get_metadata( $topic );
     my $leader_id = $metadata->{ $topic }->{ $partition }->{Leader};
     my $leader_server = $connect->_find_leader_server( $leader_id );
-    my ( $leader_port ) = $leader_server =~ /:(.*)/;
+    my ( $leader_port ) = $leader_server =~ /:(\d{1,5})$/;
 
     return( $leader_server, $leader_port );
 }

@@ -103,7 +103,7 @@ __END__
     );
     if ( $messages ) {
         foreach my $message ( @$messages ) {
-            if( $message->valid ) {
+            if ( $message->valid ) {
                 say 'key        : ', $message->key;
                 say 'payload    : ', $message->payload;
                 say 'offset     : ', $message->offset;

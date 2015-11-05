@@ -1088,6 +1088,8 @@ sub _encode_request_header {
     $request->{template}    = $_Request_header_template;
     $request->{len}         = $_Request_header_length;
     _encode_string( $request, $request_ref->{ClientId} );                   # ClientId
+
+    return;
 }
 
 # Generates a template to decrypt the fetch response body
@@ -1136,6 +1138,8 @@ sub _decode_fetch_response_template {
 
         _decode_MessageSet_template( $response );
     }
+
+    return;
 }
 
 # Decrypts MessageSet
@@ -1220,6 +1224,8 @@ sub _decode_MessageSet_array {
             + $MessageSize          # Message
             ;
     }
+
+    return;
 }
 
 # Generates a template to encrypt MessageSet
@@ -1338,6 +1344,8 @@ sub _encode_MessageSet_array {
                                                                                 # Value
         $request->{len} += $MessageSize;    # Message
     }
+
+    return;
 }
 
 # Generates a template to decrypt MessageSet
@@ -1411,8 +1419,7 @@ sub _decode_MessageSet_sized_template {
             if ( $bin_stream_length >= $response->{stream_offset} + 4 ) {   # + [l] Value length
                 $local_template .= $_Key_or_Value_template
                     if $Key_length != $NULL_BYTES_LENGTH;
-            }
-            else {
+            } else {
 # Not the full MessageSet
                 $local_template = q{};
                 last MESSAGE_SET;
@@ -1432,8 +1439,7 @@ sub _decode_MessageSet_sized_template {
             if ( $bin_stream_length >= $response->{stream_offset} ) {
                 $local_template .= $_Key_or_Value_template
                     if $Value_length != $NULL_BYTES_LENGTH;
-            }
-            else {
+            } else {
 # Not the full MessageSet
                 $local_template = q{};
                 last MESSAGE_SET;
@@ -1447,11 +1453,12 @@ sub _decode_MessageSet_sized_template {
                                         # [l] MessageSize
                 + $MessageSize          # Message
                 ;
-        }
-        else {
+        } else {
             last CREATE_TEMPLATE;
         }
     }
+
+    return;
 }
 
 # Generates a template to encrypt string
@@ -1460,18 +1467,21 @@ sub _encode_string {
 
     if ( $string eq q{} ) {
         push( @{ $request->{data} }, 0 );
-    }
-    else {
+    } else {
         my $string_length = length $string;
         push( @{ $request->{data} }, $string_length, $string );
         $request->{template}    .= q{a*};   # string;
         $request->{len}         += $string_length;
     }
+
+    return;
 }
 
 # Handler for errors
 sub _error {
     Kafka::Exception::Protocol->throw( throw_args( @_ ) );
+
+    return;
 }
 
 1;
