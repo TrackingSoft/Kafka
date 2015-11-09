@@ -1,6 +1,6 @@
 Revision history for Kafka package
 
-0.8012 ??? ???  ?? 201?
+0.8012 Mon Nov  09 2015
     CHANGES:
     - Support IPv6. IPv6 address in standard form.
     BUGFIXES:
