@@ -47,11 +47,16 @@ use Net::EmptyPort qw(
     can_bind
 );
 
+use Kafka qw(
+    $REQUEST_TIMEOUT
+);
 use Kafka::IO;
 
 #-- setting up facilities ------------------------------------------------------
 
-package TestServer {
+{
+    package TestServer;
+
     use 5.010;
     use strict;
     use warnings;
@@ -118,6 +123,7 @@ sub doit {
             my $io = Kafka::IO->new(
                 host    => $host,
                 port    => $port,
+#                timeout => $REQUEST_TIMEOUT,
             );
             ok $io->is_alive, 'socket alive';
             is $io->{af}, $af, 'Address family ok';

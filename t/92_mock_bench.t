@@ -185,10 +185,12 @@ sub fetch_messages {
         foreach my $m ( @$messages ) {
             push @fetch, $m->payload;
             unless ( $m->valid ) {
-                note "Message No $cnt, Error: ", $m->error;
-                note 'Payload    : ', length( $m->payload ) > 100 ? substr( $m->payload, 0, 100 ).'...' : $m->payload;
-                note 'offset     : ', $m->offset;
-                note 'next_offset: ', $m->next_offset;
+                diag "Message No $cnt, Error: ", $m->error;
+#                diag 'Payload    : ', length( $m->payload ) > 100 ? substr( $m->payload, 0, 100 ).'...' : $m->payload;
+                diag 'Payload    : ', $m->payload;
+                diag 'offset     : ', $m->offset;
+                diag 'next_offset: ', $m->next_offset;
+                fail 'received not valid message';
             }
             ++$cnt;
         }
@@ -373,6 +375,8 @@ while (1) {
     $first_offset = next_offset( $consumer, $TOPIC, $PARTITION, 1 );
 
     foreach my $idx ( 0 .. ( $in_package - 1 ) ) {
+        diag( sprintf( "Error: copy ne message: idx = %d, copy = '%s', message = '%s'", $idx, $copy[ $idx ] ne $messages->[ $idx ] ) )
+            if $copy[ $idx ] ne $messages->[ $idx ];
         $bench{send_mix} += send_messages( $producer, $TOPIC, $PARTITION, [ $copy[ $idx ] ] );
     }
 

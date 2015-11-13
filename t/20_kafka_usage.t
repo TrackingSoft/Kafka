@@ -84,16 +84,20 @@ my ( $port, $connect, $producer, $consumer, $response, $offsets );
 
 ( $port ) = Kafka::Cluster->new( kafka_dir => $KAFKA_BASE_DIR, does_not_start => 1 )->servers;  # for example for node_id = 0
 
+for my $host_name ( 'localhost', '127.0.0.1' ) {
+
+pass "Host name: $host_name";
+
 #-- Connection
 
 dies_ok { $connect = Kafka::Connection->new(
-    host        => 'localhost',
+    host        => $host_name,
     port        => $port,
     timeout     => 'nothing',
 ) } 'expecting to die';
 
 $connect = Kafka::Connection->new(
-    host    => 'localhost',
+    host    => $host_name,
     port    => $port,
 );
 isa_ok( $connect, 'Kafka::Connection');
@@ -145,7 +149,7 @@ $connect->close;
 
 undef $connect;
 unless ( $connect = Kafka::Connection->new(
-    host    => 'localhost',
+    host    => $host_name,
     port    => $port,
     ) ) {
     fail 'connection is not created';
@@ -218,5 +222,7 @@ if ( !$messages ) {
 undef $consumer;
 ok( !defined( $producer ), 'the consumer object is an empty' );
 $connect->close;
+
+}
 
 # POSTCONDITIONS ---------------------------------------------------------------

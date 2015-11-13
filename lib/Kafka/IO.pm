@@ -25,6 +25,7 @@ our $VERSION = '0.8012';
 #-- load the modules -----------------------------------------------------------
 
 use Carp;
+use Config;
 use Data::Validate::Domain qw(
     is_hostname
 );
@@ -51,6 +52,7 @@ use Socket qw(
     SO_ERROR
     SO_RCVTIMEO
     SO_SNDTIMEO
+    inet_aton
     inet_pton
     inet_ntop
     pack_sockaddr_in
@@ -427,7 +429,8 @@ sub _connect {
 
     # Connect returns immediately because of O_NONBLOCK.
     my $sockaddr = $self->{af} eq AF_INET
-        ? pack_sockaddr_in(  $port, inet_pton( $self->{af}, $ip ) )
+#        ? pack_sockaddr_in(  $port, inet_pton( $self->{af}, $ip ) )
+        ? pack_sockaddr_in(  $port, inet_aton( $ip ) )
         : pack_sockaddr_in6( $port, inet_pton( $self->{af}, $ip ) )
     ;
     connect( $connection, $sockaddr ) || $!{EINPROGRESS} || die( "connect ip = $ip, port = $port: $!\n" );
@@ -464,12 +467,41 @@ sub _connect {
     # the first byte. The print() and syswrite() calls are similarly different.
     # <> is of course similar to read() but delimited by newlines instead of buffer
     # sizes.
-    setsockopt( $connection, SOL_SOCKET, SO_SNDTIMEO, pack( q{L!L!}, $timeout // $REQUEST_TIMEOUT, 0 ) ) or die "setsockopt SOL_SOCKET, SO_SNDTIMEO: $!\n";
-    setsockopt( $connection, SOL_SOCKET, SO_RCVTIMEO, pack( q{L!L!}, $timeout // $REQUEST_TIMEOUT, 0 ) ) or die "setsockopt SOL_SOCKET, SO_RCVTIMEO: $!\n";
+    my $timeval = _get_timeval( $timeout // $REQUEST_TIMEOUT );
+    setsockopt( $connection, SOL_SOCKET, SO_SNDTIMEO, $timeval ) // die "setsockopt SOL_SOCKET, SO_SNDTIMEO: $!\n";
+    setsockopt( $connection, SOL_SOCKET, SO_RCVTIMEO, $timeval ) // die "setsockopt SOL_SOCKET, SO_RCVTIMEO: $!\n";
 
     vec( $self->{_select} = q{}, fileno( $self->{socket} ), 1 ) = 1;
 
     return $connection;
+}
+
+# Packing timeval
+# uses http://trinitum.org/wp/packing-timeval/
+sub _get_timeval {
+    my $timeout = shift;
+
+    my $intval = int( $timeout );                               # sec
+    my $fraction = int( ( $timeout - $intval ) * 1_000_000 );   # ms
+
+    if ( $Config{osname} eq 'netbsd' && $Config{osvers} >= 6.0 && $Config{longsize} == 4 ) {
+        if ( defined $Config{use64bitint} ) {
+            $timeout = pack( 'QL', int( $timeout ), $fraction );
+        } else {
+            $timeout = pack(
+                'LLL',
+                (
+                    $Config{byteorder} eq '1234'
+                        ? ( $timeout, 0, $fraction )
+                        : ( 0, $timeout, $fraction )
+                )
+            );
+        }
+    } else {
+        $timeout = pack( 'L!L!', $timeout, $fraction );
+    }
+
+    return $timeout;
 }
 
 sub _gethostbyname {

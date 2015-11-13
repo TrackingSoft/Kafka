@@ -1,5 +1,11 @@
 Revision history for Kafka package
 
+0.8013 ??? ???  ?? 2015
+    BUGFIXES:
+    - Packing timeval for NetBSD 6.0 and later.
+    - Use inet_aton instead inet_pton for IPv4 addresses.
+    - t/03_io_ipv6.t fixed to work with perl earlier than 5.014 .
+
 0.8012 Mon Nov  09 2015
     CHANGES:
     - Support IPv6. IPv6 address in standard form.

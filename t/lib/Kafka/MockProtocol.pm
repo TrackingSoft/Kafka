@@ -857,7 +857,7 @@ can be done to determine the cause of the error.
 
 =cut
 sub last_errorcode {
-    return ( $_package_error // 0 ) + 0;
+    return( ( $_package_error // 0 ) + 0 );
 }
 
 =head3 C<Kafka::MockProtocol::last_error()>
@@ -868,7 +868,7 @@ additional details and do not coincide completely with the C<%Kafka::ERROR> hash
 
 =cut
 sub last_error {
-    return ( $_package_error // q{} ).q{};
+    return( ( $_package_error // q{} ).q{} );
 }
 
 #-- private functions ----------------------------------------------------------
