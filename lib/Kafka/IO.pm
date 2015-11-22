@@ -52,6 +52,7 @@ use Socket qw(
     SO_RCVTIMEO
     SO_SNDTIMEO
     inet_pton
+    inet_aton
     inet_ntop
     pack_sockaddr_in
     pack_sockaddr_in6
@@ -427,7 +428,7 @@ sub _connect {
 
     # Connect returns immediately because of O_NONBLOCK.
     my $sockaddr = $self->{af} eq AF_INET
-        ? pack_sockaddr_in(  $port, inet_pton( $self->{af}, $ip ) )
+        ? pack_sockaddr_in(  $port, inet_aton( $ip ) )
         : pack_sockaddr_in6( $port, inet_pton( $self->{af}, $ip ) )
     ;
     connect( $connection, $sockaddr ) || $!{EINPROGRESS} || die( "connect ip = $ip, port = $port: $!\n" );
