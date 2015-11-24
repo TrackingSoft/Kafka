@@ -6,7 +6,7 @@ Kafka::IO - Interface to network communication with the Apache Kafka server.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::IO> version 0.8012 .
+This documentation refers to C<Kafka::IO> version 0.8013 .
 
 =cut
 
@@ -20,7 +20,7 @@ use warnings;
 
 our $DEBUG = 0;
 
-our $VERSION = '0.8012';
+our $VERSION = '0.8013';
 
 #-- load the modules -----------------------------------------------------------
 
