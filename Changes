@@ -1,5 +1,9 @@
 Revision history for Kafka package
 
+0.8014 ??? ???  ?? 2015
+    BUGFIXES:
+    - Incorrect osvers comparison for NetBSD.
+
 0.8013 Tue Nov  24 2015
     BUGFIXES:
     - Packing timeval for NetBSD 6.0 and later.

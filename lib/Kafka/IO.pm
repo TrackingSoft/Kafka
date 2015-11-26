@@ -484,7 +484,7 @@ sub _get_timeval {
     my $intval = int( $timeout );                               # sec
     my $fraction = int( ( $timeout - $intval ) * 1_000_000 );   # ms
 
-    if ( $Config{osname} eq 'netbsd' && $Config{osvers} >= 6.0 && $Config{longsize} == 4 ) {
+    if ( $Config{osname} eq 'netbsd' && _major_osvers() >= 6 && $Config{longsize} == 4 ) {
         if ( defined $Config{use64bitint} ) {
             $timeout = pack( 'QL', int( $timeout ), $fraction );
         } else {
@@ -502,6 +502,14 @@ sub _get_timeval {
     }
 
     return $timeout;
+}
+
+sub _major_osvers {
+    my $osvers = $Config{osvers};
+    my ( $major_osvers ) = $osvers =~ /^(\d+)/;
+    $major_osvers += 0;
+
+    return $major_osvers;
 }
 
 sub _gethostbyname {
