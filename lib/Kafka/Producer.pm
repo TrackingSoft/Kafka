@@ -43,7 +43,9 @@ use Kafka qw(
     $ERROR_CANNOT_GET_METADATA
     $ERROR_MISMATCH_ARGUMENT
     $REQUEST_TIMEOUT
+    $NOT_SEND_ANY_RESPONSE
     $WAIT_WRITTEN_TO_LOCAL_LOG
+    $BLOCK_UNTIL_IS_COMMITTED
 );
 use Kafka::Connection;
 use Kafka::Exceptions;
@@ -191,8 +193,6 @@ the server will wait until the data is written to the local log before sending a
 If it is C<$BLOCK_UNTIL_IS_COMMITTED>
 the server will block until the message is committed by all in sync replicas before sending a response.
 
-For any number > 1 the server will block waiting for this number of acknowledgements to occur.
-
 C<$NOT_SEND_ANY_RESPONSE>, C<$WAIT_WRITTEN_TO_LOCAL_LOG>, C<$BLOCK_UNTIL_IS_COMMITTED>
 can be imported from the L<Kafka|Kafka> module.
 
@@ -236,10 +236,20 @@ sub new {
         unless isint( $self->{CorrelationId} ) && $self->{CorrelationId} <= $MAX_CORRELATIONID;
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'ClientId' )
         unless ( $self->{ClientId} eq q{} || defined( _STRING( $self->{ClientId} ) ) ) && !utf8::is_utf8( $self->{ClientId} );
-    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'RequiredAcks' )
-        unless defined( $self->{RequiredAcks} ) && isint( $self->{RequiredAcks} ) && $self->{RequiredAcks} <= $MAX_INT16;
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'Timeout ('.( $self->{Timeout} // '<undef>' ).')' )
         unless _NUMBER( $self->{Timeout} ) && $self->{Timeout} <= $MAX_INT32;
+
+    my $required_acks = $self->{RequiredAcks};
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'RequiredAcks' )
+        unless
+               defined( $required_acks )
+            && isint( $required_acks )
+            && (
+                   $required_acks == $NOT_SEND_ANY_RESPONSE
+                || $required_acks == $WAIT_WRITTEN_TO_LOCAL_LOG
+                || $required_acks == $BLOCK_UNTIL_IS_COMMITTED
+            )
+    ;
 
     return $self;
 }
@@ -480,7 +490,7 @@ Vlad Marchenko
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2012-2013 by TrackingSoft LLC.
+Copyright (C) 2012-2016 by TrackingSoft LLC.
 
 This package is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself. See I<perlartistic> at

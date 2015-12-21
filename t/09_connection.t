@@ -219,7 +219,6 @@ sub testing {
             $NOT_SEND_ANY_RESPONSE,
             $WAIT_WRITTEN_TO_LOCAL_LOG,
             $BLOCK_UNTIL_IS_COMMITTED,
-            99999,
         ) {
 
         $request = {

@@ -118,6 +118,12 @@ sub next_offset {
                     my ( $self, $message ) = @_;
 
                     my $ret = $original_send->( $self, $message );
+
+                    # NOTE: Receive response for correct test with kafka 0.9
+                    my $response_ref;
+                    $response_ref   = $self->receive( 4 );
+                    $$response_ref .= ${ $self->receive( unpack( 'l>', $$response_ref ) ) };
+
                     $self->close;
                     ok !$self->is_alive, 'is not alive';
                     return $ret;

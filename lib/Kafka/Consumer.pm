@@ -160,7 +160,7 @@ Provides Kafka FETCH and OFFSETS requests.
 
 =item *
 
-Supports parsing the Apache Kafka 0.8 Wire Format protocol.
+Supports parsing the Apache Kafka 0.9 Wire Format protocol.
 
 =item *
 
@@ -644,7 +644,7 @@ Vlad Marchenko
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2012-2013 by TrackingSoft LLC.
+Copyright (C) 2012-2016 by TrackingSoft LLC.
 
 This package is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself. See I<perlartistic> at

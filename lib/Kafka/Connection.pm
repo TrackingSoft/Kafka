@@ -85,8 +85,12 @@ use Kafka qw(
     $ERROR_REPLICA_NOT_AVAILABLE
     $ERROR_MESSAGE_SIZE_TOO_LARGE
     $ERROR_STALE_CONTROLLER_EPOCH_CODE
+    $ERROR_GROUP_LOAD_IN_PROGRESS_CODE
     $ERROR_OFFSET_METADATA_TOO_LARGE_CODE
-    $ERROR_CONSUMER_COORDINATOR_NOT_AVAILABLE_CODE
+    $ERROR_GROUP_COORDINATOR_NOT_AVAILABLE_CODE
+    $ERROR_NOT_COORDINATOR_FOR_GROUP_CODE
+    $ERROR_NOT_ENOUGH_REPLICAS_CODE
+    $ERROR_NOT_ENOUGH_REPLICAS_AFTER_APPEND_CODE
 
     $ERROR_CANNOT_BIND
     $ERROR_CANNOT_GET_METADATA
@@ -172,7 +176,7 @@ The main features of the C<Kafka::Connection> class are:
 
 =item *
 
-Provides API for communication with Kafka 0.8 cluster.
+Provides API for communication with Kafka 0.9 cluster.
 
 =item *
 
@@ -223,20 +227,36 @@ const our %RETRY_ON_ERRORS => (
 #   $ERROR_NO_ERROR                         => 1,   # 0 - No error
     $ERROR_UNKNOWN                          => 1,   # -1 - An unexpected server error
 #   $ERROR_OFFSET_OUT_OF_RANGE              => 1,   # 1 - The requested offset is outside the range of offsets available at the server for the given topic/partition
-#   $ERROR_INVALID_MESSAGE                  => 1,   # 2 - Message contents does not match its control sum
-#   $ERROR_UNKNOWN_TOPIC_OR_PARTITION       => 1,   # 3 - Unknown topic or partition
+   $ERROR_INVALID_MESSAGE                  => 1,   # 2 - Retriable - Message contents does not match its control sum
+   $ERROR_UNKNOWN_TOPIC_OR_PARTITION       => 1,   # 3 - Retriable - Unknown topic or partition
 #   $ERROR_INVALID_MESSAGE_SIZE             => 1,   # 4 - Message has invalid size
-    $ERROR_LEADER_NOT_AVAILABLE             => 1,   # 5 - Unable to write due to ongoing Kafka leader selection
-    $ERROR_NOT_LEADER_FOR_PARTITION         => 1,   # 6 - Server is not a leader for partition
-    $ERROR_REQUEST_TIMED_OUT                => 1,   # 7 - Request time-out
+    $ERROR_LEADER_NOT_AVAILABLE             => 1,   # 5 - Retriable - Unable to write due to ongoing Kafka leader selection
+    $ERROR_NOT_LEADER_FOR_PARTITION         => 1,   # 6 - Retriable - Server is not a leader for partition
+    $ERROR_REQUEST_TIMED_OUT                => 1,   # 7 - Retriable - Request time-out
     $ERROR_BROKER_NOT_AVAILABLE             => 1,   # 8 - Broker is not available
     $ERROR_REPLICA_NOT_AVAILABLE            => 1,   # 9 - Replica not available
 #   $ERROR_MESSAGE_SIZE_TOO_LARGE           => 1,   # 10 - Message is too big
     $ERROR_STALE_CONTROLLER_EPOCH_CODE      => 1,   # 11 - Stale Controller Epoch Code
 #   $ERROR_OFFSET_METADATA_TOO_LARGE_CODE   => 1,   # 12 - Specified metadata offset is too big
-#    $ERROR_LOAD_IN_PROGRESS_CODE            => 1,   # 14 - Still loading offsets
-    $ERROR_CONSUMER_COORDINATOR_NOT_AVAILABLE_CODE  => 1,   # 15 - Topic has not yet been created
-#    $ERROR_NOT_COORDINATOR_FOR_CONSUMER_CODE    => 1,   # 16 - Request for a consumer group that it is not a coordinator for
+    $ERROR_GROUP_LOAD_IN_PROGRESS_CODE      => 1,   # 14 - Retriable - Still loading offsets
+    $ERROR_GROUP_COORDINATOR_NOT_AVAILABLE_CODE => 1,   # 15 - Retriable - Topic has not yet been created
+    $ERROR_NOT_COORDINATOR_FOR_GROUP_CODE   => 1,   # 16 - Retriable - Request for a consumer group that it is not a coordinator for
+
+#    $ERROR_INVALID_TOPIC_CODE               => 1,   # 17 - A request which attempts to access an invalid topic
+#    $ERROR_RECORD_LIST_TOO_LARGE_CODE       => 1,   # 18 - A message batch in a produce request exceeds the maximum configured segment size
+    $ERROR_NOT_ENOUGH_REPLICAS_CODE         => 1,   # 19 - Retriable - The number of in-sync replicas is lower than the configured minimum and requiredAcks is -1
+    $ERROR_NOT_ENOUGH_REPLICAS_AFTER_APPEND_CODE    => 1,   # 20 - Retriable - The message was written to the log, but with fewer in-sync replicas than required
+#    $ERROR_INVALID_REQUIRED_ACKS_CODE       => 1,   # 21 - The requested requiredAcks is invalid (anything other than -1, 1, or 0)
+#    $ERROR_ILLEGAL_GENERATION_CODE          => 1,   # 22 - The generation id provided in the request is not the current generation
+#    $ERROR_INCONSISTENT_GROUP_PROTOCOL_CODE => 1,   # 23 - The member provides a protocol type or set of protocols which is not compatible with the current group
+#    $ERROR_INVALID_GROUP_ID_CODE            => 1,   # 24 - The groupId is empty or null
+#    $ERROR_UNKNOWN_MEMBER_ID_CODE           => 1,   # 25 - The memberId is not in the current generation
+#    $ERROR_INVALID_SESSION_TIMEOUT_CODE     => 1,   # 26 - The requested session timeout is outside of the allowed range on the broker
+#    $ERROR_REBALANCE_IN_PROGRESS_CODE       => 1,   # 27 - The coordinator has begun rebalancing the group
+#    $ERROR_INVALID_COMMIT_OFFSET_SIZE_CODE  => 1,   # 28 - An offset commit was rejected because of oversize metadata
+#    $ERROR_TOPIC_AUTHORIZATION_FAILED_CODE  => 1,   # 29 - The client is not authorized to access the requested topic
+#    $ERROR_GROUP_AUTHORIZATION_FAILED_CODE  => 1,   # 30 - The client is not authorized to access a particular groupId
+#    $ERROR_CLUSTER_AUTHORIZATION_FAILED_CODE    => 1,   # 31 - The client is not authorized to use an inter-broker or administrative API
 );
 
 #-- constructor ----------------------------------------------------------------
@@ -1392,7 +1412,7 @@ Vlad Marchenko
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2012-2013 by TrackingSoft LLC.
+Copyright (C) 2012-2016 by TrackingSoft LLC.
 
 This package is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself. See I<perlartistic> at

@@ -1,6 +1,10 @@
 Revision history for Kafka package
 
-0.8014 ??? ???  ?? 2015
+    CHANGES:
+    - Adapted for kafka 0.9 .
+    - New error codes added.
+    - Few error codes renamed according to Apache Kafka documentation.
+    - Kafka::Producer->new not support RequiredAcks > 1 now.
     BUGFIXES:
     - Incorrect osvers comparison for NetBSD.
 

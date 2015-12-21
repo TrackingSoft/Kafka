@@ -128,7 +128,7 @@ Provides an object oriented API for communication with Kafka.
 
 =item *
 
-This class allows you to create Kafka 0.8 clients.
+This class allows you to create Kafka 0.9 clients.
 
 =back
 
@@ -710,7 +710,7 @@ Vlad Marchenko
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2012-2013 by TrackingSoft LLC.
+Copyright (C) 2012-2016 by TrackingSoft LLC.
 
 This package is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself. See I<perlartistic> at

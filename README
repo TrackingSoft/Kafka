@@ -129,7 +129,7 @@ The basic operation of the Kafka package modules:
 
 COPYRIGHT AND LICENCE
 
-Copyright (C) 2012-2013 by TrackingSoft LLC.
+Copyright (C) 2012-2016 by TrackingSoft LLC.
 
 This package is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself. See perlartistic at

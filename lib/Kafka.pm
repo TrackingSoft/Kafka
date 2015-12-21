@@ -44,11 +44,14 @@ our @EXPORT_OK = qw(
     $ERROR_CANNOT_SEND
     $ERROR_COMPRESSION
     $ERROR_CONSUMER_COORDINATOR_NOT_AVAILABLE_CODE
+    $ERROR_GROUP_COORDINATOR_NOT_AVAILABLE_CODE
     $ERROR_INVALID_MESSAGE
+    $ERROR_CORRUPT_MESSAGE
     $ERROR_INVALID_MESSAGE_SIZE
     $ERROR_LEADER_NOT_AVAILABLE
     $ERROR_LEADER_NOT_FOUND
     $ERROR_LOAD_IN_PROGRESS_CODE
+    $ERROR_GROUP_LOAD_IN_PROGRESS_CODE
     $ERROR_MESSAGE_SIZE_TOO_LARGE
     $ERROR_METADATA_ATTRIBUTES
     $ERROR_MISMATCH_ARGUMENT
@@ -58,6 +61,7 @@ our @EXPORT_OK = qw(
     $ERROR_NOT_BINARY_STRING
     $ERROR_NOT_LEADER_FOR_PARTITION
     $ERROR_NOT_COORDINATOR_FOR_CONSUMER_CODE
+    $ERROR_NOT_COORDINATOR_FOR_GROUP_CODE
     $ERROR_OFFSET_METADATA_TOO_LARGE_CODE
     $ERROR_OFFSET_OUT_OF_RANGE
     $ERROR_PARTITION_DOES_NOT_MATCH
@@ -71,6 +75,21 @@ our @EXPORT_OK = qw(
     $ERROR_UNKNOWN
     $ERROR_UNKNOWN_APIKEY
     $ERROR_UNKNOWN_TOPIC_OR_PARTITION
+    $ERROR_INVALID_TOPIC_CODE
+    $ERROR_RECORD_LIST_TOO_LARGE_CODE
+    $ERROR_NOT_ENOUGH_REPLICAS_CODE
+    $ERROR_NOT_ENOUGH_REPLICAS_AFTER_APPEND_CODE
+    $ERROR_INVALID_REQUIRED_ACKS_CODE
+    $ERROR_ILLEGAL_GENERATION_CODE
+    $ERROR_INCONSISTENT_GROUP_PROTOCOL_CODE
+    $ERROR_INVALID_GROUP_ID_CODE
+    $ERROR_UNKNOWN_MEMBER_ID_CODE
+    $ERROR_INVALID_SESSION_TIMEOUT_CODE
+    $ERROR_REBALANCE_IN_PROGRESS_CODE
+    $ERROR_INVALID_COMMIT_OFFSET_SIZE_CODE
+    $ERROR_TOPIC_AUTHORIZATION_FAILED_CODE
+    $ERROR_GROUP_AUTHORIZATION_FAILED_CODE
+    $ERROR_CLUSTER_AUTHORIZATION_FAILED_CODE
     $KAFKA_SERVER_PORT
     $MESSAGE_SIZE_OVERHEAD
     $MIN_BYTES_RESPOND_HAS_DATA
@@ -150,7 +169,7 @@ use Const::Fast;
 =head1 ABSTRACT
 
 The Kafka package is a set of Perl modules which provides a simple and
-consistent application programming interface (API) to Apache Kafka 0.8,
+consistent application programming interface (API) to Apache Kafka 0.9,
 a high-throughput distributed messaging system.
 
 =head1 DESCRIPTION
@@ -211,7 +230,7 @@ Returns untainted data.
 
 =head1 APACHE KAFKA'S STYLE COMMUNICATION
 
-The Kafka package is based on Kafka's 0.8 Protocol specification document at
+The Kafka package is based on Kafka's 0.9 Protocol specification document at
 L<https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol>
 
 =over 3
@@ -819,6 +838,15 @@ of Apache Kafka Wire Format protocol response.
 
 #-- The Protocol Error Codes
 
+# According
+# https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-ErrorCodes
+# $ERROR_INVALID_MESSAGE synonym $ERROR_CORRUPT_MESSAGE .
+# Also added new error code names:
+# Depricated                                        Now
+# $ERROR_LOAD_IN_PROGRESS_CODE                      $ERROR_GROUP_LOAD_IN_PROGRESS_CODE
+# $ERROR_CONSUMER_COORDINATOR_NOT_AVAILABLE_CODE    $ERROR_GROUP_COORDINATOR_NOT_AVAILABLE_CODE
+# $ERROR_NOT_COORDINATOR_FOR_CONSUMER_CODE          $ERROR_NOT_COORDINATOR_FOR_GROUP_CODE
+
 =item C<$ERROR_NO_ERROR>
 
 0 - C<q{}>
@@ -847,8 +875,11 @@ const our $ERROR_OFFSET_OUT_OF_RANGE            => 1;
 
 2 - This indicates that a message contents does not match its CRC.
 
+Synonym name $ERROR_CORRUPT_MESSAGE .
+
 =cut
 const our $ERROR_INVALID_MESSAGE                => 2;
+const our $ERROR_CORRUPT_MESSAGE                => 2;
 
 =item C<$ERROR_UNKNOWN_TOPIC_OR_PARTITION>
 
@@ -940,29 +971,154 @@ If you specify a value larger than configured maximum for offset metadata.
 =cut
 const our $ERROR_OFFSET_METADATA_TOO_LARGE_CODE => 12;
 
-=item C<$ERROR_LOAD_IN_PROGRESS_CODE>
+=item C<$ERROR_GROUP_LOAD_IN_PROGRESS_CODE>
 
 14 - The broker returns this error code for an offset fetch request
-if it is still loading offsets (after a leader change for that offsets topic partition).
+if it is still loading offsets (after a leader change for that offsets topic partition),
+or in response to group membership requests (such as heartbeats)
+when group metadata is being loaded by the coordinator..
+
+Old name $ERROR_LOAD_IN_PROGRESS_CODE .
 
 =cut
-const our $ERROR_LOAD_IN_PROGRESS_CODE          => 14;
+const our $ERROR_LOAD_IN_PROGRESS_CODE          => 14;  # Depricated
+const our $ERROR_GROUP_LOAD_IN_PROGRESS_CODE    => 14;
 
-=item C<$ERROR_CONSUMER_COORDINATOR_NOT_AVAILABLE_CODE>
+=item C<$ERROR_GROUP_COORDINATOR_NOT_AVAILABLE_CODE>
 
-15 - The broker returns this error code for consumer metadata requests
-or offset commit requests if the offsets topic has not yet been created.
+15 - The broker returns this error code for group coordinator requests, offset commits,
+and most group management requests if the offsets topic has not yet been created,
+or if the group coordinator is not active.
+
+Old name $ERROR_CONSUMER_COORDINATOR_NOT_AVAILABLE_CODE .
 
 =cut
-const our $ERROR_CONSUMER_COORDINATOR_NOT_AVAILABLE_CODE    => 15;
+const our $ERROR_CONSUMER_COORDINATOR_NOT_AVAILABLE_CODE    => 15;  # Depricated
+const our $ERROR_GROUP_COORDINATOR_NOT_AVAILABLE_CODE       => 15;
 
-=item C<$ERROR_NOT_COORDINATOR_FOR_CONSUMER_CODE>
+=item C<$ERROR_NOT_COORDINATOR_FOR_GROUP_CODE>
 
 16 - The broker returns this error code if it receives an offset fetch or commit request
-for a consumer group that it is not a coordinator for.
+for a group that it is not a coordinator for.
+
+Old name $ERROR_NOT_COORDINATOR_FOR_CONSUMER_CODE .
 
 =cut
-const our $ERROR_NOT_COORDINATOR_FOR_CONSUMER_CODE  => 16;
+const our $ERROR_NOT_COORDINATOR_FOR_CONSUMER_CODE  => 16;  # Depricated
+const our $ERROR_NOT_COORDINATOR_FOR_GROUP_CODE     => 16;
+
+=item C<$ERROR_INVALID_TOPIC_CODE>
+
+17 - For a request which attempts to access an invalid topic (e.g. one which has an illegal name),
+or if an attempt is made to write to an internal topic (such as the consumer offsets topic).
+
+=cut
+const our $ERROR_INVALID_TOPIC_CODE                 => 17;
+
+=item C<$ERROR_RECORD_LIST_TOO_LARGE_CODE>
+
+18 - If a message batch in a produce request exceeds the maximum configured segment size.
+
+=cut
+const our $ERROR_RECORD_LIST_TOO_LARGE_CODE         => 18;
+
+=item C<$ERROR_NOT_ENOUGH_REPLICAS_CODE>
+
+19 - Returned from a produce request when the number of in-sync replicas
+is lower than the configured minimum and requiredAcks is -1.
+
+=cut
+const our $ERROR_NOT_ENOUGH_REPLICAS_CODE           => 19;
+
+=item C<$ERROR_NOT_ENOUGH_REPLICAS_AFTER_APPEND_CODE>
+
+20 - Returned from a produce request when the message was written to the log,
+but with fewer in-sync replicas than required.
+
+=cut
+const our $ERROR_NOT_ENOUGH_REPLICAS_AFTER_APPEND_CODE  => 20;
+
+=item C<$ERROR_INVALID_REQUIRED_ACKS_CODE>
+
+21 - Returned from a produce request if the requested requiredAcks is invalid
+(anything other than -1, 1, or 0).
+
+=cut
+const our $ERROR_INVALID_REQUIRED_ACKS_CODE         => 21;
+
+=item C<$ERROR_ILLEGAL_GENERATION_CODE>
+
+22 - Returned from group membership requests (such as heartbeats)
+when the generation id provided in the request is not the current generation.
+
+=cut
+const our $ERROR_ILLEGAL_GENERATION_CODE            => 22;
+
+=item C<$ERROR_INCONSISTENT_GROUP_PROTOCOL_CODE>
+
+23 - Returned in join group when the member provides a protocol type or set of protocols
+which is not compatible with the current group.
+
+=cut
+const our $ERROR_INCONSISTENT_GROUP_PROTOCOL_CODE   => 23;
+
+=item C<$ERROR_INVALID_GROUP_ID_CODE>
+
+24 - Returned in join group when the groupId is empty or null.
+
+=cut
+const our $ERROR_INVALID_GROUP_ID_CODE              => 24;
+
+=item C<$ERROR_UNKNOWN_MEMBER_ID_CODE>
+
+25 - Returned from group requests (offset commits/fetches, heartbeats, etc)
+when the memberId is not in the current generation.
+
+=cut
+const our $ERROR_UNKNOWN_MEMBER_ID_CODE             => 25;
+
+=item C<$ERROR_INVALID_SESSION_TIMEOUT_CODE>
+
+26 - Return in join group when the requested session timeout is outside of the allowed range on the broker.
+
+=cut
+const our $ERROR_INVALID_SESSION_TIMEOUT_CODE       => 26;
+
+=item C<$ERROR_REBALANCE_IN_PROGRESS_CODE>
+
+27 - Returned in heartbeat requests when the coordinator has begun rebalancing the group.
+This indicates to the client that it should rejoin the group.
+
+=cut
+const our $ERROR_REBALANCE_IN_PROGRESS_CODE         => 27;
+
+=item C<$ERROR_INVALID_COMMIT_OFFSET_SIZE_CODE>
+
+28 - This error indicates that an offset commit was rejected because of oversize metadata.
+
+=cut
+const our $ERROR_INVALID_COMMIT_OFFSET_SIZE_CODE    => 28;
+
+=item C<$ERROR_TOPIC_AUTHORIZATION_FAILED_CODE>
+
+29 - Returned by the broker when the client is not authorized to access the requested topic.
+
+=cut
+const our $ERROR_TOPIC_AUTHORIZATION_FAILED_CODE    => 29;
+
+=item C<$ERROR_GROUP_AUTHORIZATION_FAILED_CODE>
+
+30 - Returned by the broker when the client is not authorized to access a particular groupId.
+
+=cut
+const our $ERROR_GROUP_AUTHORIZATION_FAILED_CODE    => 30;
+
+=item C<$ERROR_CLUSTER_AUTHORIZATION_FAILED_CODE>
+
+31 - Returned by the broker when the client is not authorized to use an inter-broker or administrative API.
+
+=cut
+const our $ERROR_CLUSTER_AUTHORIZATION_FAILED_CODE  => 31;
 
 =item C<%ERROR>
 
@@ -1007,9 +1163,25 @@ our %ERROR = (
     $ERROR_MESSAGE_SIZE_TOO_LARGE                   => q{Message is too big},
     $ERROR_STALE_CONTROLLER_EPOCH_CODE              => q{Stale Controller Epoch Code},
     $ERROR_OFFSET_METADATA_TOO_LARGE_CODE           => q{Specified metadata offset is too big},
-    $ERROR_LOAD_IN_PROGRESS_CODE                    => q{Still loading offsets},
-    $ERROR_CONSUMER_COORDINATOR_NOT_AVAILABLE_CODE  => q{Topic has not yet been created},
-    $ERROR_NOT_COORDINATOR_FOR_CONSUMER_CODE        => q{Request for a consumer group that it is not a coordinator for},
+    $ERROR_GROUP_LOAD_IN_PROGRESS_CODE              => q{Still loading offsets},
+    $ERROR_GROUP_COORDINATOR_NOT_AVAILABLE_CODE     => q{Topic has not yet been created},
+    $ERROR_NOT_COORDINATOR_FOR_GROUP_CODE           => q{Request for a group that it is not a coordinator for},
+
+    $ERROR_INVALID_TOPIC_CODE                       => q{A request which attempts to access an invalid topic},
+    $ERROR_RECORD_LIST_TOO_LARGE_CODE               => q{A message batch in a produce request exceeds the maximum configured segment size},
+    $ERROR_NOT_ENOUGH_REPLICAS_CODE                 => q{The number of in-sync replicas is lower than the configured minimum and requiredAcks is -1},
+    $ERROR_NOT_ENOUGH_REPLICAS_AFTER_APPEND_CODE    => q{The message was written to the log, but with fewer in-sync replicas than required},
+    $ERROR_INVALID_REQUIRED_ACKS_CODE               => q{The requested requiredAcks is invalid (anything other than -1, 1, or 0)},
+    $ERROR_ILLEGAL_GENERATION_CODE                  => q{The generation id provided in the request is not the current generation},
+    $ERROR_INCONSISTENT_GROUP_PROTOCOL_CODE         => q{The member provides a protocol type or set of protocols which is not compatible with the current group},
+    $ERROR_INVALID_GROUP_ID_CODE                    => q{The groupId is empty or null},
+    $ERROR_UNKNOWN_MEMBER_ID_CODE                   => q{The memberId is not in the current generation},
+    $ERROR_INVALID_SESSION_TIMEOUT_CODE             => q{The requested session timeout is outside of the allowed range on the broker},
+    $ERROR_REBALANCE_IN_PROGRESS_CODE               => q{The coordinator has begun rebalancing the group},
+    $ERROR_INVALID_COMMIT_OFFSET_SIZE_CODE          => q{An offset commit was rejected because of oversize metadata},
+    $ERROR_TOPIC_AUTHORIZATION_FAILED_CODE          => q{The client is not authorized to access the requested topic},
+    $ERROR_GROUP_AUTHORIZATION_FAILED_CODE          => q{The client is not authorized to access a particular groupId},
+    $ERROR_CLUSTER_AUTHORIZATION_FAILED_CODE        => q{The client is not authorized to use an inter-broker or administrative API},
 );
 
 =over
@@ -1289,7 +1461,7 @@ Vlad Marchenko
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2012-2013 by TrackingSoft LLC.
+Copyright (C) 2012-2016 by TrackingSoft LLC.
 
 This package is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself. See I<perlartistic> at

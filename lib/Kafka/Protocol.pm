@@ -301,8 +301,6 @@ Support for working with 64 bit elements of the Kafka protocol on 32 bit systems
 #                                 If it is 0 the server does not send any response.
 #                                 If it is 1, the server will wait the data is written to the local log before sending a response.
 #                                 If it is -1 the server will block until the message is committed by all in sync replicas before sending a response.
-#                                 For any number > 1 the server will block waiting for this number of acknowledgements to occur
-#                                 (but the server will never wait for more acknowledgements than there are in-sync replicas).
 # Size => int32                   The size of the subsequent request or response message in bytes
 # Time => int64                   Used to ask for all messages before a certain time (ms).
 #                                 There are two special values.
@@ -1548,7 +1546,7 @@ Vlad Marchenko
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2012-2013 by TrackingSoft LLC.
+Copyright (C) 2012-2016 by TrackingSoft LLC.
 
 This package is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself. See I<perlartistic> at

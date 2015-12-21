@@ -189,6 +189,7 @@ CRC
 ErrorCode
 FetchOffset
 Gladkov
+groupId
 HighwaterMarkOffset
 hostname
 ie
@@ -206,6 +207,7 @@ Marchenko
 MaxBytes
 MaxNumberOfOffsets
 MaxWaitTime
+memberId
 MERCHANTABILITY
 MessageSets
 MessageSetSize
@@ -218,7 +220,9 @@ NodeId
 occured
 perlartistic
 prereq
+rebalancing
 ReplicaId
+requiredAcks
 RequiredAcks
 ResponseMessage
 sec
