@@ -41,7 +41,9 @@ use Kafka qw(
     $DEFAULT_MAX_BYTES
     $DEFAULT_MAX_WAIT_TIME
     $ERROR_MISMATCH_ARGUMENT
-    $ERROR_RESPOSEMESSAGE_NOT_RECEIVED
+    $ERROR_RESPONSEMESSAGE_NOT_RECEIVED
+    $IP_V4
+    $IP_V6
     $KAFKA_SERVER_PORT
     $MIN_BYTES_RESPOND_IMMEDIATELY
     $MIN_BYTES_RESPOND_HAS_DATA
@@ -124,17 +126,21 @@ sub is_ERROR_MISMATCH_ARGUMENT {
 
 # INSTRUCTIONS -----------------------------------------------------------------
 
+my $ip_version_verified;
 testing();
 testing( $KAFKA_BASE_DIR ) if $KAFKA_BASE_DIR;
+ok $ip_version_verified, 'ip_version verified';
 
 communication_error();
 
 sub testing {
     my ( $kafka_base_dir ) = @_;
 
+    $ip_version_verified = undef;
+
     if ( $kafka_base_dir ) {
         #-- Connecting to the Kafka server port (for example for node_id = 0)
-        ( $port ) =  Kafka::Cluster->new( kafka_dir => $KAFKA_BASE_DIR, does_not_start => 1 )->servers;
+        ( $port ) =  Kafka::Cluster->new( kafka_dir => $KAFKA_BASE_DIR, reuse_existing => 1 )->servers;
     } else {
         $port = $Kafka::MockIO::KAFKA_MOCK_SERVER_PORT;
         Kafka::MockIO::override();
@@ -147,6 +153,15 @@ sub testing {
         port    => $port,
     );
     isa_ok( $connect, 'Kafka::Connection' );
+    ok !defined( $connect->{ip_version} ), 'ip_version OK';
+
+    $connect = Kafka::Connection->new(
+        host        => 'localhost',
+        port        => $port,
+        ip_version  => $IP_V4,
+    );
+    isa_ok( $connect, 'Kafka::Connection' );
+    is $connect->{ip_version}, $IP_V4, 'ip_version OK';
 
 #-- get_known_servers
     is scalar( $connect->get_known_servers() ), 1, 'Known only one server';
@@ -173,6 +188,9 @@ sub testing {
 # broker_list
     new_ERROR_MISMATCH_ARGUMENT( 'broker_list', @not_array0 );
     new_ERROR_MISMATCH_ARGUMENT( 'broker_list', @not_is_like_server_list );
+
+# ip_version
+    new_ERROR_MISMATCH_ARGUMENT( 'ip_version', -1, $IP_V6 * 2 );
 
 # CorrelationId
     new_ERROR_MISMATCH_ARGUMENT( 'CorrelationId', @not_isint );
@@ -209,8 +227,9 @@ sub testing {
 #-- ProduceRequest
 
     $connect = Kafka::Connection->new(
-        host    => 'localhost',
-        port    => $port,
+        host        => 'localhost',
+        port        => $port,
+        ip_version  => $IP_V4,
     );
 
 # Here and below, the query explicitly indicate ApiKey - producer and consumer must act also
@@ -320,6 +339,16 @@ sub testing {
     ok scalar( $connect->get_known_servers() ), 'Known some servers';
 
 #-- is_server_connected
+    foreach my $server ( keys %{ $connect->{_IO_cache} } ) {
+        my $io = $connect->{_IO_cache}->{ $server }->{IO};
+        if ( exists $io->{ip_version} ) {
+            my $ip_version = $io->{ip_version};
+            ok defined( $ip_version ), 'server is connected already';
+            is $ip_version, $IP_V4, 'ip_version OK';
+            ++$ip_version_verified;
+        }
+    }
+
     foreach my $server ( $connect->get_known_servers() ) {
         if ( $connect->is_server_connected( $server ) ) {
             ok $connect->is_server_connected( $server ), 'server is connected';
@@ -429,7 +458,7 @@ sub communication_error {
         as      => 'send',
     } );
 
-#-- $ERROR_RESPOSEMESSAGE_NOT_RECEIVED
+#-- $ERROR_RESPONSEMESSAGE_NOT_RECEIVED
 
     $method = \&Kafka::IO::receive;
 
@@ -475,7 +504,7 @@ sub communication_error {
 
     eval { $response = $connect->receive_response_to_request( $request ); };
     isa_ok( $@, 'Kafka::Exception' );
-    is $@->code, $ERROR_RESPOSEMESSAGE_NOT_RECEIVED, '$ERROR_RESPOSEMESSAGE_NOT_RECEIVED OK';
+    is $@->code, $ERROR_RESPONSEMESSAGE_NOT_RECEIVED, '$ERROR_RESPONSEMESSAGE_NOT_RECEIVED OK';
 
     Sub::Install::reinstall_sub( {
         code    => $method,

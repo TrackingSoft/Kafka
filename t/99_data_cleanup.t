@@ -33,8 +33,6 @@ plan 'no_plan';
 #-- load the modules -----------------------------------------------------------
 
 use Const::Fast;
-use File::HomeDir;
-use File::Spec;
 
 use Kafka::Cluster;
 
@@ -42,19 +40,13 @@ use Kafka::Cluster;
 
 #-- declarations ---------------------------------------------------------------
 
-# WARNING: must match the settings of your system
-const my $KAFKA_BASE_DIR    => $ENV{KAFKA_BASE_DIR} || File::Spec->catdir( File::HomeDir->my_home, 'kafka' );
+# WARNING: must point to local Kafka installation dir
+const my $KAFKA_BASE_DIR    => $ENV{KAFKA_BASE_DIR};
 
 #-- Global data ----------------------------------------------------------------
 
 # INSTRUCTIONS -----------------------------------------------------------------
 
-my $cluster = Kafka::Cluster->new(
-    kafka_dir       => $KAFKA_BASE_DIR,
-    reuse_existing  => 1,
-);
-isa_ok( $cluster, 'Kafka::Cluster' );
-
-$cluster->close;
+ok defined( Kafka::Cluster::data_cleanup( kafka_dir => $KAFKA_BASE_DIR ) ), 'data directory cleaned';
 
 # POSTCONDITIONS ---------------------------------------------------------------

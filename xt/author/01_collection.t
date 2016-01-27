@@ -188,6 +188,7 @@ Crc
 CRC
 ErrorCode
 FetchOffset
+FQDN
 Gladkov
 groupId
 HighwaterMarkOffset

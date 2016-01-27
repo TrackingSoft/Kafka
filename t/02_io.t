@@ -48,6 +48,7 @@ use Socket qw(
     PF_INET
     PF_INET6
     inet_aton
+    inet_ntop
 );
 use Sub::Install;
 use Sys::SigAction qw(
@@ -56,6 +57,8 @@ use Sys::SigAction qw(
 use Time::HiRes qw();
 
 use Kafka qw(
+    $IP_V4
+    $IP_V6
     $KAFKA_SERVER_PORT
     $REQUEST_TIMEOUT
 );
@@ -345,10 +348,53 @@ SKIP: {
     lives_ok { $resp = $io->receive( length( $test_message ) ); } 'expecting to live';
     is( $$resp, $test_message, 'receive OK' );
 
+    # ip_version
+
+    foreach my $ip_version ( undef, $IP_V4 ) {
+        $io = Kafka::IO->new(
+            host        => '127.0.0.1',
+            port        => $port,
+            ip_version  => $ip_version,
+        );
+        is $io->{af}, AF_INET, 'af OK';
+        is $io->{pf}, PF_INET, 'pf OK';
+        is $io->{ip}, '127.0.0.1', 'ip OK';
+    }
+
+    foreach my $ip_version ( undef, $IP_V4 ) {
+        $io = Kafka::IO->new(
+            host        => 'localhost',
+            port        => $port,
+            ip_version  => $ip_version,
+        );
+        is $io->{af}, AF_INET, 'af OK';
+        is $io->{pf}, PF_INET, 'pf OK';
+        is $io->{ip}, inet_ntop( AF_INET, scalar( gethostbyname( 'localhost' ) ) ), 'ip OK';
+    }
+
+    my $host = '127.0.0.1';
+    throws_ok {
+        Kafka::IO->new(
+            host        => $host,
+            port        => $port,
+            ip_version  => $IP_V6,
+        );
+    } 'Kafka::Exception::IO', "bad ip_version for $host";
+
+    $host = 'localhost';
+    dies_ok {
+        Kafka::IO->new(
+            host        => $host,
+            port        => $port,
+            ip_version  => $IP_V6,
+        );
+    } "bad ip_version for $host";
+
+    #-- close connection
+
     undef $server;
     ok $io, 'IO exists';
     throws_ok { $sent = $io->send( $test_message ); } 'Kafka::Exception::IO', 'error thrown';
-
 }
 
 # POSTCONDITIONS ---------------------------------------------------------------

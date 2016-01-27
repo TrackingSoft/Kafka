@@ -45,6 +45,8 @@ use Socket qw(
     AF_INET
     AF_INET6
     IPPROTO_TCP
+    NI_NUMERICHOST
+    NIx_NOSERV
     PF_INET
     PF_INET6
     SOCK_STREAM
@@ -52,6 +54,8 @@ use Socket qw(
     SO_ERROR
     SO_RCVTIMEO
     SO_SNDTIMEO
+    getaddrinfo
+    getnameinfo
     inet_aton
     inet_pton
     inet_ntop
@@ -70,6 +74,9 @@ use Kafka qw(
     $ERROR_CANNOT_SEND
     $ERROR_MISMATCH_ARGUMENT
     $ERROR_NOT_BINARY_STRING
+    $ERROR_INCOMPATIBLE_HOST_IP_VERSION
+    $IP_V4
+    $IP_V6
     $KAFKA_SERVER_PORT
     $REQUEST_TIMEOUT
 );
@@ -150,8 +157,8 @@ C<new()> takes arguments in key-value pairs. The following arguments are current
 
 =item C<host =E<gt> $host>
 
-C<$host> is an Apache Kafka host to connect to. It can be a hostname or the
-IP-address in the IPv4 or IPv6 form (for example '127.0.0.1', '0:0:0:0:0:0:0:1' or '::1').
+C<$host> is Kafka host to connect to. It can be a host name or an IP-address in
+IPv4 or IPv6 form (for example '127.0.0.1', '0:0:0:0:0:0:0:1' or '::1').
 
 =item C<port =E<gt> $port>
 
@@ -163,13 +170,6 @@ C<$KAFKA_SERVER_PORT> is the default Apache Kafka server port that can be import
 from the L<Kafka|Kafka> module.
 
 =item C<timeout =E<gt> $timeout>
-
-Optional, default = C<$REQUEST_TIMEOUT>.
-
-C<$timeout> specifies how long we wait for remote server to respond before
-the IO object disconnects and throws internal exception.
-The C<$timeout> is specified in seconds (could be any integer or floating-point type)
-and supported by C<gethostbyname()>, connect, blocking receive and send calls.
 
 C<$REQUEST_TIMEOUT> is the default timeout that can be imported from the L<Kafka|Kafka> module.
 
@@ -189,6 +189,20 @@ Default C<$REQUEST_TIMEOUT> is used for the rest of IO operations.
 
 =back
 
+=over 3
+
+=item C<ip_version =E<gt> $ip_version>
+
+Force version of IP protocol for resolving host name (or interpretation of passed address).
+
+Optional, undefined by default, which works in the following way: version of IP address
+is detected automatically, host name is resolved into IPv4 address.
+
+See description of L<$IP_V4|Kafka::IO/$IP_V4>, L<$IP_V6|Kafka::IO/$IP_V6>
+in C<Kafka> L<EXPORT|Kafka/EXPORT>.
+
+=back
+
 =cut
 sub new {
     my ( $class, @args ) = @_;
@@ -197,6 +211,7 @@ sub new {
         host        => q{},
         timeout     => $REQUEST_TIMEOUT,
         port        => $KAFKA_SERVER_PORT,
+        ip_version  => undef,
         af          => '',  # Address family constant
         pf          => '',  # Protocol family constant
         ip          => '',  # Human-readable textual representation of the ip address
@@ -356,8 +371,7 @@ sub _connect {
     my $timeout = $self->{timeout};
 
     my $ip = '';
-    if ( is_ipv4( $name ) || is_ipv6( $name ) ) {
-        $self->_get_family( $name );
+    if ( $self->_get_family( $name ) ) {
         $ip = $self->{ip} = $name;
     } else {
         if ( defined $timeout ) {
@@ -411,6 +425,7 @@ sub _connect {
             }
         } else {
             $ip = $self->_gethostbyname( $name );
+            die( "not resolve a host name to the IP address: $name\n" ) unless $ip;
         }
     }
 
@@ -515,9 +530,39 @@ sub _major_osvers {
 sub _gethostbyname {
     my ( $self, $name ) = @_;
 
-    $self->_get_family( $name );
-    my $ipaddr = gethostbyname( $name );
-    $self->{ip} = $ipaddr ? inet_ntop( $self->{af}, $ipaddr ) : '';
+    my $is_v4_fqdn = 1;
+    $self->{ip} = '';
+
+    my $ip_version = $self->{ip_version};
+    if ( defined( $ip_version ) && $ip_version == $IP_V6 ) {
+        my ( $err, @addrs ) = getaddrinfo(
+            $name,
+            '',     # not interested in the service name
+            {
+                family      => AF_INET6,
+                socktype    => SOCK_STREAM,
+                protocol    => IPPROTO_TCP,
+            },
+        );
+        return( $self->{ip} ) if $err;
+
+        $is_v4_fqdn = 0;
+        for my $addr ( @addrs ) {
+            my ( $err, $ipaddr ) = getnameinfo( $addr->{addr}, NI_NUMERICHOST, NIx_NOSERV );
+            next if $err;
+
+            $self->{af} = AF_INET6;
+            $self->{pf} = PF_INET6;
+            $self->{ip} = $ipaddr;
+            last;
+        }
+    }
+
+    if ( $is_v4_fqdn && ( !defined( $ip_version ) || $ip_version == $IP_V4 ) ) {
+        if ( my $ipaddr = gethostbyname( $name ) ) {
+            $self->{ip} = inet_ntop( $self->{af}, $ipaddr );
+        }
+    }
 
     return $self->{ip};
 }
@@ -525,15 +570,38 @@ sub _gethostbyname {
 sub _get_family {
     my ( $self, $name ) = @_;
 
-    if ( is_ipv6( $name ) ) {
+    my $is_ip;
+    my $ip_version = $self->{ip_version} // 0;
+    if ( ( ( $is_ip = is_ipv6( $name ) ) && !$ip_version ) || $ip_version == $IP_V6 ) {
+        $self->_error( $ERROR_INCOMPATIBLE_HOST_IP_VERSION, "ip_version = $ip_version, host = $name" )
+            if
+                   $ip_version
+                && (
+                        ( !$is_ip && is_ipv4( $name ) )
+                    || ( $is_ip && $ip_version == $IP_V4 )
+                )
+        ;
+
         $self->{af} = AF_INET6;
         $self->{pf} = PF_INET6;
-    } else {
+    } elsif ( ( ( $is_ip = is_ipv4( $name ) ) && !$ip_version ) || $ip_version == $IP_V4 ) {
+        $self->_error( $ERROR_INCOMPATIBLE_HOST_IP_VERSION, "ip_version = $ip_version, host = $name" )
+            if
+                   $ip_version
+                && (
+                        ( !$is_ip && is_ipv6( $name ) )
+                    || ( $is_ip && $ip_version == $IP_V6 )
+                )
+        ;
+
+        $self->{af} = AF_INET;
+        $self->{pf} = PF_INET;
+    } elsif ( !$ip_version ) {
         $self->{af} = AF_INET;
         $self->{pf} = PF_INET;
     }
 
-    return;
+    return $is_ip;
 }
 
 # Show additional debugging information

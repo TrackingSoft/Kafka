@@ -63,7 +63,7 @@ testing();
 
 sub testing {
     #-- Connecting to the Kafka server port (for example for node_id = 0)
-    my $cluster =  Kafka::Cluster->new( kafka_dir => $KAFKA_BASE_DIR, does_not_start => 1 );
+    my $cluster =  Kafka::Cluster->new( kafka_dir => $KAFKA_BASE_DIR, reuse_existing => 1 );
     my @server_ports = $cluster->servers;
     my $port =  $server_ports[0];
 

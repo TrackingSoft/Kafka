@@ -68,7 +68,8 @@ our @EXPORT_OK = qw(
     $ERROR_REPLICA_NOT_AVAILABLE
     $ERROR_REQUEST_OR_RESPONSE
     $ERROR_REQUEST_TIMED_OUT
-    $ERROR_RESPOSEMESSAGE_NOT_RECEIVED
+    $ERROR_RESPONSEMESSAGE_NOT_RECEIVED
+    $ERROR_INCOMPATIBLE_HOST_IP_VERSION
     $ERROR_SEND_NO_ACK
     $ERROR_STALE_CONTROLLER_EPOCH_CODE
     $ERROR_TOPIC_DOES_NOT_MATCH
@@ -90,6 +91,8 @@ our @EXPORT_OK = qw(
     $ERROR_TOPIC_AUTHORIZATION_FAILED_CODE
     $ERROR_GROUP_AUTHORIZATION_FAILED_CODE
     $ERROR_CLUSTER_AUTHORIZATION_FAILED_CODE
+    $IP_V4
+    $IP_V6
     $KAFKA_SERVER_PORT
     $MESSAGE_SIZE_OVERHEAD
     $MIN_BYTES_RESPOND_HAS_DATA
@@ -667,6 +670,30 @@ const our $DEFAULT_MAX_WAIT_TIME                => 100;
 #   00:00:00:06:                    # Value => bytes (a length 0x6 = 6 bytes)
 const our $MESSAGE_SIZE_OVERHEAD                => 26;
 
+=pod
+
+=head2 IP version
+
+Specify IP protocol version for resolving of IP address and host names.
+
+=over
+
+=item C<$IP_V4>
+
+Interpret address as IPv4 and force resolving of host name in IPv4.
+
+=cut
+const our $IP_V4                                => 4;
+
+=item C<$IP_V6>
+
+Interpret address as IPv6 and force resolving of host name in IPv6.
+
+=back
+
+=cut
+const our $IP_V6                                => 6;
+
 #-- Codec numbers:
 
 =pod
@@ -825,7 +852,14 @@ const our $ERROR_COMPRESSION                    => -1015;
 -1016 - 'ResponseMessage' not received
 
 =cut
-const our $ERROR_RESPOSEMESSAGE_NOT_RECEIVED    => -1016;
+const our $ERROR_RESPONSEMESSAGE_NOT_RECEIVED   => -1016;
+
+=item C<$ERROR_INCOMPATIBLE_HOST_IP_VERSION>
+
+-1017 - Incompatible host name and IP version
+
+=cut
+const our $ERROR_INCOMPATIBLE_HOST_IP_VERSION   => -1017;
 
 =back
 
@@ -1145,7 +1179,8 @@ our %ERROR = (
     $ERROR_PARTITION_DOES_NOT_MATCH                 => q{Partition does not match the requested},
     $ERROR_NOT_BINARY_STRING                        => q{Not binary string},
     $ERROR_COMPRESSION                              => q{Compression error},
-    $ERROR_RESPOSEMESSAGE_NOT_RECEIVED              => q{'ResponseMessage' not received},
+    $ERROR_RESPONSEMESSAGE_NOT_RECEIVED             => q{'ResponseMessage' not received},
+    $ERROR_INCOMPATIBLE_HOST_IP_VERSION             => q{'Incompatible host name and IP version'},
 
     #-- The Protocol Error Messages
     # https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-ErrorCodes
@@ -1321,6 +1356,7 @@ Kafka:
     Data::Validate::Domain
     Data::Validate::IP
     Exception::Class
+    List::Utils
     Params::Util
     Scalar::Util::Numeric
     String::CRC32

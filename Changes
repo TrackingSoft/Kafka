@@ -2,11 +2,15 @@ Revision history for Kafka package
 
     CHANGES:
     - Adapted for kafka 0.9 .
-    - New error codes added.
-    - Few error codes renamed according to Apache Kafka documentation.
-    - Kafka::Producer->new not support RequiredAcks > 1 now.
+    - Updated error codes to conform with Kafka documentation.
+    - Kafka::Producer->new does not support values of RequiredAcks > 1 anymore.
+    - Added 'ip_version' argument for Kafka::Connection->new and Kafka::IO->new to
+      force host name resolving (or IP address interpretation) in IPv4 or IPv6.
+    - Added error codes $ERROR_INCOMPATIBLE_HOST_IP_VERSION .
     BUGFIXES:
     - Incorrect osvers comparison for NetBSD.
+    - Remove unnecessary dependency on List::MoreUtils
+      (thanks to Dan Book).
 
 0.8013 Tue Nov  24 2015
     BUGFIXES:
@@ -54,7 +58,7 @@ Revision history for Kafka package
 
 0.8009 Tue Jan  13 2015
     CHANGES:
-    - Added error $ERROR_RESPOSEMESSAGE_NOT_RECEIVED .
+    - Added error $ERROR_RESPONSEMESSAGE_NOT_RECEIVED .
     BUGFIXES:
     - Module Kafka::IO no longer uses sigtrap
       (thanks to Mark Hedges).

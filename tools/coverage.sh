@@ -34,5 +34,6 @@ perl -MDevel::Cover t/50_debug_level.t
 perl -MDevel::Cover t/90_mock_io.t
 perl -MDevel::Cover t/91_mock_usage.t
 perl -MDevel::Cover t/92_mock_bench.t
+perl -MDevel::Cover t/99_data_cleanup.t
 
 cover

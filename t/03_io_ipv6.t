@@ -38,16 +38,22 @@ plan 'no_plan';
 #-- load the modules -----------------------------------------------------------
 
 use Socket qw(
+    getaddrinfo
     AF_INET
     AF_INET6
     PF_INET
     PF_INET6
+
+    SOCK_STREAM
+    IPPROTO_TCP
 );
 use Net::EmptyPort qw(
     can_bind
 );
 
 use Kafka qw(
+    $IP_V4
+    $IP_V6
     $REQUEST_TIMEOUT
 );
 use Kafka::IO;
@@ -138,6 +144,69 @@ sub doit {
             lives_ok { $resp = $io->receive( length( $test_message ) ); } 'expecting to live';
             is( $$resp, $test_message, 'receive OK' );
 
+            foreach my $ip_version ( undef, $IP_V6 ) {
+                $io = Kafka::IO->new(
+                    host        => $host,
+                    port        => $port,
+                    ip_version  => $ip_version,
+                );
+                is $io->{af}, AF_INET6, 'af OK';
+                is $io->{pf}, PF_INET6, 'pf OK';
+                is $io->{ip}, $host, 'ip OK';
+            }
+
+            foreach my $hostname ( '127.0.0.1', 'localhost' ) {
+                dies_ok {
+                    my $bad_io = Kafka::IO->new(
+                        host        => $hostname,
+                        port        => $port,
+                        ip_version  => $IP_V4,
+                    );
+                } 'bad ip_version';
+            }
+
+            my $host_v6 = 'ip6-localhost';
+
+            my ( $err, @addrs ) = getaddrinfo(
+                $host_v6,
+                '',     # not interested in the service name
+                {
+                    family      => AF_INET6,
+                    socktype    => SOCK_STREAM,
+                    protocol    => IPPROTO_TCP,
+                },
+            );
+            unless ( $err ) {
+                # /etc/hosts contains:
+                # ::1     ip6-localhost
+                my $v6_io = Kafka::IO->new(
+                    host        => $host_v6,
+                    port        => $port,
+                    ip_version  => $IP_V6,
+                );
+                is $v6_io->{af}, AF_INET6, 'af OK';
+                is $v6_io->{pf}, PF_INET6, 'pf OK';
+                is $v6_io->{ip}, '::1', 'ip OK';
+            }
+
+            foreach my $ip_version ( undef, $IP_V4 ) {
+                dies_ok {
+                    $io = Kafka::IO->new(
+                        host        => $host_v6,
+                        port        => $port,
+                        ip_version  => $ip_version,
+                    );
+                } "bad ip_version for host_v6";
+            }
+
+            throws_ok {
+                $io = Kafka::IO->new(
+                    host        => '::1',
+                    port        => $port,
+                    ip_version  => $IP_V4,
+                );
+            } 'Kafka::Exception::IO', "bad ip_version for IPv6";
+
             ok $io->close, 'Socket closed';
         },
         server => sub {
@@ -175,6 +244,7 @@ subtest 'v6' => sub {
     foreach my $host_name (
         '0:0:0:0:0:0:0:1',
         '::1',
+#TODO: v6 fqdn resolve test
     ) {
         doit( $host_name, AF_INET6, PF_INET6 );
     }

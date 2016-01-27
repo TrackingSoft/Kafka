@@ -47,12 +47,14 @@ use Kafka::Protocol qw(
 
 use Kafka::Cluster;
 
-#-- setting up facilities ------------------------------------------------------
-
 #-- declarations ---------------------------------------------------------------
 
 # WARNING: must match the settings of your system
 const my $KAFKA_BASE_DIR    => $ENV{KAFKA_BASE_DIR};
+
+#-- setting up facilities ------------------------------------------------------
+
+ok defined( Kafka::Cluster::data_cleanup( kafka_dir => $KAFKA_BASE_DIR ) ), 'data directory cleaned';
 
 #-- Global data ----------------------------------------------------------------
 

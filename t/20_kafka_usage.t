@@ -82,7 +82,7 @@ my ( $port, $connect, $producer, $consumer, $response, $offsets );
 
 #-- Connecting to the Kafka server port
 
-( $port ) = Kafka::Cluster->new( kafka_dir => $KAFKA_BASE_DIR, does_not_start => 1 )->servers;  # for example for node_id = 0
+( $port ) = Kafka::Cluster->new( kafka_dir => $KAFKA_BASE_DIR, reuse_existing => 1 )->servers;  # for example for node_id = 0
 
 for my $host_name ( 'localhost', '127.0.0.1' ) {
 

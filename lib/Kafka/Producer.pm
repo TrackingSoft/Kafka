@@ -315,15 +315,15 @@ sub send {
 
     $key //= q{};
 
-    $self->_error( $ERROR_MISMATCH_ARGUMENT, $topic )
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'topic' )
         unless defined( $topic ) && ( $topic eq q{} || defined( _STRING( $topic ) ) ) && !utf8::is_utf8( $topic );
-    $self->_error( $ERROR_MISMATCH_ARGUMENT, $partition )
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'partition' )
         unless defined( $partition ) && isint( $partition ) && $partition >= 0;
-    $self->_error( $ERROR_MISMATCH_ARGUMENT, $messages )
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'messages' )
         unless defined( _STRING( $messages ) ) || _ARRAY0( $messages );
-    $self->_error( $ERROR_MISMATCH_ARGUMENT, $key )
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'key' )
         unless ( $key eq q{} || defined( _STRING( $key ) ) ) && !utf8::is_utf8( $key );
-    $self->_error( $ERROR_MISMATCH_ARGUMENT, $compression_codec )
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'compression_codec' )
         unless ( !defined( $compression_codec ) || $known_compression_codecs{ $compression_codec } );
 
     $messages = [ $messages ] unless ref( $messages );

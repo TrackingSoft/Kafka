@@ -357,13 +357,13 @@ sub fetch {
     my ( $self, $topic, $partition, $start_offset, $max_size, $_return_all ) = @_;
     # Special argument: $_return_all - return redundant messages sent out of a compressed package posts
 
-    $self->_error( $ERROR_MISMATCH_ARGUMENT, '$topic' )
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'topic' )
         unless defined( $topic ) && ( $topic eq q{} || defined( _STRING( $topic ) ) ) && !utf8::is_utf8( $topic );
-    $self->_error( $ERROR_MISMATCH_ARGUMENT, '$partition' )
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'partition' )
         unless defined( $partition ) && isint( $partition ) && $partition >= 0;
-    $self->_error( $ERROR_MISMATCH_ARGUMENT, '$offset' )
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'offset' )
         unless defined( $start_offset ) && ( ( _isbig( $start_offset ) && $start_offset >= 0 ) || defined( _NONNEGINT( $start_offset ) ) );
-    $self->_error( $ERROR_MISMATCH_ARGUMENT, "\$max_size ($max_size)" )
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, "max_size ($max_size)" )
         unless ( !defined( $max_size ) || ( ( _isbig( $max_size ) || _POSINT( $max_size ) ) && $max_size >= $MESSAGE_SIZE_OVERHEAD && $max_size <= $MAX_INT32 ) );
 
     my $request = {
@@ -479,13 +479,13 @@ Optional. The argument must be a positive int32 signed integer.
 sub offsets {
     my ( $self, $topic, $partition, $time, $max_number ) = @_;
 
-    $self->_error( $ERROR_MISMATCH_ARGUMENT, '$topic' )
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'topic' )
         unless defined( $topic) && ( $topic eq q{} || defined( _STRING( $topic ) ) ) && !utf8::is_utf8( $topic );
-    $self->_error( $ERROR_MISMATCH_ARGUMENT, '$partition' )
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'partition' )
         unless defined( $partition ) && isint( $partition ) && $partition >= 0;
-    $self->_error( $ERROR_MISMATCH_ARGUMENT, '$time' )
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'time' )
         unless defined( $time ) && ( _isbig( $time ) || isint( $time ) ) && $time >= $RECEIVE_EARLIEST_OFFSETS;
-    $self->_error( $ERROR_MISMATCH_ARGUMENT, "\$max_number ($max_number)" )
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, "max_number ($max_number)" )
         unless !defined( $max_number ) || ( _POSINT( $max_number ) && $max_number <= $MAX_INT32 );
 
     my $request = {

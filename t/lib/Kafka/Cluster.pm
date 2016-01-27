@@ -77,7 +77,7 @@ use Kafka::IO;
 
 =head1 DESCRIPTION
 
-This module is not a user module.
+This module is not intended to be used by the end user.
 
 The main features of the C<Kafka::Cluster> module are:
 
@@ -85,31 +85,31 @@ The main features of the C<Kafka::Cluster> module are:
 
 =item *
 
-Automatic start and stop the zookeeper server.
+Automatic start and stop of local zookeeper server for tests.
 
 =item *
 
-Start-up, re-initialize, stop the kafka servers cluster.
+Start-up, re-initialize, stop cluster of kafka servers.
 
 =item *
 
-The servers automatically uses free ports.
+A free port is automatically selected for started servers.
 
 =item *
 
-Create, delete the data structures used by servers.
+Create, delete data structures used by servers.
 
 =item *
 
-Getting information about the used servers.
+Getting information about running servers.
 
 =item *
 
-Connection to an earlier running cluster.
+Connection to earlier started cluster.
 
 =item *
 
-The ability to perform a query to necessary server cluster.
+Perform query to a cluster.
 
 =back
 
@@ -121,7 +121,7 @@ The following constants are available for export
 
 =head3 C<$START_PORT>
 
-The port used to start the search of free ports - 9094.
+Initial port number to start search for a free port - 9094.
 Zookeeper server uses the first available port.
 
 =cut
@@ -129,11 +129,11 @@ const our   $START_PORT                     => 9094;    # Port Number 9094-9099 
 
 =head3 C<$DEFAULT_TOPIC>
 
-Used topic name.
+Default topic name.
 
 =cut
 const our   $DEFAULT_TOPIC                  => 'mytopic';
-const our   $DEFAULT_REPLICATION_FACTOR     => 3;       # The cluster contains 3 servers
+const our   $DEFAULT_REPLICATION_FACTOR     => 3;       # Cluster consists of 3 servers by default
 
 const my    $MAX_START_ATTEMPT              => 10;
 const my    $MAX_STOP_ATTEMPT               => 30;
@@ -157,34 +157,34 @@ my ( $start_dir, $kafka_properties_file, $kafka_host );
 
 #-- constructor ----------------------------------------------------------------
 
-# protection against re-create the cluster object
+# protection against re-creation of cluster object
 our $_used = 0;
 
 =head2 CONSTRUCTOR
 
 =head3 C<new>
 
-Starts the server required for cluster or provides the ability to connect to a running cluster.
-In the first call in start-up, also launching a zookeeper server.
+Starts server required for cluster or provides ability to connect to a running cluster.
+A zookeeper server is launched during the first call to start.
 Creates a C<Kafka::Cluster> object.
 
-An error will cause the program to halt.
+An error causes program to halt.
 
-To identify a particular server in the cluster port is used.
+Port is used to identify a particular server in the cluster.
 The structures of these servers are created in the C<t/data>.
 
 C<new()> takes arguments in key-value pairs.
-The following arguments are currently recognized:
+The following arguments are recognized:
 
 =over 3
 
 =item C<kafka_dir =E<gt> $kafka_dir>
 
-The root directory of the Kafka installation.
+The root directory of local Kafka installation.
 
 =item C<replication_factor =E<gt> $replication_factor>
 
-Number kafka servers belonging to the generated cluster.
+Number of kafka servers to be started in cluster.
 
 Optional, default = 3.
 
@@ -194,17 +194,17 @@ The number of partitions per created topic.
 
 Optional, default = 1.
 
-=item C<does_not_start =E<gt> $does_not_start>
+=item C<reuse_existing =E<gt> $reuse_existing>
 
-Sign of the need to connect to the already created cluster.
+Connect to previously created cluster instead of creating a new one.
 
-Optional, default = false (create and run a new cluster).
+Optional, default = false (creates and runs a new cluster).
 
 =item C<t_dir =E<gt> $t_dir>
 
-The required data structures are prepared to work in the directory C<t/>.
-When connected to a cluster from another directory,
-you must specify the path to the directory C<t/>.
+Required data structures are prepared to work in provided directory C<t/>.
+When connecting to a cluster from another directory,
+you must specify path to C<t/> directory.
 
 Optional - not specified (operation carried out in the directory C<t/>).
 
@@ -214,12 +214,12 @@ Optional - not specified (operation carried out in the directory C<t/>).
 sub new {
     my ( $class, %args ) = @_;
 
-    # protection against re-create the cluster object
+    # protection against re-creating of cluster object
     !$_used
         || confess "The object of class '$class' already exists";
 
     # The argument is needed because multiple versions can be installed simultaneously
-    defined( _STRING( $args{kafka_dir} ) )      # must match the settings of your system
+    defined( _STRING( $args{kafka_dir} ) )      # must match local kafka insatll dir
         // confess( "The value of 'kafka_dir' should be a string" );
 
     my $kafka_replication_factor = $args{replication_factor} //= $DEFAULT_REPLICATION_FACTOR;
@@ -234,7 +234,7 @@ sub new {
 
     my $self = {
         kafka   => {},                          # {
-                                                #   'does_not_start'        => ..., # boolean
+                                                #   'reuse_existing'        => ..., # boolean
                                                 #   'base_dir'              => ...,
                                                 #   'bin_dir'               => ...,
                                                 #   'config_dir'            => ...,
@@ -254,9 +254,9 @@ sub new {
 
     $self->{kafka}->{partition} = $args{partition};
 
-    # basic definitions (existence of most service directory is assumed)
-    my ( $does_not_start, $kafka_base_dir, $kafka_bin_dir, $kafka_config_dir, $kafka_data_dir );
-    $does_not_start         = $self->{kafka}->{does_not_start}  = $args{does_not_start};
+    # basic definitions (existence of most service directories is assumed)
+    my ( $reuse_existing, $kafka_base_dir, $kafka_bin_dir, $kafka_config_dir, $kafka_data_dir );
+    $reuse_existing         = $self->{kafka}->{reuse_existing}  = $args{reuse_existing};
     $kafka_base_dir         = $self->{kafka}->{base_dir}        = $args{kafka_dir};
     $kafka_bin_dir          = $self->{kafka}->{bin_dir}         = catdir( $start_dir, 'bin' );
     $kafka_config_dir       = $self->{kafka}->{config_dir}      = catdir( $start_dir, 'config' );
@@ -267,7 +267,7 @@ sub new {
         $kafka_data_dir     = $self->{kafka}->{data_dir}        = catdir( $start_dir, 'data' );
     }
 
-    # verification environment
+    # verification of environment
     confess( "File does not exist (kafka version is not 0.8 ?): $KAFKA_0_8_REF_FILE_MASK" )
         unless $self->_is_kafka_0_8;
 
@@ -288,14 +288,14 @@ sub new {
             } else {
                 ( undef, $zookeeper_client_port ) = split( /:/, $cfg->val( $INI_SECTION, 'zookeeper.connect' ) );
                 if ( !check_port( { host => $ZOOKEEPER_HOST, port => $zookeeper_client_port } ) ) {
-                    if ( $does_not_start || $run_in_base_dir ) {
-                        # We expect that the Zookeeper server must be running
+                    if ( $reuse_existing || $run_in_base_dir ) {
+                        # We expect that Zookeeper server must be running
                         confess( "Zookeeper server is not running on port $zookeeper_client_port" );
                     } else {
-                        undef $zookeeper_client_port;   # The zookeeper must be started
+                        undef $zookeeper_client_port;   # zookeeper must be started
                     }
                 } else {
-                    # the port at which the clients will connect the Zookeeper server
+                    # port at which clients will be able to connect to Zookeeper server
                     $self->{kafka}->{zookeeper_clientPort} = $zookeeper_client_port;
                 }
             }
@@ -303,13 +303,13 @@ sub new {
     }
     closedir $dh;
 
-    confess 'Desired cluster factor does not correspond to the number of already existing data directory'
+    confess 'Desired cluster factor does not correspond to the number existing data directories'
         if $replication_factor && $replication_factor != $kafka_replication_factor;
 
     unless ( $zookeeper_client_port ) {
         confess( "Zookeeper server is not running" )
-            if $does_not_start;
-        # the port at which the clients will connect the Zookeeper server
+            if $reuse_existing;
+        # port at which clients will connect to Zookeeper server
         $self->{kafka}->{zookeeper_clientPort} = $zookeeper_client_port = $self->_start_zookeeper;
     }
 
@@ -325,7 +325,7 @@ sub new {
         $kafka_data_dir
     );
 
-    if ( $does_not_start ) {
+    if ( $reuse_existing ) {
         foreach my $inifile ( @ini_files ) {
             if ( !( my $cfg = Config::IniFiles->new(
                     -file       => $inifile,
@@ -371,7 +371,7 @@ sub new {
         $kafka_host = $cfg->val( $INI_SECTION, 'host.name' );
     }
 
-    $self->start if !$does_not_start;
+    $self->start if !$reuse_existing;
 
     ++$_used;
     return $self;
@@ -381,13 +381,13 @@ sub new {
 
 =head2 METHODS
 
-The following methods are defined for the C<Kafka::Cluster> class:
+The following methods are defined for C<Kafka::Cluster> class:
 
 =cut
 
 =head3 C<base_dir>
 
-Returns the root directory of the installation of Kafka.
+Returns the root directory of local installation of Kafka.
 
 =cut
 sub base_dir {
@@ -398,15 +398,15 @@ sub base_dir {
 
 =head3 C<log_dir( $port )>
 
-Constructs and returns the path to the data directory kafka server with the specified port.
+Constructs and returns the path to kafka server data directory with specified port.
 
-This function take argument. The following argument is currently recognized:
+This function takes argument. The following arguments are supported:
 
 =over 3
 
 =item C<$port>
 
-C<$port> denoting the port number of the kafka service.
+C<$port> denoting port number of the kafka service.
 The C<$port> should be a number.
 
 =back
@@ -422,7 +422,7 @@ sub log_dir {
 
 =head3 C<servers>
 
-Returns a sorted list of ports kafka servers in the cluster.
+Returns a sorted list of ports of all kafka servers in the cluster.
 
 =cut
 sub servers {
@@ -433,17 +433,17 @@ sub servers {
 
 =head3 C<node_id( $port )>
 
-Returns the node ID assigned by kafka server in the cluster.
-Returns C <undef>, if the server does not have an ID
-or a server with the specified port is not in the cluster.
+Returns node ID assigned to kafka server in the cluster.
+Returns C <undef>, if  server does not have an ID
+or no server with the specified port is present in the cluster.
 
-This function take argument. The following argument is currently recognized:
+This function takes argument the following argument:
 
 =over 3
 
 =item C<$port>
 
-C<$port> denoting the port number of the kafka service.
+C<$port> denoting port number of the kafka service.
 The C<$port> should be a number.
 
 =back
@@ -459,7 +459,7 @@ sub node_id {
 
 =head3 C<zookeeper_port>
 
-Returns the port number used by zookeeper server.
+Returns port number used by zookeeper server.
 
 =cut
 sub zookeeper_port {
@@ -472,9 +472,9 @@ sub zookeeper_port {
 
 =head3 C<init>
 
-Initializes the data structures used by kafka servers.
-At initialization, all the servers are stopped and deleted the data structure used by them.
-Zookeeper server does not stop, his data structure does not remove.
+Initializes data structures used by kafka servers.
+At initialization all servers are stopped and data structures used by them are deleted.
+Zookeeper server does not get stopped, its data structures is not removed.
 
 =cut
 sub init {
@@ -492,16 +492,16 @@ sub init {
 
 =head3 C<stop( $port )>
 
-Stops kafka server with the specified port.
-Stop all servers in the cluster, if the port is not specified.
+Stops kafka server specified by port.
+If port is omitted stops all servers in the cluster.
 
-This function take argument. The following argument is currently recognized:
+This function takes the following argument:
 
 =over 3
 
 =item C<$port>
 
-C<$port> denoting the port number of the kafka service.
+C<$port> denoting port number of the kafka service.
 The C<$port> should be a number.
 
 =back
@@ -530,16 +530,16 @@ sub stop {
 
 =head3 C<start( $port )>
 
-Starts (restarts) kafka server with the specified port.
-Starts (restarts) all servers in the cluster, if the port is not specified.
+Starts (restarts) kafka server with specified port.
+If port is not specified starts (restarts) all servers in the cluster.
 
-This function take argument. The following argument is currently recognized:
+This function takes the following argument:
 
 =over 3
 
 =item C<$port>
 
-C<$port> denoting the port number of the kafka service.
+C<$port> denoting port number of kafka service.
 The C<$port> should be a number.
 
 =back
@@ -554,7 +554,7 @@ sub start {
         $self->start( $_ ) for $self->servers;
 
         if ( $self->{kafka}->{is_first_run} ) {
-            # Create a topic with a properly replication factor
+            # Create a topic with proper replication factor
             $self->_create_topic;
             delete $self->{kafka}->{is_first_run};
         }
@@ -579,7 +579,7 @@ sub start {
         $port
     );
 
-    # Try sending request to make sure that Kafka server is really, really working now
+    # Try sending request to make sure that Kafka server is really working now
     my $attempts = $MAX_START_ATTEMPT;
     while ( $attempts-- ) {
         my $error;
@@ -632,23 +632,23 @@ sub start {
 
 =head3 C<request( $port, $bin_stream, $without_response )>
 
-Kafka server transmits a string of binary query retrieves and returns a binary response.
-No response is expected, and returns an empty string if the argument C<$without_response> is true.
+Transmits a string of binary query to Kafka server and returns a binary response.
+When no response is expected functions returns an empty string if argument C<$without_response> is set to true.
 
-Kafka server is identified by the specified port.
+Kafka server is identified by specified port.
 
-This function take arguments. The following arguments is currently recognized:
+This function takes the following argument:
 
 =over 3
 
 =item C<$port>
 
-C<$port> denoting the port number of the kafka service.
+C<$port> denoting port number of kafka service.
 The C<$port> should be a number.
 
 =item C<$bin_stream>
 
-C<$bin_stream> denoting an empty binary string of the request to kafka server.
+C<$bin_stream> denoting an empty binary string of request to kafka server.
 
 =back
 
@@ -678,7 +678,7 @@ sub request {
 
 =head3 C<is_run_in_base_dir>
 
-Returns true, if the work is performed in the root directory of the installation Kafka.
+Returns true, if work is performed in the root of Kafka installation directory.
 
 =cut
 sub is_run_in_base_dir {
@@ -689,9 +689,8 @@ sub is_run_in_base_dir {
 
 =head3 C<close>
 
-Stop all production servers (including the zookeeper server).
-Deletes all data directories used by the servers.
-After execution, the C<t/data> catalog does not contain service files.
+Stops all production servers (including zookeeper server).
+Deletes all data directories used by servers.
 
 =cut
 sub close {
@@ -700,7 +699,6 @@ sub close {
     $self->init;
     unless ( $self->is_run_in_base_dir ) {
         $self->_stop_zookeeper;
-        # WARNING: Removing things is a much more dangerous proposition than creating things.
         say '[', scalar( localtime ), '] Removing zookeeper log tree: ', $self->_data_dir;
         remove_tree( catdir( $self->_data_dir, 'zookeeper' ) );
     }
@@ -710,9 +708,106 @@ sub close {
     return;
 }
 
+#-- public functions -----------------------------------------------------------
+
+=head3 C<data_cleanup>
+
+This function stops all running servers processes, deletes all data directories and
+service files in C<t/data> directory.
+
+Returns number of deleted files.
+
+C<data_cleanup()> takes arguments in key-value pairs.
+The following arguments are recognized:
+
+=over 3
+
+=item C<kafka_dir =E<gt> $kafka_dir>
+
+The root directory of Kafka installation.
+
+=item C<t_dir =E<gt> $t_dir>
+
+Required data structures are prepared to work in the directory C<t/>.
+When connected to a cluster from another directory, you must specify path to the
+C<t/> directory.
+
+Optional - if not specified operation is carried out in the C<t/> directory.
+
+=cut
+
+my %_ignore_names = (
+    '.'             => 1,
+    '..'            => 1,
+    '.gitignore'    => 1,
+);
+
+sub data_cleanup {
+    my ( %args ) = @_;
+
+    # The argument is needed because multiple versions can be installed simultaneously
+    my $kafka_dir = $args{kafka_dir};
+    defined( _STRING( $kafka_dir ) )  # must match kafka dir of your local system
+        // confess( "The value of 'kafka_dir' should be a string" );
+
+    my $t_dir = $args{t_dir};
+    !defined( $t_dir ) || defined( _STRING( $t_dir ) )
+        // confess( "The value of 't_dir' should be a string" );
+
+    my $start_dir = $args{t_dir} // $Bin;
+
+    my $run_in_base_dir = $kafka_dir eq $start_dir;
+    my $kafka_data_dir = $run_in_base_dir
+        ? '/tmp'
+        : catdir( $start_dir, 'data' )
+    ;
+
+    my $removed = 0;
+
+    if ( -d $kafka_data_dir ) {
+        my $cwd = getcwd();
+        if ( chdir( $kafka_data_dir ) && getcwd() eq $kafka_data_dir ) {
+            foreach my $pid_file ( glob '*.pid' ) {
+                my $pid;
+                if ( !( my $PID = IO::File->new( $pid_file, 'r' ) ) ) {
+                    carp( "Cannot read pid file $pid_file: $!" );
+                } else {
+                    $pid = <$PID>;
+                    $PID->close;
+
+                    chomp $pid if $pid;
+                }
+                next unless $pid && $pid =~ /^\d+$/;
+
+                kill 'KILL', $pid;
+
+                my $cnt = $MAX_STOP_ATTEMPT;
+                while ( kill( 0 => $pid ) && $cnt-- ) {
+                    sleep 1;
+                }
+            }
+
+            foreach my $file_or_dir ( glob '*' ) {
+                next if exists $_ignore_names{ $file_or_dir };
+
+                if ( -d $file_or_dir ) {
+                    $removed += remove_tree( $file_or_dir );
+                } else {
+                    $removed += unlink $file_or_dir;
+                }
+            }
+
+            chdir $cwd;
+        } else {
+            confess "Cannot change directory to $kafka_data_dir";
+        }
+    }
+
+    return $removed;
+}
+
 #-- private functions ----------------------------------------------------------
 
-# we know what we do
 sub _clear_tainted {
     my ( $str ) = @_;
 
@@ -727,14 +822,14 @@ sub _clear_cwd {
 
 #-- private attributes ---------------------------------------------------------
 
-# Returns a reference to a hash with descriptions kafka servers forming the cluster.
+# Returns a reference to a hash describing kafka servers in the cluster.
 sub _cluster {
     my ( $self ) = @_;
 
     return $self->{cluster};
 }
 
-# Returns a hash with the description kafka server with the specified port.
+# Returns hash with the details of kafka server by provided port.
 sub _server {
     my ( $self, $port ) = @_;
 
@@ -747,7 +842,7 @@ sub _server {
     }
 }
 
-# Constructs and returns the path to the metrics-directory of Kafka server with the specified port.
+# Constructs and returns the path to the metrics-directory of Kafka server by specified port.
 sub _metrics_dir {
     my ( $self, $port ) = @_;
 
@@ -756,21 +851,21 @@ sub _metrics_dir {
     return catdir( $self->_data_dir, "metrics-logs-$port" );
 }
 
-# Returns the path to the directory with the external programs.
+# Returns path to Kafka bin directory.
 sub _bin_dir {
     my ( $self ) = @_;
 
     return $self->{kafka}->{bin_dir};
 }
 
-# Returns the path to the configuration file templates.
+# Returns path to the configuration templates.
 sub _config_dir {
     my ( $self ) = @_;
 
     return $self->{kafka}->{config_dir};
 }
 
-# Returns the path to the directory with the data used by the server.
+# Returns path to the data directory.
 sub _data_dir {
     my ( $self ) = @_;
 
@@ -779,8 +874,8 @@ sub _data_dir {
 
 #-- private methods ------------------------------------------------------------
 
-# Kills the process with the specified pid (argument $pid), sending a signal ($signal).
-# Argument specifies the name of the process.
+# Kills process by specified pid (argument $pid), sending a signal ($signal).
+# Argument specifies name of the process.
 sub _kill_pid {
     my ( $self, $pid, $what, $signal ) = @_;
 
@@ -802,7 +897,7 @@ sub _kill_pid {
     return;
 }
 
-# Completes the program on configuration file error.
+# Terminates program on configuration file error.
 sub _ini_error {
     my ( $self, $inifile ) = @_;
 
@@ -811,7 +906,7 @@ sub _ini_error {
     confess $error;
 }
 
-# Returns true, if set in the constructor Kafka installation directory does not contain installation version 0.8.
+# Checks for proper Kafka version.
 sub _is_kafka_0_8 {
     my ( $self ) = @_;
 
@@ -825,22 +920,22 @@ sub _is_kafka_0_8 {
     return -f $ref_file;
 }
 
-# Returns true, if the argument contains a valid port number.
+# Returns true, if argument is a valid port number.
 sub _verify_port {
     my ( $self, $port ) = @_;
 
     return( _NONNEGINT( $port ) // confess 'The argument must be a positive integer' );
 }
 
-# Terminates the program if you are working in an invalid directory.
+# Terminates program if working in an invalid directory.
 sub _verify_run_dir {
     my ( $self ) = @_;
 
-    confess 'Operation is not valid because running in the Kafka server directory - perform the operation manually'
+    confess 'Operation is not valid because running in base Kafka server directory - perform operation manually'
         if $self->is_run_in_base_dir;
 }
 
-# Constructs and returns the path to the pid-file (the server with the specified port).
+# Constructs and returns path to the pid-file (using specified port).
 sub _get_pid_file_name {
     my ( $self, $port ) = @_;
 
@@ -849,14 +944,14 @@ sub _get_pid_file_name {
     return catfile( $self->_data_dir, "kafka-$port.pid" );
 }
 
-# Constructs and returns the path to the pid-file used by zookeeper server.
+# Constructs and returns path to the pid-file used by zookeeper server.
 sub _get_zookeeper_pid_file_name {
     my ( $self ) = @_;
 
     return catfile( $self->_data_dir, "zookeeper.pid" );
 }
 
-# pid is obtained from a specified pid-file.
+# reads pid from supplied pid-file.
 sub _read_pid_file {
     my ( $self, $pid_file ) = @_;
 
@@ -874,7 +969,7 @@ sub _read_pid_file {
     return; # no pid found
 }
 
-# Deletes kafka server data directory trees.
+# Deletes kafka server data directory tree.
 sub _remove_log_tree {
     my ( $self, $port ) = @_;
 
@@ -892,7 +987,6 @@ sub _remove_log_tree {
 
     $self->_verify_port( $port );
 
-    # WARNING: Removing things is a much more dangerous proposition than creating things.
     remove_tree( $self->log_dir( $port ) );
     remove_tree( $self->_metrics_dir( $port ) );
 
@@ -905,7 +999,7 @@ sub _start_zookeeper {
 
     return if $self->is_run_in_base_dir;
 
-    # the port at which the clients will connect the Zookeeper server
+    # the port for connecting to Zookeeper server
     my $zookeeper_client_port = empty_port( $START_PORT - 1 );
     my $log_dir = $self->{kafka}->{zookeeper_dataDir} = catdir( $self->_data_dir, 'zookeeper' );
 
@@ -948,7 +1042,7 @@ sub _start_zookeeper {
     return $zookeeper_client_port;
 }
 
-# Creates data directories for the kafka server.
+# Creates data directories for kafka server.
 sub _create_kafka_log_dir {
     my ( $self, $port ) = @_;
 
@@ -983,13 +1077,13 @@ sub _create_kafka_log_dir {
     return;
 }
 
-# Starts the server. The following arguments:
-#   $server_name    - The name of the server.
-#   $property_file  - The path to the configuration file.
+# Starts server. Possible arguments:
+#   $server_name    - Name of the server.
+#   $property_file  - Path to the configuration file.
 #   $arg            - Additional arguments.
 #   $pid_file       - Name of new pid-file.
-#   $log_dir        - The path to the data directory.
-#   $port           - The port that should be used to run the server.
+#   $log_dir        - Path to the data directory.
+#   $port           - Port that should be used to run server.
 sub _start_server {
     my ( $self, $server_name, $property_file, $arg, $pid_file, $log_dir, $port ) = @_;
 
@@ -1045,10 +1139,10 @@ sub _start_server {
             }
         }
 
-        # Expect to port is ready
+        # Wait for port to be ready
         $attempts = $MAX_START_ATTEMPT;
         while ( $attempts-- ) {
-            # The simplified test as readiness for operation will be evaluated on the Kafka server availability
+            # The simplified test as readiness for operation will be evaluated on Kafka server availability
             last if check_port( { host => $server_host, port => $port } );
             sleep 1;
         }
@@ -1063,11 +1157,11 @@ sub _start_server {
 
     chdir $cwd;
 
-    confess "Port $port is available after $server_name starting"
+    confess "Port $port is available after starting $server_name"
         unless check_port( { host => $server_host, port => $port } );
 }
 
-# Shuts down the zookeeper server.
+# Shuts down zookeeper server.
 sub _stop_zookeeper {
     my ( $self ) = @_;
 
@@ -1076,7 +1170,7 @@ sub _stop_zookeeper {
     my $port = $self->zookeeper_port;
     my $pid_file = $self->_get_zookeeper_pid_file_name;
 
-    confess 'Trying to stop the zookeeper server is not running'
+    confess 'Trying to stop zookeeper server while it is not running'
         unless -e $pid_file;
 
     $self->_stop_server( $pid_file, 'zookeeper', $port );
@@ -1085,10 +1179,10 @@ sub _stop_zookeeper {
     return;
 }
 
-# Kills the server process. The following arguments:
+# Kills server process. Take the following arguments:
 #   $pid_file       - Path to pid-file.
-#   $server_name    - The server name.
-#   $port           - The port used by the server.
+#   $server_name    - Server name.
+#   $port           - Port used by the server.
 sub _stop_server {
     my ( $self, $pid_file, $server_name, $port ) = @_;
 
@@ -1109,19 +1203,19 @@ sub _stop_server {
         unlink $pid_file;
     }
 
-    confess "Port $port is not available after $server_name stopping"
+    confess "Port $port is not available after stopping $server_name"
         if check_port( { host => $server_host, port => $port } );
 }
 
-# Create a new topic with a replication factor.
+# Creates a new topic with specified replication factor.
 sub _create_topic {
     my ( $self ) = @_;
 
     $self->_verify_run_dir;
 
     my @servers = $self->servers;
-    # choose the server port that was launched first
-    # the log will be recorded in the appropriate directory
+    # choose server port that was launched first
+    # log will be recorded in the appropriate directory
     my $port    = $servers[0];
     my $log_dir = $self->log_dir( $port );
     my $partitions = $self->{kafka}->{partition};
@@ -1187,14 +1281,14 @@ __END__
 
 =head1 DIAGNOSTICS
 
-Error will causes to die automatically.
-The error message will be displayed on the console.
+An error causes script to die automatically.
+Error message will be displayed on console.
 
 =head1 SEE ALSO
 
 The basic operation of the Kafka package modules:
 
-L<Kafka|Kafka> - constants and messages used by the Kafka package modules.
+L<Kafka|Kafka> - constants and messages used by Kafka package modules.
 
 L<Kafka::Connection|Kafka::Connection> - interface to connect to a Kafka cluster.
 
@@ -1208,7 +1302,7 @@ properties.
 L<Kafka::Int64|Kafka::Int64> - functions to work with 64 bit elements of the
 protocol on 32 bit systems.
 
-L<Kafka::Protocol|Kafka::Protocol> - functions to process messages in the
+L<Kafka::Protocol|Kafka::Protocol> - functions to process messages in
 Apache Kafka's Protocol.
 
 L<Kafka::IO|Kafka::IO> - low-level interface for communication with Kafka server.
@@ -1218,7 +1312,7 @@ L<Kafka::Exceptions|Kafka::Exceptions> - module designated to handle Kafka excep
 L<Kafka::Internals|Kafka::Internals> - internal constants and functions used
 by several package modules.
 
-A wealth of detail about the Apache Kafka and the Kafka Protocol:
+A wealth of detail about Apache Kafka and Kafka Protocol:
 
 Main page at L<http://kafka.apache.org/>
 

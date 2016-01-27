@@ -412,6 +412,7 @@ sub new {
 
     while ( @args ) {
         my $k = shift @args;
+        next unless defined $k;
         $self->{ $k } = shift @args if exists $self->{ $k };
     }
 

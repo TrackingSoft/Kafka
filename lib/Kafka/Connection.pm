@@ -98,9 +98,12 @@ use Kafka qw(
     $ERROR_MISMATCH_ARGUMENT
     $ERROR_MISMATCH_CORRELATIONID
     $ERROR_NO_KNOWN_BROKERS
-    $ERROR_RESPOSEMESSAGE_NOT_RECEIVED
+    $ERROR_RESPONSEMESSAGE_NOT_RECEIVED
     $ERROR_SEND_NO_ACK
     $ERROR_UNKNOWN_APIKEY
+
+    $IP_V4
+    $IP_V6
     $KAFKA_SERVER_PORT
     $NOT_SEND_ANY_RESPONSE
     $RECEIVE_MAX_ATTEMPTS
@@ -300,6 +303,16 @@ of Kafka servers. This list will be used to locate the new leader if the server 
 via C<host =E<gt> $host> and C<port =E<gt> $port> arguments becomes unavailable. Either C<host>
 or C<broker_list> must be supplied.
 
+=item C<ip_version =E<gt> $ip_version>
+
+Specify version of IP for interpreting of passed IP address and resolving of host name.
+
+Optional, undefined by default, which works in the following way: version of IP address
+is detected automatically, host name is resolved into IPv4 address.
+
+See description of L<$IP_V4|Kafka::IO/$IP_V4>, L<$IP_V6|Kafka::IO/$IP_V6>
+in C<Kafka> L<EXPORT|Kafka/EXPORT>.
+
 =item C<timeout =E<gt> $timeout>
 
 Optional, default = C<$Kafka::REQUEST_TIMEOUT>.
@@ -398,6 +411,7 @@ sub new {
         port                    => $KAFKA_SERVER_PORT,
         broker_list             => [],
         timeout                 => $REQUEST_TIMEOUT,
+        ip_version              => undef,
         CorrelationId           => undef,
         SEND_MAX_ATTEMPTS       => $SEND_MAX_ATTEMPTS,
         RECEIVE_MAX_ATTEMPTS    => $RECEIVE_MAX_ATTEMPTS,
@@ -441,6 +455,10 @@ sub new {
         unless _POSINT( $self->{RETRY_BACKOFF} );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'MaxLoggedErrors' )
         unless defined( _NONNEGINT( $self->{MaxLoggedErrors} ) );
+
+    my $ip_version = $self->{ip_version};
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'ip_version ('.( $ip_version // '<undef>' ).')' )
+        unless ( !defined( $ip_version ) || ( defined( _NONNEGINT( $ip_version ) ) && ( $ip_version == $IP_V4 || $ip_version == $IP_V6 ) ) );
 
     $self->{_metadata} = {};                # {
                                             #   TopicName => {
@@ -544,7 +562,7 @@ Consult Kafka "Wire protocol" documentation for more details about metadata stru
 sub get_metadata {
     my ( $self, $topic ) = @_;
 
-    $self->_error( $ERROR_MISMATCH_ARGUMENT, '$topic' )
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'topic' )
         unless !defined( $topic ) || ( ( $topic eq q{} || defined( _STRING( $topic ) ) ) && !utf8::is_utf8( $topic ) );
 
     $self->_update_metadata( $topic )
@@ -756,7 +774,7 @@ sub receive_response_to_request {
                     if ( length( $$encoded_response_ref ) > 4 ) {   # MessageSize => int32
                         $response = $protocol{ $api_key }->{decode}->( $encoded_response_ref );
                     } else {
-                        $self->_error( $ERROR_RESPOSEMESSAGE_NOT_RECEIVED );
+                        $self->_error( $ERROR_RESPONSEMESSAGE_NOT_RECEIVED );
                     }
                 }
 
@@ -823,9 +841,9 @@ The C<$topic> must be a normal non-false string of non-zero length.
 sub exists_topic_partition {
     my ( $self, $topic, $partition ) = @_;
 
-    $self->_error( $ERROR_MISMATCH_ARGUMENT, $topic )
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'topic' )
         unless defined( $topic ) && ( $topic eq q{} || defined( _STRING( $topic ) ) ) && !utf8::is_utf8( $topic );
-    $self->_error( $ERROR_MISMATCH_ARGUMENT, $partition )
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'partition' )
         unless defined( $partition ) && isint( $partition ) && $partition >= 0;
 
     unless ( %{ $self->{_metadata} } ) {    # the first request
@@ -1043,7 +1061,7 @@ sub _update_metadata {
             return $self->_attempt_update_metadata( $is_recursive_call, $topic, undef, $ERROR_NO_KNOWN_BROKERS );
         } else {
             # FATAL error
-            $self->_error( $ERROR_NO_KNOWN_BROKERS, "topic = '$topic'" );
+            $self->_error( $ERROR_NO_KNOWN_BROKERS, "topic = '".( $topic // '<undef>' )."'" );
         }
     }
 
@@ -1106,7 +1124,7 @@ sub _update_metadata {
 
     %$received_metadata
         # FATAL error
-        or $self->_error( $ERROR_CANNOT_GET_METADATA, "topic = '$topic'" );
+        or $self->_error( $ERROR_CANNOT_GET_METADATA, "topic = '".( $topic // '<undef>' )."'" );
 
     # Update metadata for received topics
     $self->{_metadata}->{ $_ }  = $received_metadata->{ $_ } foreach keys %{ $received_metadata };
@@ -1134,7 +1152,7 @@ sub _attempt_update_metadata {
         return( 1 ) if $self->_update_metadata( $topic, 1 );
     }
     # FATAL error
-    $self->_error( $error_code, "topic = '$topic'", defined( $partition ) ? ", partition = $partition" : () );
+    $self->_error( $error_code, "topic = '".( $topic // '<undef>' )."'", defined( $partition ) ? ", partition = $partition" : () );
 
     return;
 }
@@ -1177,6 +1195,7 @@ sub _connectIO {
                 host        => $server_data->{host},
                 port        => $server_data->{port},
                 timeout     => $self->{timeout},
+                ip_version  => $self->{ip_version},
             );
             $server_data->{error} = undef;
         } catch {

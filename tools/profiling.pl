@@ -133,7 +133,7 @@ foreach my $t_dir ( @T_DIRS ) {
         try {
             ( $port ) = Kafka::Cluster->new(
                 kafka_dir       => $base_dir,
-                does_not_start  => 1,
+                reuse_existing  => 1,
                 t_dir           => $t_dir,
             )->servers;
         } catch {
