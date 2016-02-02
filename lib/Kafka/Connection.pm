@@ -40,10 +40,8 @@ use Data::Validate::IP qw(
     is_ipv6
 );
 use Const::Fast;
-use List::MoreUtils qw(
-    all
-);
 use List::Util qw(
+    all
     shuffle
 );
 use Params::Util qw(

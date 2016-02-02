@@ -32,7 +32,6 @@ my %config = (
         'Exporter'                  => '5.70',
         'IO::Compress::Gzip'        => '2.064',
         'IO::Uncompress::Gunzip'    => '2.064',
-        'List::MoreUtils'           => '0.33',
         'List::Util'                => '1.38',
         'Params::Util'              => '1.07',
         'Scalar::Util'              => '1.38',

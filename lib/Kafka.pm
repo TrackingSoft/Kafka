@@ -1321,7 +1321,6 @@ Kafka:
     Data::Validate::Domain
     Data::Validate::IP
     Exception::Class
-    List::MoreUtils
     Params::Util
     Scalar::Util::Numeric
     String::CRC32

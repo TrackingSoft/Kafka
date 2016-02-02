@@ -39,7 +39,6 @@ Kafka:
    Exporter
    IO::Compress::Gzip
    IO::Uncompress::Gunzip
-   List::MoreUtils
    List::Util
    Params::Util
    Scalar::Util
