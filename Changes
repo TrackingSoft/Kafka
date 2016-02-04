@@ -1,5 +1,6 @@
 Revision history for Kafka package
 
+0.9000 Thu Feb  04 2016
     CHANGES:
     - Adapted for kafka 0.9 .
     - Updated error codes to conform with Kafka documentation.
