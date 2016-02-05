@@ -129,7 +129,7 @@ sub is_ERROR_MISMATCH_ARGUMENT {
 my $ip_version_verified;
 testing();
 testing( $KAFKA_BASE_DIR ) if $KAFKA_BASE_DIR;
-ok $ip_version_verified, 'ip_version verified';
+ok( $ip_version_verified, 'ip_version verified' ) if $KAFKA_BASE_DIR;
 
 communication_error();
 

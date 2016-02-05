@@ -18,7 +18,7 @@ use Test::More;
 
 BEGIN {
     plan skip_all => 'Unknown base directory of Kafka server'
-        unless defined $ENV{KAFKA_BASE_DIR};
+        unless $ENV{KAFKA_BASE_DIR};
 }
 
 BEGIN {

@@ -1,5 +1,8 @@
 Revision history for Kafka package
 
+    BUGFIXES:
+    - Tests corrected.
+
 0.9000 Thu Feb  04 2016
     CHANGES:
     - Adapted for kafka 0.9 .
