@@ -46,6 +46,10 @@ use Socket qw(
 
     SOCK_STREAM
     IPPROTO_TCP
+
+    inet_aton
+    inet_ntop
+    pack_sockaddr_in
 );
 use Net::EmptyPort qw(
     can_bind
@@ -116,6 +120,16 @@ use Kafka::IO;
 
 #-- declarations ---------------------------------------------------------------
 
+sub is_alive_v4 {
+    my ( $ip, $port ) = @_;
+
+    socket( my $tmp_socket, PF_INET, SOCK_STREAM, IPPROTO_TCP );
+    my $is_alive = connect( $tmp_socket, pack_sockaddr_in(  $port, inet_aton( $ip ) ) );
+    CORE::close( $tmp_socket );
+
+    return $is_alive;
+}
+
 sub doit {
     my ( $host, $af, $pf ) = @_;
 
@@ -156,13 +170,19 @@ sub doit {
             }
 
             foreach my $hostname ( '127.0.0.1', 'localhost' ) {
-                dies_ok {
-                    my $bad_io = Kafka::IO->new(
-                        host        => $hostname,
-                        port        => $port,
-                        ip_version  => $IP_V4,
-                    );
-                } 'bad ip_version';
+                my $ip_v4;
+                if ( my $ipaddr = gethostbyname( $hostname ) ) {
+                    $ip_v4 = inet_ntop( AF_INET, $ipaddr );
+                }
+                if ( $ip_v4 && !is_alive_v4( $ip_v4, $port ) ) {
+                    dies_ok {
+                        my $bad_io = Kafka::IO->new(
+                            host        => $hostname,
+                            port        => $port,
+                            ip_version  => $IP_V4,
+                        );
+                    } "bad ip_version for $hostname";
+                }
             }
 
             my $host_v6 = 'ip6-localhost';
@@ -227,15 +247,6 @@ sub doit {
 #-- Global data ----------------------------------------------------------------
 
 # INSTRUCTIONS -----------------------------------------------------------------
-
-#subtest 'v4' => sub {
-#    foreach my $host_name (
-#        'localhost',
-#        '127.0.0.1',
-#    ) {
-#        doit( $host_name, AF_INET, PF_INET );
-#    }
-#};
 
 subtest 'v6' => sub {
     plan skip_all => 'IPv6 not supported'
