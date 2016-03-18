@@ -210,6 +210,8 @@ BEGIN {
     $functions_Kafka_Internals = [ qw(
         _get_CorrelationId
         _isbig
+        format_message
+        format_reference
     ) ];
 
     use_ok 'Kafka::Internals',

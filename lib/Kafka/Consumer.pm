@@ -56,6 +56,7 @@ use Kafka::Internals qw(
     $MAX_INT32
     _get_CorrelationId
     _isbig
+    format_message
 );
 use Kafka::Connection;
 use Kafka::Message;
@@ -295,13 +296,13 @@ sub new {
         unless defined( $self->{CorrelationId} ) && isint( $self->{CorrelationId} );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'ClientId' )
         unless ( $self->{ClientId} eq q{} || defined( _STRING( $self->{ClientId} ) ) ) && !utf8::is_utf8( $self->{ClientId} );
-    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'MaxWaitTime ('.( $self->{MaxWaitTime} // '<undef>' ).')' )
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, format_message( 'MaxWaitTime (%s)', $self->{MaxWaitTime} ) )
         unless defined( $self->{MaxWaitTime} ) && isint( $self->{MaxWaitTime} ) && $self->{MaxWaitTime} > 0 && $self->{MaxWaitTime} <= $MAX_INT32;
-    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'MinBytes ('.( $self->{MinBytes} // '<undef>' ).')' )
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, format_message( 'MinBytes (%s)', $self->{MinBytes} ) )
         unless ( _isbig( $self->{MinBytes} ) ? ( $self->{MinBytes} >= 0 ) : defined( _NONNEGINT( $self->{MinBytes} ) ) ) && $self->{MinBytes} <= $MAX_INT32;
-    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'MaxBytes ('.( $self->{MaxBytes} // '<undef>' ).')' )
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, format_message( 'MaxBytes (%s)', $self->{MaxBytes} ) )
         unless ( _isbig( $self->{MaxBytes} ) ? ( $self->{MaxBytes} > 0 ) : _POSINT( $self->{MaxBytes} ) ) && $self->{MaxBytes} >= $MESSAGE_SIZE_OVERHEAD && $self->{MaxBytes} <= $MAX_INT32;
-    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'MaxNumberOfOffsets ('.( $self->{MaxNumberOfOffsets} // '<undef>' ).')' )
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, format_message( 'MaxNumberOfOffsets (%s)', $self->{MaxNumberOfOffsets} ) )
         unless defined( _POSINT( $self->{MaxNumberOfOffsets} ) ) && $self->{MaxNumberOfOffsets} <= $MAX_INT32;
 
     return $self;
@@ -363,7 +364,7 @@ sub fetch {
         unless defined( $partition ) && isint( $partition ) && $partition >= 0;
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'offset' )
         unless defined( $start_offset ) && ( ( _isbig( $start_offset ) && $start_offset >= 0 ) || defined( _NONNEGINT( $start_offset ) ) );
-    $self->_error( $ERROR_MISMATCH_ARGUMENT, "max_size ($max_size)" )
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, format_message( 'max_size (%s)', $max_size ) )
         unless ( !defined( $max_size ) || ( ( _isbig( $max_size ) || _POSINT( $max_size ) ) && $max_size >= $MESSAGE_SIZE_OVERHEAD && $max_size <= $MAX_INT32 ) );
 
     my $request = {
@@ -391,10 +392,10 @@ sub fetch {
     my $messages = [];
     foreach my $received_topic ( @{ $response->{topics} } ) {
         $received_topic->{TopicName} eq $topic
-            or $self->_error( $ERROR_TOPIC_DOES_NOT_MATCH, "'$topic' ne '".$received_topic->{TopicName}."'" );
+            or $self->_error( $ERROR_TOPIC_DOES_NOT_MATCH, format_message( "'%s' ne '%s'", $topic, $received_topic->{TopicName} ) );
         foreach my $received_partition ( @{ $received_topic->{partitions} } ) {
             $received_partition->{Partition} == $partition
-                or $self->_error( $ERROR_PARTITION_DOES_NOT_MATCH, "$partition != ".$received_partition->{Partition} );
+                or $self->_error( $ERROR_PARTITION_DOES_NOT_MATCH, format_message( '%s != %s', $partition, $received_partition->{Partition} ) );
             my $HighwaterMarkOffset = $received_partition->{HighwaterMarkOffset};
             foreach my $Message ( @{ $received_partition->{MessageSet} } ) {
                 my $offset = $Message->{Offset};
@@ -485,7 +486,7 @@ sub offsets {
         unless defined( $partition ) && isint( $partition ) && $partition >= 0;
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'time' )
         unless defined( $time ) && ( _isbig( $time ) || isint( $time ) ) && $time >= $RECEIVE_EARLIEST_OFFSETS;
-    $self->_error( $ERROR_MISMATCH_ARGUMENT, "max_number ($max_number)" )
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, format_message( 'max_number (%s)', $max_number ) )
         unless !defined( $max_number ) || ( _POSINT( $max_number ) && $max_number <= $MAX_INT32 );
 
     my $request = {

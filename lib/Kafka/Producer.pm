@@ -56,6 +56,7 @@ use Kafka::Internals qw(
     $MAX_INT32
     $PRODUCER_ANY_OFFSET
     _get_CorrelationId
+    format_message
 );
 
 #-- declarations ---------------------------------------------------------------
@@ -232,11 +233,11 @@ sub new {
 
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'Connection' )
         unless _INSTANCE( $self->{Connection}, 'Kafka::Connection' );
-    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'CorrelationId ('.( $self->{CorrelationId} // '<undef>' ).')' )
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, format_message( 'CorrelationId (%s)', $self->{CorrelationId} ) )
         unless isint( $self->{CorrelationId} ) && $self->{CorrelationId} <= $MAX_CORRELATIONID;
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'ClientId' )
         unless ( $self->{ClientId} eq q{} || defined( _STRING( $self->{ClientId} ) ) ) && !utf8::is_utf8( $self->{ClientId} );
-    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'Timeout ('.( $self->{Timeout} // '<undef>' ).')' )
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, format_message( 'Timeout (%s)', $self->{Timeout} ) )
         unless _NUMBER( $self->{Timeout} ) && $self->{Timeout} <= $MAX_INT32;
 
     my $required_acks = $self->{RequiredAcks};
@@ -328,7 +329,7 @@ sub send {
 
     $messages = [ $messages ] unless ref( $messages );
     foreach my $message ( @$messages ) {
-        $self->_error( $ERROR_MISMATCH_ARGUMENT, 'message = '.( $message // '<undef>' ) )
+        $self->_error( $ERROR_MISMATCH_ARGUMENT, format_message( 'message = %s', $message ) )
             unless defined( $message ) && ( $message eq q{} || ( defined( _STRING( $message ) ) && !utf8::is_utf8( $message ) ) );
     }
 

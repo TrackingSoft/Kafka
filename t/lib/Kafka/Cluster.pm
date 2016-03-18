@@ -66,6 +66,9 @@ use Params::Util qw(
 use Proc::Daemon;
 use Try::Tiny;
 
+use Kafka::Internals qw(
+    format_message
+);
 use Kafka::IO;
 
 #-- declarations ---------------------------------------------------------------
@@ -484,7 +487,7 @@ sub init {
 
     $self->stop;
     # WARNING: Deleting old Kafka server log directories
-    say '[', scalar( localtime ), '] Removing the kafka log tree: ', $self->_data_dir;
+    say format_message( '[%s] Removing the kafka log tree: %s', $self->_data_dir, scalar( localtime ) );
     $self->_remove_log_tree;
 
     return 1;
@@ -699,7 +702,7 @@ sub close {
     $self->init;
     unless ( $self->is_run_in_base_dir ) {
         $self->_stop_zookeeper;
-        say '[', scalar( localtime ), '] Removing zookeeper log tree: ', $self->_data_dir;
+        say format_message( '[%s] Removing zookeeper log tree: %s', scalar( localtime ), $self->_data_dir );
         remove_tree( catdir( $self->_data_dir, 'zookeeper' ) );
     }
 
@@ -890,7 +893,7 @@ sub _kill_pid {
     if ( !kill( 0, $pid ) ) {
         carp( "$what $pid does not seem to be running" );
     } else {
-        say '[', scalar( localtime ), "] Stopping $what: pid = $pid, signal = $signal";
+        say format_message( '[%s] Stopping %s: pid = %s, signal = %s', scalar( localtime ), $what, $pid, $signal );
         kill $signal, $pid;
     }
 
@@ -1111,7 +1114,7 @@ sub _start_server {
     $property_file = catfile( $log_dir, $property_file );
     my $cmd_str = "$server_start_cmd $arg $property_file";
     if ( $pid ) {
-        say '[', scalar( localtime ), "] Starting $server_name: port = ", $port, ", pid = $pid";
+        say format_message( '[%s] Starting %s: port = %s, pid = %s', scalar( localtime ), $server_name, $port, $pid );
 
         my $attempts = $MAX_START_ATTEMPT;
         while ( $attempts-- ) {
@@ -1250,7 +1253,7 @@ sub _create_topic {
         '--topic'                           => $DEFAULT_TOPIC,
     );
 
-    say '[', scalar( localtime ), "] Creating topic '$DEFAULT_TOPIC': replication factor = ", scalar( @servers ), ", partition = $partitions";
+    say format_message( "[%s] Creating topic '%s': replication factor = %s, partition = %s", scalar( localtime ), $DEFAULT_TOPIC, scalar( @servers ), $partitions );
     my ( $exit_status, $child_error );
     {
         my $out_fh = IO::File->new( catfile( $log_dir, 'kafka-create-topic-stdout.log' ), 'w+' );

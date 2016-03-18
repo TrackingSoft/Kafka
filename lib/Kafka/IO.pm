@@ -84,6 +84,7 @@ use Kafka::Exceptions;
 use Kafka::Internals qw(
     $MAX_SOCKET_REQUEST_BYTES
     debug_level
+    format_message
 );
 
 #-- declarations ---------------------------------------------------------------
@@ -378,7 +379,7 @@ sub _connect {
             my $remaining;
             my $start = time();
 
-            $self->_debug_msg( "name = '$name', number of wallclock seconds = ".ceil( $timeout ) )
+            $self->_debug_msg( format_message( "name = '%s', number of wallclock seconds = %s", $name, ceil( $timeout ) ) )
                 if $self->debug_level;
 
             # DNS lookup.
@@ -398,16 +399,16 @@ sub _connect {
             my $error = $@;
             undef $h;
 
-            $self->_debug_msg( "_connect: ip = '".( $ip || '<undef>' ).", error = '$error', \$? = $?, \$! = '$!'" )
+            $self->_debug_msg( format_message( "_connect: ip = '%s', error = '%s', \$? = %s, \$! = '%s'", $ip, $error, $?, $! ) )
                 if $self->debug_level;
 
             die $error if $error;
-            die( "gethostbyname $name: \$? = '$?', \$! = '$!'\n" ) unless $ip;
+            die( format_message( "gethostbyname %s: \$? = '%s', \$! = '%s'\n", $name, $?, $! ) ) unless $ip;
 
             my $elapsed = time() - $start;
             # $SIG{ALRM} restored automatically, but we need to restart previous alarm manually
 
-            $self->_debug_msg( "_connect: ".( $remaining // '<undef>' )." (remaining) - $elapsed (elapsed) = ".( $remaining - $elapsed ) )
+            $self->_debug_msg( format_message( '_connect: %s (remaining) - %s (elapsed) = %s', $remaining, $elapsed, $remaining - $elapsed ) )
                 if $self->debug_level;
             if ( $remaining ) {
                 if ( $remaining - $elapsed > 0 ) {
@@ -425,7 +426,7 @@ sub _connect {
             }
         } else {
             $ip = $self->_gethostbyname( $name );
-            die( "not resolve a host name to the IP address: $name\n" ) unless $ip;
+            die( format_message( "not resolve a host name to the IP address: %s\n", $name ) ) unless $ip;
         }
     }
 
@@ -448,7 +449,7 @@ sub _connect {
         ? pack_sockaddr_in(  $port, inet_aton( $ip ) )
         : pack_sockaddr_in6( $port, inet_pton( $self->{af}, $ip ) )
     ;
-    connect( $connection, $sockaddr ) || $!{EINPROGRESS} || die( "connect ip = $ip, port = $port: $!\n" );
+    connect( $connection, $sockaddr ) || $!{EINPROGRESS} || die( format_message( "connect ip = %s, port = %s: %s\n", $ip, $port, $! ) );
 
     $self->{socket}     = $connection;
     $self->{_select}    = undef;
@@ -464,12 +465,12 @@ sub _connect {
     unless ( vec( $vec, fileno( $connection ), 1 ) ) {
         # If no response yet, impose our own timeout.
         $! = Errno::ETIMEDOUT();
-        die( "connect ip = $ip, port = $port: $!\n" );
+        die( format_message( "connect ip = %s, port = %s: %s\n", $ip, $port, $! ) );
     }
 
     # This is how we see whether it connected or there was an error. Document Unix, are you kidding?!
     $! = unpack( q{L}, getsockopt( $connection, SOL_SOCKET, SO_ERROR ) );
-    die( "connect ip = $ip, port = $port: $!\n" ) if $!;
+    die( format_message( "connect ip = %s, port = %s: %s\n", $ip, $port, $! ) ) if $!;
 
     # Set timeout on all reads and writes.
     #
@@ -573,7 +574,7 @@ sub _get_family {
     my $is_ip;
     my $ip_version = $self->{ip_version} // 0;
     if ( ( ( $is_ip = is_ipv6( $name ) ) && !$ip_version ) || $ip_version == $IP_V6 ) {
-        $self->_error( $ERROR_INCOMPATIBLE_HOST_IP_VERSION, "ip_version = $ip_version, host = $name" )
+        $self->_error( $ERROR_INCOMPATIBLE_HOST_IP_VERSION, format_message( 'ip_version = %s, host = %s', $ip_version, $name ) )
             if
                    $ip_version
                 && (
@@ -585,7 +586,7 @@ sub _get_family {
         $self->{af} = AF_INET6;
         $self->{pf} = PF_INET6;
     } elsif ( ( ( $is_ip = is_ipv4( $name ) ) && !$ip_version ) || $ip_version == $IP_V4 ) {
-        $self->_error( $ERROR_INCOMPATIBLE_HOST_IP_VERSION, "ip_version = $ip_version, host = $name" )
+        $self->_error( $ERROR_INCOMPATIBLE_HOST_IP_VERSION, format_message( 'ip_version = %s, host = %s', $ip_version, $name ) )
             if
                    $ip_version
                 && (
@@ -645,7 +646,7 @@ sub _debug_msg {
             )
         ;
     } else {
-        say STDERR '[', scalar( localtime ), ' ] ', $message;
+        say STDERR format_message( '[%s] %s', scalar( localtime ), $message );
     }
 
     return;

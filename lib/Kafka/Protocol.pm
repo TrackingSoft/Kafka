@@ -94,6 +94,7 @@ use Kafka::Internals qw(
     $APIKEY_OFFSET
     $APIKEY_PRODUCE
     $PRODUCER_ANY_OFFSET
+    format_message
 );
 
 #-- declarations ---------------------------------------------------------------
@@ -1175,7 +1176,7 @@ sub _decode_MessageSet_array {
             my $decompressed;
             if ( $compression_codec == $COMPRESSION_GZIP ) {
                 gunzip( \$Message->{Value} => \$decompressed )
-                    or _error( $ERROR_COMPRESSION, "gunzip failed: $GunzipError" );
+                    or _error( $ERROR_COMPRESSION, format_message( 'gunzip failed: %s', $GunzipError ) );
             } elsif ( $compression_codec == $COMPRESSION_SNAPPY ) {
                 my ( $header, $x_version, $x_compatversion, undef ) = unpack( q{a[8]L>L>L>}, $Message->{Value} );   # undef - $x_length
 
@@ -1186,7 +1187,7 @@ sub _decode_MessageSet_array {
                         $Message->{Value} = substr( $Message->{Value}, 20 );    # 20 = q{a[8]L>L>L>}
                     } else {
                         #warn("V $x_version and comp $x_compatversion");
-                        _error( $ERROR_COMPRESSION, "Snappy compression with incompatible xerial header version found (x_version = $x_version, x_compatversion = $x_compatversion)" );
+                        _error( $ERROR_COMPRESSION, format_message( 'Snappy compression with incompatible xerial header version found (x_version = %s, x_compatversion = %s)', $x_version, $x_compatversion ) );
                     }
                 }
 

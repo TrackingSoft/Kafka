@@ -121,6 +121,7 @@ use Kafka::Internals qw(
     $MAX_INT32
     debug_level
     _get_CorrelationId
+    format_message
 );
 use Kafka::IO;
 use Kafka::Protocol qw(
@@ -441,11 +442,11 @@ sub new {
         unless defined( $self->{host} ) && ( $self->{host} eq q{} || defined( _STRING( $self->{host} ) ) ) && !utf8::is_utf8( $self->{host} );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'port' )
         unless _POSINT( $self->{port} );
-    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'timeout ('.( $self->{timeout} // '<undef>' ).')' )
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, format_message( 'timeout (%s)', $self->{timeout} ) )
         unless ( _NUMBER( $self->{timeout} ) && $self->{timeout} > 0 && $self->{timeout} <= $MAX_INT32 ) || !defined( $self->{timeout} );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'broker_list' )
         unless _ARRAY0( $self->{broker_list} );
-    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'CorrelationId ('.( $self->{CorrelationId} // '<undef>' ).')' )
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, format_message( 'CorrelationId (%s)', $self->{CorrelationId} ) )
         unless isint( $self->{CorrelationId} ) && $self->{CorrelationId} <= $MAX_CORRELATIONID;
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'SEND_MAX_ATTEMPTS' )
         unless _POSINT( $self->{SEND_MAX_ATTEMPTS} );
@@ -457,7 +458,7 @@ sub new {
         unless defined( _NONNEGINT( $self->{MaxLoggedErrors} ) );
 
     my $ip_version = $self->{ip_version};
-    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'ip_version ('.( $ip_version // '<undef>' ).')' )
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, format_message( 'ip_version (%s)', $ip_version ) )
         unless ( !defined( $ip_version ) || ( defined( _NONNEGINT( $ip_version ) ) && ( $ip_version == $IP_V4 || $ip_version == $IP_V6 ) ) );
 
     $self->{_metadata} = {};                # {
@@ -567,7 +568,7 @@ sub get_metadata {
 
     $self->_update_metadata( $topic )
         # FATAL error
-        or $self->_error( $ERROR_CANNOT_GET_METADATA, "topic = '".( $topic // '<undef>' )."'" );
+        or $self->_error( $ERROR_CANNOT_GET_METADATA, format_message( "topic = '%s'", $topic ) );
 
     my $clone;
     if ( defined $topic ) {
@@ -611,7 +612,7 @@ sub is_server_alive {
         unless $self->get_known_servers;
 
     my $io_cache = $self->{_IO_cache};
-    $self->_error( $ERROR_MISMATCH_ARGUMENT, "Unknown server '$server' (is not found in the metadata)" )
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, format_message( "Unknown server '%s' (is not found in the metadata)", $server ) )
         unless exists( $io_cache->{ $server } );
 
     if ( my $io = $self->_connectIO( $server ) ) {
@@ -704,7 +705,7 @@ sub receive_response_to_request {
     ) {
         $self->_update_metadata( $topic_name )  # hash metadata could be updated
             # FATAL error
-            or $self->_error( $ERROR_CANNOT_GET_METADATA, "topic = '$topic_name'" );
+            or $self->_error( $ERROR_CANNOT_GET_METADATA, format_message( "topic = '%s'", $topic_name ) );
     }
     my $encoded_request = $protocol{ $api_key }->{encode}->( $request, $compression_codec );
 
@@ -791,7 +792,7 @@ sub receive_response_to_request {
                     last REQUEST;   # go to the next attempt
                 } else {
                     # FATAL error
-                    $self->_error( $ErrorCode, "topic = '$topic_name', partition = $partition" );
+                    $self->_error( $ErrorCode, format_message( "topic = '%s', partition = %s", $topic_name, $partition ) );
                 }
             }
         }
@@ -807,14 +808,14 @@ sub receive_response_to_request {
 
         $self->_update_metadata( $topic_name )
             # FATAL error
-            or $self->_error( $ErrorCode || $ERROR_CANNOT_GET_METADATA, "topic = '$topic_name', partition = $partition" );
+            or $self->_error( $ErrorCode || $ERROR_CANNOT_GET_METADATA, format_message( "topic = '%s', partition = %s", $topic_name, $partition ) );
     }
 
     # FATAL error
     if ( $ErrorCode ) {
-        $self->_error( $ErrorCode, "topic = '".$topic_data->{TopicName}."'".( $partition_data ? ", partition = ".$partition_data->{Partition} : q{} ) );
+        $self->_error( $ErrorCode, format_message( "topic = '%s'%s", $topic_data->{TopicName}, $partition_data ? ", partition = ".$partition_data->{Partition} : q{} ) );
     } else {
-        $self->_error( $ERROR_UNKNOWN_TOPIC_OR_PARTITION, "topic = '$topic_name', partition = $partition" );
+        $self->_error( $ERROR_UNKNOWN_TOPIC_OR_PARTITION, format_message( "topic = '%s', partition = %s", $topic_name, $partition ) );
     }
 
     return;
@@ -849,7 +850,7 @@ sub exists_topic_partition {
     unless ( %{ $self->{_metadata} } ) {    # the first request
         $self->_update_metadata( $topic )   # hash metadata could be updated
             # FATAL error
-            or $self->_error( $ERROR_CANNOT_GET_METADATA, "topic = '$topic'" );
+            or $self->_error( $ERROR_CANNOT_GET_METADATA, format_message( "topic = '%s'", $topic ) );
     }
 
     return exists $self->{_metadata}->{ $topic }->{ $partition };
@@ -965,13 +966,13 @@ sub _remember_nonfatal_error {
 
     shift( @{ $self->{_nonfatal_errors} } )
         if scalar( @{ $self->{_nonfatal_errors} } ) == $max_logged_errors;
-    my $msg = sprintf( "[%s] Non-fatal error: %s (ErrorCode %s, server '%s', topic '%s', partition %s)",
+    my $msg = format_message( "[%s] Non-fatal error: %s (ErrorCode %s, server '%s', topic '%s', partition %s)",
         scalar( localtime ),
         $error      // ( defined( $error_code ) && exists( $ERROR{ $error_code } ) ? $ERROR{ $error_code } : '<undef>' ),
         $error_code // 'IO error',
-        $server     // '<undef>',
-        $topic      // '<undef>',
-        $partition  // '<undef>',
+        $server,
+        $topic,
+        $partition,
     );
 
     say STDERR $msg
@@ -1061,7 +1062,7 @@ sub _update_metadata {
             return $self->_attempt_update_metadata( $is_recursive_call, $topic, undef, $ERROR_NO_KNOWN_BROKERS );
         } else {
             # FATAL error
-            $self->_error( $ERROR_NO_KNOWN_BROKERS, "topic = '".( $topic // '<undef>' )."'" );
+            $self->_error( $ERROR_NO_KNOWN_BROKERS, format_message( "topic = '%s'", $topic ) );
         }
     }
 
@@ -1118,13 +1119,13 @@ sub _update_metadata {
             return $self->_attempt_update_metadata( $is_recursive_call, $TopicName, $partition, $ErrorCode );
         } else {
             # FATAL error
-            $self->_error( $ErrorCode, "topic = '$TopicName'", defined( $partition ) ? ", partition = $partition" : () );
+            $self->_error( $ErrorCode, format_message( "topic = '%s'%s", $TopicName, defined( $partition ) ? ", partition = $partition" : '' ) );
         }
     }
 
     %$received_metadata
         # FATAL error
-        or $self->_error( $ERROR_CANNOT_GET_METADATA, "topic = '".( $topic // '<undef>' )."'" );
+        or $self->_error( $ERROR_CANNOT_GET_METADATA, format_message( "topic = '%s'", $topic ) );
 
     # Update metadata for received topics
     $self->{_metadata}->{ $_ }  = $received_metadata->{ $_ } foreach keys %{ $received_metadata };
@@ -1152,7 +1153,7 @@ sub _attempt_update_metadata {
         return( 1 ) if $self->_update_metadata( $topic, 1 );
     }
     # FATAL error
-    $self->_error( $error_code, "topic = '".( $topic // '<undef>' )."'", defined( $partition ) ? ", partition = $partition" : () );
+    $self->_error( $error_code, format_message( "topic = '%s'%s", $topic, defined( $partition ) ? ", partition = $partition" : '' ) );
 
     return;
 }

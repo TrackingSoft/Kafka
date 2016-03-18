@@ -56,6 +56,9 @@ use Exception::Class (
 use Kafka qw(
     %ERROR
 );
+use Kafka::Internals qw(
+    format_message
+);
 
 #-- declarations ---------------------------------------------------------------
 
@@ -207,7 +210,7 @@ sub throw_args {
 
     return(
         code    => $error_code,
-        message => $ERROR{ $error_code }.( $description ? ": $description" : q{} ),
+        message => format_message( '%s%s', $ERROR{ $error_code }, $description ? ": $description" : '' ),
     );
 }
 
