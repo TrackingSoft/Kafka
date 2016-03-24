@@ -118,9 +118,10 @@ sub debug_msg {
 
 #-- Global data ----------------------------------------------------------------
 
+my $server_port = empty_port( $KAFKA_SERVER_PORT );
 $server = Test::TCP->new(
     code    => $server_code,
-    port    => empty_port( $KAFKA_SERVER_PORT - 1 ),
+    port    => $server_port,
 );
 $port = $server->port;
 ok $port, "server port = $port";
