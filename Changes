@@ -4,6 +4,7 @@ Revision history for Kafka package
     - Adapted for kafka 0.9.0.1 .
     BUGFIXES:
     - Tests corrected.
+    - Require perl 5.10 core modules version.
 
 0.9001 Tri Feb  05 2016
     BUGFIXES:
