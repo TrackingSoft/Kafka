@@ -1,5 +1,6 @@
 Revision history for Kafka package
 
+0.9010 Thu Apr  28 2016
     CHANGES:
     - Adapted for kafka 0.9.0.1 .
     BUGFIXES:
