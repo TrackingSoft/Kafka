@@ -7,7 +7,7 @@ server via socket.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::MockIO> version 0.9010 .
+This documentation refers to C<Kafka::MockIO> version 0.9011 .
 
 =cut
 
@@ -19,7 +19,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.9010';
+our $VERSION = '0.9011';
 
 #-- load the modules -----------------------------------------------------------
 

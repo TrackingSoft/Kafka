@@ -1,5 +1,6 @@
 Revision history for Kafka package
 
+0.9011 Tue May  24 2016
     BUGFIXES:
     - Test::More required version corrected.
 
