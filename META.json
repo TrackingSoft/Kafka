@@ -73,6 +73,7 @@
             "File::Spec::Functions" : "3.2501",
             "IO::File" : "1.14",
             "IO::Socket::INET" : "1.31",
+            "IO::Socket::IP" : "0.37",
             "List::Util" : "1.19",
             "Net::EmptyPort" : "0",
             "Params::Util" : "1.07",

@@ -65,6 +65,7 @@ The Kafka package has the following optional dependencies:
    File::Spec::Functions
    IO::File
    IO::Socket::INET
+   IO::Socket::IP
    List::Util
    Net::EmptyPort
    Params::Util

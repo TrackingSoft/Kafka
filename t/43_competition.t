@@ -94,7 +94,7 @@ const my $MSG_LEN               => int( $MAX_DATA / $MAX_DATA_RECORS );
 const my $MAX_MSGS_SENT         => min( 10_000, int( $MAX_CORRELATIONID / ( $MSG_LEN + $MESSAGE_SIZE_OVERHEAD ) ) ),
 const my $MAX_MSGS_RECV         => min( 10_000, int( $MAX_CORRELATIONID / ( $MSG_LEN + $MESSAGE_SIZE_OVERHEAD ) ) ),
 const my $CLIENT_MSGS           => int( $MAX_DATA_RECORS / $PAIRS_CLIENTS );
-const my $SECS_TO_WAIT          => 300;
+const my $SECS_TO_WAIT          => 600;
 
 const my $AUTO_CREATE_TOPICS    => 'true';
 const my $REPLICATION_FACTOR    => 3;
