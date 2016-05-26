@@ -1,5 +1,6 @@
 Revision history for Kafka package
 
+0.9012 Thu May  26 2016
     CHANGES:
     - Test improvements.
     BUGFIXES:
