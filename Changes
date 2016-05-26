@@ -1,5 +1,8 @@
 Revision history for Kafka package
 
+    BUGFIXES:
+    - Data::Dumper 'Sparseseen' method not used now.
+
 0.9011 Tue May  24 2016
     BUGFIXES:
     - Test::More required version corrected.

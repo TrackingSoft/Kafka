@@ -248,7 +248,7 @@ sub format_reference {
             ->Quotekeys( 0 )
             ->Sortkeys( 1 )
             ->Useperl( 1 )      # XS version seems to have a bug which sometimes results in modification of original object
-            ->Sparseseen( 1 )   # speed up since we don't use "Seen" hash
+#            ->Sparseseen( 1 )   # speed up since we don't use "Seen" hash
         ;
     }
 
