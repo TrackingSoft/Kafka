@@ -45,6 +45,7 @@ use Const::Fast;
 use Kafka qw(
     $BLOCK_UNTIL_IS_COMMITTED
     $RECEIVE_LATEST_OFFSET
+    $RETRY_BACKOFF
 );
 use Kafka::Cluster qw(
     $DEFAULT_TOPIC
@@ -187,8 +188,9 @@ $topic      = $DEFAULT_TOPIC;
 
 # connecting to the Kafka server port
 $connection = Kafka::Connection->new(
-    host    => 'localhost',
-    port    => $port,
+    host            => 'localhost',
+    port            => $port,
+    RETRY_BACKOFF   => $RETRY_BACKOFF * 2,
 );
 $producer = Kafka::Producer->new(
     Connection      => $connection,

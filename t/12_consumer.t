@@ -51,6 +51,7 @@ use Kafka qw(
     $MIN_BYTES_RESPOND_IMMEDIATELY
     $RECEIVE_EARLIEST_OFFSETS
     $RECEIVE_LATEST_OFFSET
+    $RETRY_BACKOFF
 );
 use Kafka::Cluster;
 use Kafka::Connection;
@@ -135,8 +136,9 @@ sub communication_error {
     my $method_name = "${module}::${name}";
     my $method = \&$method_name;
     $connect = Kafka::Connection->new(
-        host        => 'localhost',
-        port        => $port,
+        host            => 'localhost',
+        port            => $port,
+        RETRY_BACKOFF   => $RETRY_BACKOFF * 2,
     );
 
     Sub::Install::reinstall_sub( {
@@ -206,8 +208,9 @@ sub testing {
 #-- Connecting to the Kafka server port
 
     $connect = Kafka::Connection->new(
-        host    => 'localhost',
-        port    => $port,
+        host            => 'localhost',
+        port            => $port,
+        RETRY_BACKOFF   => $RETRY_BACKOFF * 2,
     );
 
 #-- simple start

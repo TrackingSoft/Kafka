@@ -53,6 +53,7 @@ use Kafka qw(
     $BLOCK_UNTIL_IS_COMMITTED
     $MESSAGE_SIZE_OVERHEAD
     $RECEIVE_LATEST_OFFSET
+    $RETRY_BACKOFF
 );
 use Kafka::Cluster;
 use Kafka::Connection;
@@ -311,6 +312,7 @@ sub create_client {
             host                    => $HOST,
             port                    => $port,
             AutoCreateTopicsEnable  => 1,
+            RETRY_BACKOFF           => $RETRY_BACKOFF * 2,
         );
 
         if ( $client_type eq 'producer' ) {
@@ -402,6 +404,7 @@ $connection = Kafka::Connection->new(
     host                    => $HOST,
     port                    => $port,
     AutoCreateTopicsEnable  => 1,
+    RETRY_BACKOFF           => $RETRY_BACKOFF * 2,
 );
 $producer = Kafka::Producer->new(
     Connection      => $connection,

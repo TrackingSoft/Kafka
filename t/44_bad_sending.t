@@ -47,6 +47,7 @@ use Kafka qw(
     $ERROR_SEND_NO_ACK
     $MESSAGE_SIZE_OVERHEAD
     $RECEIVE_LATEST_OFFSET
+    $RETRY_BACKOFF
 );
 use Kafka::Connection;
 use Kafka::Consumer;
@@ -312,6 +313,7 @@ isa_ok( $cluster, 'Kafka::Cluster' );
 $connection = Kafka::Connection->new(
     host            => $HOST,
     port            => $port,
+    RETRY_BACKOFF   => $RETRY_BACKOFF * 2,
 );
 $producer = Kafka::Producer->new(
     Connection      => $connection,

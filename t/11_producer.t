@@ -47,6 +47,7 @@ use Kafka qw(
     $ERROR_MISMATCH_ARGUMENT
     $NOT_SEND_ANY_RESPONSE
     $REQUEST_TIMEOUT
+    $RETRY_BACKOFF
     $WAIT_WRITTEN_TO_LOCAL_LOG
 );
 use Kafka::Cluster;
@@ -115,8 +116,9 @@ sub communication_error {
     my $method = \&$method_name;
 
     $connect = Kafka::Connection->new(
-        host        => 'localhost',
-        port        => $port,
+        host            => 'localhost',
+        port            => $port,
+        RETRY_BACKOFF   => $RETRY_BACKOFF * 2,
     );
     $producer = Kafka::Producer->new(
         Connection  => $connect,
@@ -170,8 +172,9 @@ sub testing {
 #-- Connecting to the Kafka server port
 
     $connect = Kafka::Connection->new(
-        host    => 'localhost',
-        port    => $port,
+        host            => 'localhost',
+        port            => $port,
+        RETRY_BACKOFF   => $RETRY_BACKOFF * 2,
     );
 
 #-- simple start

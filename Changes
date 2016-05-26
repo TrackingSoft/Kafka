@@ -1,5 +1,7 @@
 Revision history for Kafka package
 
+    CHANGES:
+    - Test improvements.
     BUGFIXES:
     - Data::Dumper 'Sparseseen' method not used now.
 

@@ -39,6 +39,9 @@ plan 'no_plan';
 
 use Const::Fast;
 
+use Kafka qw(
+    $RETRY_BACKOFF
+);
 use Kafka::Cluster;
 use Kafka::Connection;
 use Kafka::MockIO;
@@ -69,8 +72,9 @@ sub testing {
 
 #-- simple start
     my $connect = Kafka::Connection->new(
-        host    => 'localhost',
-        port    => $port,
+        host            => 'localhost',
+        port            => $port,
+        RETRY_BACKOFF   => $RETRY_BACKOFF * 2,
     );
     isa_ok( $connect, 'Kafka::Connection' );
 

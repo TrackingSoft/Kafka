@@ -61,6 +61,7 @@ use Kafka qw(
     $NOT_SEND_ANY_RESPONSE
     $WAIT_WRITTEN_TO_LOCAL_LOG
     $BLOCK_UNTIL_IS_COMMITTED
+    $RETRY_BACKOFF
 );
 use Kafka::Cluster;
 use Kafka::Connection;
@@ -124,6 +125,7 @@ unless ( $connect = Kafka::Connection->new(
     port    => $port,
     SEND_MAX_ATTEMPTS       => $attempts,
     RECEIVE_MAX_ATTEMPTS    => $attempts,
+    RETRY_BACKOFF           => $RETRY_BACKOFF * 2,
     ) ) {
     BAIL_OUT 'connection is not created';
 }

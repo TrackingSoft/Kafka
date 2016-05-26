@@ -40,6 +40,7 @@ BEGIN {
 use Const::Fast;
 use Kafka qw(
     $BLOCK_UNTIL_IS_COMMITTED
+    $RETRY_BACKOFF
 );
 use Kafka::Cluster;
 use Kafka::Connection;
@@ -108,8 +109,9 @@ exit;
 
 sub get_new_connection {
     return Kafka::Connection->new(
-        host    => $HOST,
-        port    => $PORT,
+        host                    => $HOST,
+        port                    => $PORT,
+        RETRY_BACKOFF           => $RETRY_BACKOFF * 2,
     );
 }
 

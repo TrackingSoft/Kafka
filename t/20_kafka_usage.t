@@ -51,6 +51,7 @@ use Kafka qw(
     $RECEIVE_LATEST_OFFSET
     $RECEIVE_EARLIEST_OFFSETS
     $REQUEST_TIMEOUT
+    $RETRY_BACKOFF
 );
 use Kafka::Cluster;
 use Kafka::Connection;
@@ -97,8 +98,9 @@ dies_ok { $connect = Kafka::Connection->new(
 ) } 'expecting to die';
 
 $connect = Kafka::Connection->new(
-    host    => $host_name,
-    port    => $port,
+    host            => $host_name,
+    port            => $port,
+    RETRY_BACKOFF   => $RETRY_BACKOFF * 2,
 );
 isa_ok( $connect, 'Kafka::Connection');
 
@@ -149,8 +151,9 @@ $connect->close;
 
 undef $connect;
 unless ( $connect = Kafka::Connection->new(
-    host    => $host_name,
-    port    => $port,
+    host            => $host_name,
+    port            => $port,
+    RETRY_BACKOFF   => $RETRY_BACKOFF * 2,
     ) ) {
     fail 'connection is not created';
 }

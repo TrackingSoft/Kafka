@@ -68,6 +68,7 @@ use Kafka qw(
     $MIN_BYTES_RESPOND_HAS_DATA
     $RECEIVE_EARLIEST_OFFSETS
     $REQUEST_TIMEOUT
+    $RETRY_BACKOFF
     $SEND_MAX_ATTEMPTS
     $WAIT_WRITTEN_TO_LOCAL_LOG
 );
@@ -307,6 +308,7 @@ sub Kafka_IO_error {
         host                => $host,
         port                => $port,
         CorrelationId       => $CorrelationId,
+        RETRY_BACKOFF       => $RETRY_BACKOFF * 2,
     );
 
     is scalar( @{ $connection->nonfatal_errors } ), 0, 'non-fatal errors are not fixed';
@@ -340,6 +342,7 @@ $connection = Kafka::Connection->new(
     host                => $host,
     port                => $port,
     CorrelationId       => $CorrelationId,
+    RETRY_BACKOFF       => $RETRY_BACKOFF * 2,
 );
 
 #-- $ERROR_LEADER_NOT_FOUND
@@ -441,6 +444,7 @@ foreach my $ErrorCode (
         host                => $host,
         port                => $port,
         CorrelationId       => $CorrelationId,
+        RETRY_BACKOFF       => $RETRY_BACKOFF * 2,
     );
 
     is scalar( @{ $connection->nonfatal_errors } ), 0, 'non-fatal errors are not fixed';

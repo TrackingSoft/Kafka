@@ -57,6 +57,7 @@ use Kafka qw(
     $BLOCK_UNTIL_IS_COMMITTED
     $DEFAULT_MAX_BYTES
     $RECEIVE_LATEST_OFFSET
+    $RETRY_BACKOFF
 );
 use Kafka::Cluster qw(
     $DEFAULT_REPLICATION_FACTOR
@@ -163,6 +164,7 @@ for my $auto_create_topics_enable ( 'true', 'false' ) {
             host                    => 'localhost',
             port                    => $port,
             AutoCreateTopicsEnable  => $AutoCreateTopicsEnable,
+            RETRY_BACKOFF           => $RETRY_BACKOFF * 2,
         );
         $producer = Kafka::Producer->new(
             Connection      => $connection,

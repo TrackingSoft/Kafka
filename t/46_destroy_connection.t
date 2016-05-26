@@ -32,6 +32,9 @@ plan 'no_plan';
 
 #-- load the modules -----------------------------------------------------------
 
+use Kafka qw(
+    $RETRY_BACKOFF
+);
 use Kafka::Cluster;
 use Kafka::Connection;
 
@@ -56,8 +59,9 @@ sub new_connection {
 
     # connecting to the Kafka server port
     my $connection = Kafka::Connection->new(
-        host    => 'localhost',
-        port    => $port,
+        host            => 'localhost',
+        port            => $port,
+        RETRY_BACKOFF   => $RETRY_BACKOFF * 2,
     );
     isa_ok( $connection, 'Kafka::Connection' );
 
