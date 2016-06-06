@@ -44,15 +44,20 @@ our @EXPORT_OK = qw(
     $ERROR_CANNOT_SEND
     $ERROR_COMPRESSION
     $ERROR_CONSUMER_COORDINATOR_NOT_AVAILABLE_CODE
+    $ERROR_GROUP_COORDINATOR_NOT_AVAILABLE
     $ERROR_GROUP_COORDINATOR_NOT_AVAILABLE_CODE
     $ERROR_INVALID_MESSAGE
     $ERROR_CORRUPT_MESSAGE
+    $ERROR_INVALID_FETCH_SIZE
     $ERROR_INVALID_MESSAGE_SIZE
     $ERROR_LEADER_NOT_AVAILABLE
     $ERROR_LEADER_NOT_FOUND
     $ERROR_LOAD_IN_PROGRESS_CODE
+    $ERROR_GROUP_LOAD_IN_PROGRESS
     $ERROR_GROUP_LOAD_IN_PROGRESS_CODE
     $ERROR_MESSAGE_SIZE_TOO_LARGE
+    $ERROR_MESSAGE_TOO_LARGE
+    $ERROR_NETWORK_EXCEPTION
     $ERROR_METADATA_ATTRIBUTES
     $ERROR_MISMATCH_ARGUMENT
     $ERROR_MISMATCH_CORRELATIONID
@@ -61,7 +66,9 @@ our @EXPORT_OK = qw(
     $ERROR_NOT_BINARY_STRING
     $ERROR_NOT_LEADER_FOR_PARTITION
     $ERROR_NOT_COORDINATOR_FOR_CONSUMER_CODE
+    $ERROR_NOT_COORDINATOR_FOR_GROUP
     $ERROR_NOT_COORDINATOR_FOR_GROUP_CODE
+    $ERROR_OFFSET_METADATA_TOO_LARGE
     $ERROR_OFFSET_METADATA_TOO_LARGE_CODE
     $ERROR_OFFSET_OUT_OF_RANGE
     $ERROR_PARTITION_DOES_NOT_MATCH
@@ -71,26 +78,46 @@ our @EXPORT_OK = qw(
     $ERROR_RESPONSEMESSAGE_NOT_RECEIVED
     $ERROR_INCOMPATIBLE_HOST_IP_VERSION
     $ERROR_SEND_NO_ACK
+    $ERROR_STALE_CONTROLLER_EPOCH
     $ERROR_STALE_CONTROLLER_EPOCH_CODE
     $ERROR_TOPIC_DOES_NOT_MATCH
     $ERROR_UNKNOWN
     $ERROR_UNKNOWN_APIKEY
     $ERROR_UNKNOWN_TOPIC_OR_PARTITION
     $ERROR_INVALID_TOPIC_CODE
+    $ERROR_INVALID_TOPIC_EXCEPTION
+    $ERROR_RECORD_LIST_TOO_LARGE
     $ERROR_RECORD_LIST_TOO_LARGE_CODE
+    $ERROR_NOT_ENOUGH_REPLICAS
     $ERROR_NOT_ENOUGH_REPLICAS_CODE
+    $ERROR_NOT_ENOUGH_REPLICAS_AFTER_APPEND
     $ERROR_NOT_ENOUGH_REPLICAS_AFTER_APPEND_CODE
+    $ERROR_INVALID_REQUIRED_ACKS
     $ERROR_INVALID_REQUIRED_ACKS_CODE
+    $ERROR_ILLEGAL_GENERATION
     $ERROR_ILLEGAL_GENERATION_CODE
+    $ERROR_INCONSISTENT_GROUP_PROTOCOL
     $ERROR_INCONSISTENT_GROUP_PROTOCOL_CODE
+    $ERROR_INVALID_GROUP_ID
     $ERROR_INVALID_GROUP_ID_CODE
+    $ERROR_UNKNOWN_MEMBER_ID
     $ERROR_UNKNOWN_MEMBER_ID_CODE
+    $ERROR_INVALID_SESSION_TIMEOUT
     $ERROR_INVALID_SESSION_TIMEOUT_CODE
+    $ERROR_REBALANCE_IN_PROGRESS
     $ERROR_REBALANCE_IN_PROGRESS_CODE
+    $ERROR_INVALID_COMMIT_OFFSET_SIZE
     $ERROR_INVALID_COMMIT_OFFSET_SIZE_CODE
+    $ERROR_TOPIC_AUTHORIZATION_FAILED
     $ERROR_TOPIC_AUTHORIZATION_FAILED_CODE
+    $ERROR_GROUP_AUTHORIZATION_FAILED
     $ERROR_GROUP_AUTHORIZATION_FAILED_CODE
+    $ERROR_CLUSTER_AUTHORIZATION_FAILED
     $ERROR_CLUSTER_AUTHORIZATION_FAILED_CODE
+    $ERROR_INVALID_TIMESTAMP
+    $ERROR_UNSUPPORTED_SASL_MECHANISM
+    $ERROR_ILLEGAL_SASL_STATE
+    $ERROR_UNSUPPORTED_VERSION
     $IP_V4
     $IP_V6
     $KAFKA_SERVER_PORT
@@ -651,7 +678,7 @@ const our $DEFAULT_MAX_WAIT_TIME                => 100;
 
 =item C<$MESSAGE_SIZE_OVERHEAD>
 
-26 - size of protocol overhead (data added by protocol) for each message.
+34 - size of protocol overhead (data added by protocol) for each message.
 
 =back
 
@@ -659,6 +686,15 @@ const our $DEFAULT_MAX_WAIT_TIME                => 100;
 # Look at the structure of 'Message sets'
 # https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-Messagesets
 # for example the case with an empty key:
+# Message format:
+# v0
+# Message => Crc MagicByte Attributes Key Value
+#   Crc => int32
+#   MagicByte => int8
+#   Attributes => int8
+#   Key => bytes
+#   Value => bytes
+#
 # MessageSet => [Offset MessageSize Message]
 #   00:00:00:00:00:00:00:00:        # Offset => int64
 #   00:00:00:14:                    # MessageSize => int32 (a size 0x14 = 20 bytes)
@@ -668,7 +704,16 @@ const our $DEFAULT_MAX_WAIT_TIME                => 100;
 #   00:                             # Attributes => int8 (the lowest 2 bits - Compression None)
 #   ff:ff:ff:ff:                    # Key => bytes (a length -1 = null bytes)
 #   00:00:00:06:                    # Value => bytes (a length 0x6 = 6 bytes)
-const our $MESSAGE_SIZE_OVERHEAD                => 26;
+#
+# v1 (supported since 0.10.0)
+# Message => Crc MagicByte Attributes Key Value
+#   Crc => int32
+#   MagicByte => int8
+#   Attributes => int8
+#   Timestamp => int64              # new since 0.10.0
+#   Key => bytes
+#   Value => bytes
+const our $MESSAGE_SIZE_OVERHEAD                => 34;
 
 =pod
 
@@ -874,12 +919,6 @@ of Apache Kafka Wire Format protocol response.
 
 # According
 # https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-ErrorCodes
-# $ERROR_INVALID_MESSAGE synonym $ERROR_CORRUPT_MESSAGE .
-# Also added new error code names:
-# Depricated                                        Now
-# $ERROR_LOAD_IN_PROGRESS_CODE                      $ERROR_GROUP_LOAD_IN_PROGRESS_CODE
-# $ERROR_CONSUMER_COORDINATOR_NOT_AVAILABLE_CODE    $ERROR_GROUP_COORDINATOR_NOT_AVAILABLE_CODE
-# $ERROR_NOT_COORDINATOR_FOR_CONSUMER_CODE          $ERROR_NOT_COORDINATOR_FOR_GROUP_CODE
 
 =item C<$ERROR_NO_ERROR>
 
@@ -899,15 +938,14 @@ const our $ERROR_UNKNOWN                        => -1;
 
 =item C<$ERROR_OFFSET_OUT_OF_RANGE>
 
-1 - The requested offset is outside the range of offsets available at the server
-for the given topic/partition.
+1 - The requested offset is not within the range of offsets maintained by the server.
 
 =cut
 const our $ERROR_OFFSET_OUT_OF_RANGE            => 1;
 
 =item C<$ERROR_INVALID_MESSAGE>
 
-2 - This indicates that a message contents does not match its CRC.
+2 - This message has failed its CRC checksum, exceeds the valid size, or is otherwise corrupt.
 
 Synonym name $ERROR_CORRUPT_MESSAGE .
 
@@ -917,21 +955,24 @@ const our $ERROR_CORRUPT_MESSAGE                => 2;
 
 =item C<$ERROR_UNKNOWN_TOPIC_OR_PARTITION>
 
-3 - This request is for a topic or partition that does not exist on this broker.
+3 - This server does not host this topic-partition.
 
 =cut
 const our $ERROR_UNKNOWN_TOPIC_OR_PARTITION     => 3;
 
-=item C<$ERROR_INVALID_MESSAGE_SIZE>
+=item C<$ERROR_INVALID_FETCH_SIZE>
 
-4 - Message has invalid size.
+4 - The requested fetch size is invalid.
+
+Synonym name $ERROR_INVALID_MESSAGE_SIZE .
 
 =cut
 const our $ERROR_INVALID_MESSAGE_SIZE           => 4;
+const our $ERROR_INVALID_FETCH_SIZE             => 4;
 
 =item C<$ERROR_LEADER_NOT_AVAILABLE>
 
-5 - Unable to write due to ongoing Kafka leader selection
+5 - Unable to write due to ongoing Kafka leader selection.
 
 This error is thrown if we are in the middle of a leadership election and there is
 no current leader for this partition, hence it is unavailable for writes.
@@ -941,7 +982,7 @@ const our $ERROR_LEADER_NOT_AVAILABLE           => 5;
 
 =item C<$ERROR_NOT_LEADER_FOR_PARTITION>
 
-6 - Server is not a leader for partition
+6 - Server is not a leader for partition.
 
 This error is thrown if the client attempts to send messages to a replica that is not the leader for some partition.
 It indicates that the clients metadata is out of date.
@@ -951,7 +992,7 @@ const our $ERROR_NOT_LEADER_FOR_PARTITION       => 6;
 
 =item C<$ERROR_REQUEST_TIMED_OUT>
 
-7 - Request time-out
+7 - Request time-out.
 
 This error is thrown if the request exceeds the user-specified time limit in the request.
 
@@ -960,7 +1001,7 @@ const our $ERROR_REQUEST_TIMED_OUT              => 7;
 
 =item C<$ERROR_BROKER_NOT_AVAILABLE>
 
-8 - Broker is not available
+8 - Broker is not available.
 
 This is not a client facing error and is used mostly by tools when a broker is not alive.
 
@@ -969,190 +1010,269 @@ const our $ERROR_BROKER_NOT_AVAILABLE           => 8;
 
 =item C<$ERROR_REPLICA_NOT_AVAILABLE>
 
-9 - Replica not available
+9 - The replica is not available for the requested topic-partition.
 
 If replica is expected on a broker, but is not (this can be safely ignored).
 
 =cut
 const our $ERROR_REPLICA_NOT_AVAILABLE          => 9;
 
-=item C<$ERROR_MESSAGE_SIZE_TOO_LARGE>
+=item C<$ERROR_MESSAGE_TOO_LARGE>
 
-10 - Message is too big
+10 - The request included a message larger than the max message size the server will accept.
 
 The server has a configurable maximum message size to avoid unbounded memory allocation.
 This error is thrown if the client attempt to produce a message larger than this maximum.
 
+Synonym name $ERROR_MESSAGE_SIZE_TOO_LARGE .
+
 =cut
 const our $ERROR_MESSAGE_SIZE_TOO_LARGE         => 10;
+const our $ERROR_MESSAGE_TOO_LARGE              => 10;
 
-=item C<$ERROR_STALE_CONTROLLER_EPOCH_CODE>
+=item C<$ERROR_STALE_CONTROLLER_EPOCH>
 
-11 - Stale Controller Epoch Code
+11 - The controller moved to another broker.
 
 According to Apache Kafka documentation:
 Internal error code for broker-to-broker communication.
 
+Synonym name $ERROR_STALE_CONTROLLER_EPOCH_CODE .
+
 =cut
 const our $ERROR_STALE_CONTROLLER_EPOCH_CODE    => 11;
+const our $ERROR_STALE_CONTROLLER_EPOCH         => 11;
 
-=item C<$ERROR_OFFSET_METADATA_TOO_LARGE_CODE>
+=item C<$ERROR_OFFSET_METADATA_TOO_LARGE>
 
 12 - Specified metadata offset is too big
 
 If you specify a value larger than configured maximum for offset metadata.
 
+Synonym name $ERROR_OFFSET_METADATA_TOO_LARGE_CODE .
+
 =cut
+const our $ERROR_OFFSET_METADATA_TOO_LARGE      => 12;
 const our $ERROR_OFFSET_METADATA_TOO_LARGE_CODE => 12;
 
-=item C<$ERROR_GROUP_LOAD_IN_PROGRESS_CODE>
+=item C<$ERROR_NETWORK_EXCEPTION>
 
-14 - The broker returns this error code for an offset fetch request
-if it is still loading offsets (after a leader change for that offsets topic partition),
-or in response to group membership requests (such as heartbeats)
-when group metadata is being loaded by the coordinator..
-
-Old name $ERROR_LOAD_IN_PROGRESS_CODE .
+13 - The server disconnected before a response was received.
 
 =cut
-const our $ERROR_LOAD_IN_PROGRESS_CODE          => 14;  # Depricated
+const our $ERROR_NETWORK_EXCEPTION              => 13;
+
+=item C<$ERROR_GROUP_LOAD_IN_PROGRESS>
+
+14 - The coordinator is loading and hence can't process requests for this group.
+
+Synonym name $ERROR_GROUP_LOAD_IN_PROGRESS_CODE, $ERROR_LOAD_IN_PROGRESS_CODE .
+
+=cut
+const our $ERROR_LOAD_IN_PROGRESS_CODE          => 14;
+const our $ERROR_GROUP_LOAD_IN_PROGRESS         => 14;
 const our $ERROR_GROUP_LOAD_IN_PROGRESS_CODE    => 14;
 
-=item C<$ERROR_GROUP_COORDINATOR_NOT_AVAILABLE_CODE>
+=item C<$ERROR_GROUP_COORDINATOR_NOT_AVAILABLE>
 
-15 - The broker returns this error code for group coordinator requests, offset commits,
-and most group management requests if the offsets topic has not yet been created,
-or if the group coordinator is not active.
+15 - The group coordinator is not available.
 
-Old name $ERROR_CONSUMER_COORDINATOR_NOT_AVAILABLE_CODE .
+Synonym name $ERROR_GROUP_COORDINATOR_NOT_AVAILABLE_CODE, $ERROR_CONSUMER_COORDINATOR_NOT_AVAILABLE_CODE .
 
 =cut
-const our $ERROR_CONSUMER_COORDINATOR_NOT_AVAILABLE_CODE    => 15;  # Depricated
+const our $ERROR_CONSUMER_COORDINATOR_NOT_AVAILABLE_CODE    => 15;
+const our $ERROR_GROUP_COORDINATOR_NOT_AVAILABLE            => 15;
 const our $ERROR_GROUP_COORDINATOR_NOT_AVAILABLE_CODE       => 15;
 
-=item C<$ERROR_NOT_COORDINATOR_FOR_GROUP_CODE>
+=item C<$ERROR_NOT_COORDINATOR_FOR_GROUP>
 
-16 - The broker returns this error code if it receives an offset fetch or commit request
-for a group that it is not a coordinator for.
+16 - This is not the correct coordinator for this group.
 
-Old name $ERROR_NOT_COORDINATOR_FOR_CONSUMER_CODE .
+Synonym name $ERROR_NOT_COORDINATOR_FOR_GROUP_CODE, $ERROR_NOT_COORDINATOR_FOR_CONSUMER_CODE .
 
 =cut
-const our $ERROR_NOT_COORDINATOR_FOR_CONSUMER_CODE  => 16;  # Depricated
+const our $ERROR_NOT_COORDINATOR_FOR_CONSUMER_CODE  => 16;
+const our $ERROR_NOT_COORDINATOR_FOR_GROUP          => 16;
 const our $ERROR_NOT_COORDINATOR_FOR_GROUP_CODE     => 16;
 
-=item C<$ERROR_INVALID_TOPIC_CODE>
+=item C<$ERROR_INVALID_TOPIC_EXCEPTION>
 
-17 - For a request which attempts to access an invalid topic (e.g. one which has an illegal name),
-or if an attempt is made to write to an internal topic (such as the consumer offsets topic).
+17 - The request attempted to perform an operation on an invalid topic.
+
+Synonym name $ERROR_INVALID_TOPIC_CODE .
 
 =cut
 const our $ERROR_INVALID_TOPIC_CODE                 => 17;
+const our $ERROR_INVALID_TOPIC_EXCEPTION            => 17;
 
-=item C<$ERROR_RECORD_LIST_TOO_LARGE_CODE>
+=item C<$ERROR_RECORD_LIST_TOO_LARGE>
 
-18 - If a message batch in a produce request exceeds the maximum configured segment size.
+18 - The request included message batch larger than the configured segment size on the server.
+
+Synonym name $ERROR_RECORD_LIST_TOO_LARGE_CODE .
 
 =cut
+const our $ERROR_RECORD_LIST_TOO_LARGE              => 18;
 const our $ERROR_RECORD_LIST_TOO_LARGE_CODE         => 18;
 
-=item C<$ERROR_NOT_ENOUGH_REPLICAS_CODE>
+=item C<$ERROR_NOT_ENOUGH_REPLICAS>
 
-19 - Returned from a produce request when the number of in-sync replicas
-is lower than the configured minimum and requiredAcks is -1.
+19 - Messages are rejected since there are fewer in-sync replicas than required.
+
+Synonym name $ERROR_NOT_ENOUGH_REPLICAS_CODE .
 
 =cut
+const our $ERROR_NOT_ENOUGH_REPLICAS                => 19;
 const our $ERROR_NOT_ENOUGH_REPLICAS_CODE           => 19;
 
-=item C<$ERROR_NOT_ENOUGH_REPLICAS_AFTER_APPEND_CODE>
+=item C<$ERROR_NOT_ENOUGH_REPLICAS_AFTER_APPEND>
 
-20 - Returned from a produce request when the message was written to the log,
-but with fewer in-sync replicas than required.
+20 - Messages are written to the log, but to fewer in-sync replicas than required.
+
+Synonym name $ERROR_NOT_ENOUGH_REPLICAS_AFTER_APPEND_CODE .
 
 =cut
+const our $ERROR_NOT_ENOUGH_REPLICAS_AFTER_APPEND       => 20;
 const our $ERROR_NOT_ENOUGH_REPLICAS_AFTER_APPEND_CODE  => 20;
 
-=item C<$ERROR_INVALID_REQUIRED_ACKS_CODE>
+=item C<$ERROR_INVALID_REQUIRED_ACKS>
 
-21 - Returned from a produce request if the requested requiredAcks is invalid
-(anything other than -1, 1, or 0).
+21 - Produce request specified an invalid value for required acks.
+
+Synonym name $ERROR_INVALID_REQUIRED_ACKS_CODE .
 
 =cut
+const our $ERROR_INVALID_REQUIRED_ACKS              => 21;
 const our $ERROR_INVALID_REQUIRED_ACKS_CODE         => 21;
 
-=item C<$ERROR_ILLEGAL_GENERATION_CODE>
+=item C<$ERROR_ILLEGAL_GENERATION>
 
-22 - Returned from group membership requests (such as heartbeats)
-when the generation id provided in the request is not the current generation.
+22 - Specified group generation id is not valid.
+
+Synonym name $ERROR_ILLEGAL_GENERATION_CODE .
 
 =cut
+const our $ERROR_ILLEGAL_GENERATION                 => 22;
 const our $ERROR_ILLEGAL_GENERATION_CODE            => 22;
 
-=item C<$ERROR_INCONSISTENT_GROUP_PROTOCOL_CODE>
+=item C<$ERROR_INCONSISTENT_GROUP_PROTOCOL>
 
-23 - Returned in join group when the member provides a protocol type or set of protocols
-which is not compatible with the current group.
+23 - The group member's supported protocols are incompatible with those of existing members.
+
+Synonym name $ERROR_INCONSISTENT_GROUP_PROTOCOL_CODE .
 
 =cut
+const our $ERROR_INCONSISTENT_GROUP_PROTOCOL        => 23;
 const our $ERROR_INCONSISTENT_GROUP_PROTOCOL_CODE   => 23;
 
-=item C<$ERROR_INVALID_GROUP_ID_CODE>
+=item C<$ERROR_INVALID_GROUP_ID>
 
-24 - Returned in join group when the groupId is empty or null.
+24 - The configured groupId is invalid.
+
+Synonym name $ERROR_INVALID_GROUP_ID_CODE .
 
 =cut
+const our $ERROR_INVALID_GROUP_ID                   => 24;
 const our $ERROR_INVALID_GROUP_ID_CODE              => 24;
 
-=item C<$ERROR_UNKNOWN_MEMBER_ID_CODE>
+=item C<$ERROR_UNKNOWN_MEMBER_ID>
 
-25 - Returned from group requests (offset commits/fetches, heartbeats, etc)
-when the memberId is not in the current generation.
+25 - The coordinator is not aware of this member.
+
+Synonym name $ERROR_UNKNOWN_MEMBER_ID_CODE .
 
 =cut
+const our $ERROR_UNKNOWN_MEMBER_ID                  => 25;
 const our $ERROR_UNKNOWN_MEMBER_ID_CODE             => 25;
 
-=item C<$ERROR_INVALID_SESSION_TIMEOUT_CODE>
+=item C<$ERROR_INVALID_SESSION_TIMEOUT>
 
-26 - Return in join group when the requested session timeout is outside of the allowed range on the broker.
+26 - The session timeout is not within the range allowed by the broker
+(as configured by group.min.session.timeout.ms and group.max.session.timeout.ms).
+
+Synonym name $ERROR_INVALID_SESSION_TIMEOUT_CODE .
 
 =cut
+const our $ERROR_INVALID_SESSION_TIMEOUT            => 26;
 const our $ERROR_INVALID_SESSION_TIMEOUT_CODE       => 26;
 
-=item C<$ERROR_REBALANCE_IN_PROGRESS_CODE>
+=item C<$ERROR_REBALANCE_IN_PROGRESS>
 
-27 - Returned in heartbeat requests when the coordinator has begun rebalancing the group.
-This indicates to the client that it should rejoin the group.
+27 - The group is rebalancing, so a rejoin is needed.
+
+Synonym name $ERROR_REBALANCE_IN_PROGRESS_CODE .
 
 =cut
+const our $ERROR_REBALANCE_IN_PROGRESS              => 27;
 const our $ERROR_REBALANCE_IN_PROGRESS_CODE         => 27;
 
-=item C<$ERROR_INVALID_COMMIT_OFFSET_SIZE_CODE>
+=item C<$ERROR_INVALID_COMMIT_OFFSET_SIZE>
 
-28 - This error indicates that an offset commit was rejected because of oversize metadata.
+28 - The committing offset data size is not valid.
+
+Synonym name $ERROR_INVALID_COMMIT_OFFSET_SIZE_CODE .
 
 =cut
+const our $ERROR_INVALID_COMMIT_OFFSET_SIZE         => 28;
 const our $ERROR_INVALID_COMMIT_OFFSET_SIZE_CODE    => 28;
 
-=item C<$ERROR_TOPIC_AUTHORIZATION_FAILED_CODE>
+=item C<$ERROR_TOPIC_AUTHORIZATION_FAILED>
 
-29 - Returned by the broker when the client is not authorized to access the requested topic.
+29 - Not authorized to access topics: [Topic authorization failed.].
+
+Synonym name $ERROR_TOPIC_AUTHORIZATION_FAILED_CODE .
 
 =cut
+const our $ERROR_TOPIC_AUTHORIZATION_FAILED         => 29;
 const our $ERROR_TOPIC_AUTHORIZATION_FAILED_CODE    => 29;
 
-=item C<$ERROR_GROUP_AUTHORIZATION_FAILED_CODE>
+=item C<$ERROR_GROUP_AUTHORIZATION_FAILED>
 
-30 - Returned by the broker when the client is not authorized to access a particular groupId.
+30 - Not authorized to access group: Group authorization failed.
+
+Synonym name $ERROR_GROUP_AUTHORIZATION_FAILED_CODE .
 
 =cut
+const our $ERROR_GROUP_AUTHORIZATION_FAILED         => 30;
 const our $ERROR_GROUP_AUTHORIZATION_FAILED_CODE    => 30;
 
-=item C<$ERROR_CLUSTER_AUTHORIZATION_FAILED_CODE>
+=item C<$ERROR_CLUSTER_AUTHORIZATION_FAILED>
 
-31 - Returned by the broker when the client is not authorized to use an inter-broker or administrative API.
+31 - Cluster authorization failed.
+
+Synonym name $ERROR_CLUSTER_AUTHORIZATION_FAILED_CODE .
 
 =cut
+const our $ERROR_CLUSTER_AUTHORIZATION_FAILED       => 31;
 const our $ERROR_CLUSTER_AUTHORIZATION_FAILED_CODE  => 31;
+
+=item C<$ERROR_INVALID_TIMESTAMP>
+
+32 - The timestamp of the message is out of acceptable range.
+
+=cut
+const our $ERROR_INVALID_TIMESTAMP                  => 32;
+
+=item C<$ERROR_UNSUPPORTED_SASL_MECHANISM>
+
+33 - The broker does not support the requested SASL mechanism.
+
+=cut
+const our $ERROR_UNSUPPORTED_SASL_MECHANISM         => 33;
+
+=item C<$ERROR_ILLEGAL_SASL_STATE>
+
+34 - Request is not valid given the current SASL state.
+
+=cut
+const our $ERROR_ILLEGAL_SASL_STATE                 => 34;
+
+=item C<$ERROR_UNSUPPORTED_VERSION>
+
+35 - The version of API is not supported.
+
+=cut
+const our $ERROR_UNSUPPORTED_VERSION                => 35;
 
 =item C<%ERROR>
 
@@ -1189,34 +1309,39 @@ our %ERROR = (
     $ERROR_OFFSET_OUT_OF_RANGE                      => q{The requested offset is outside the range of offsets maintained by the server for the given topic/partition},
     $ERROR_INVALID_MESSAGE                          => q{Message contents does not match its CRC},
     $ERROR_UNKNOWN_TOPIC_OR_PARTITION               => q{Unknown topic or partition},
-    $ERROR_INVALID_MESSAGE_SIZE                     => q{Message has invalid size},
+    $ERROR_INVALID_FETCH_SIZE                       => q{The requested fetch size is invalid},
     $ERROR_LEADER_NOT_AVAILABLE                     => q{Unable to write due to ongoing Kafka leader selection},
     $ERROR_NOT_LEADER_FOR_PARTITION                 => q{Server is not a leader for partition},
     $ERROR_REQUEST_TIMED_OUT                        => q{Request time-out},
     $ERROR_BROKER_NOT_AVAILABLE                     => q{Broker is not available},
     $ERROR_REPLICA_NOT_AVAILABLE                    => q{Replica not available},
-    $ERROR_MESSAGE_SIZE_TOO_LARGE                   => q{Message is too big},
-    $ERROR_STALE_CONTROLLER_EPOCH_CODE              => q{Stale Controller Epoch Code},
-    $ERROR_OFFSET_METADATA_TOO_LARGE_CODE           => q{Specified metadata offset is too big},
-    $ERROR_GROUP_LOAD_IN_PROGRESS_CODE              => q{Still loading offsets},
-    $ERROR_GROUP_COORDINATOR_NOT_AVAILABLE_CODE     => q{Topic has not yet been created},
-    $ERROR_NOT_COORDINATOR_FOR_GROUP_CODE           => q{Request for a group that it is not a coordinator for},
+    $ERROR_MESSAGE_TOO_LARGE                        => q{Message is too big},
+    $ERROR_STALE_CONTROLLER_EPOCH                   => q{Stale Controller Epoch Code},
+    $ERROR_OFFSET_METADATA_TOO_LARGE                => q{The metadata field of the offset request was too large},
+    $ERROR_NETWORK_EXCEPTION                        => q{The server disconnected before a response was received},
+    $ERROR_GROUP_LOAD_IN_PROGRESS                   => q{The coordinator is loading and hence can't process requests for this group},
+    $ERROR_GROUP_COORDINATOR_NOT_AVAILABLE          => q{The group coordinator is not available.},
+    $ERROR_NOT_COORDINATOR_FOR_GROUP                => q{Request for a group that it is not a coordinator for},
 
-    $ERROR_INVALID_TOPIC_CODE                       => q{A request which attempts to access an invalid topic},
-    $ERROR_RECORD_LIST_TOO_LARGE_CODE               => q{A message batch in a produce request exceeds the maximum configured segment size},
-    $ERROR_NOT_ENOUGH_REPLICAS_CODE                 => q{The number of in-sync replicas is lower than the configured minimum and requiredAcks is -1},
-    $ERROR_NOT_ENOUGH_REPLICAS_AFTER_APPEND_CODE    => q{The message was written to the log, but with fewer in-sync replicas than required},
-    $ERROR_INVALID_REQUIRED_ACKS_CODE               => q{The requested requiredAcks is invalid (anything other than -1, 1, or 0)},
-    $ERROR_ILLEGAL_GENERATION_CODE                  => q{The generation id provided in the request is not the current generation},
-    $ERROR_INCONSISTENT_GROUP_PROTOCOL_CODE         => q{The member provides a protocol type or set of protocols which is not compatible with the current group},
-    $ERROR_INVALID_GROUP_ID_CODE                    => q{The groupId is empty or null},
-    $ERROR_UNKNOWN_MEMBER_ID_CODE                   => q{The memberId is not in the current generation},
-    $ERROR_INVALID_SESSION_TIMEOUT_CODE             => q{The requested session timeout is outside of the allowed range on the broker},
-    $ERROR_REBALANCE_IN_PROGRESS_CODE               => q{The coordinator has begun rebalancing the group},
-    $ERROR_INVALID_COMMIT_OFFSET_SIZE_CODE          => q{An offset commit was rejected because of oversize metadata},
-    $ERROR_TOPIC_AUTHORIZATION_FAILED_CODE          => q{The client is not authorized to access the requested topic},
-    $ERROR_GROUP_AUTHORIZATION_FAILED_CODE          => q{The client is not authorized to access a particular groupId},
-    $ERROR_CLUSTER_AUTHORIZATION_FAILED_CODE        => q{The client is not authorized to use an inter-broker or administrative API},
+    $ERROR_INVALID_TOPIC_EXCEPTION                  => q{A request which attempts to access an invalid topic},
+    $ERROR_RECORD_LIST_TOO_LARGE                    => q{A message batch in a produce request exceeds the maximum configured segment size},
+    $ERROR_NOT_ENOUGH_REPLICAS                      => q{Messages are rejected since there are fewer in-sync replicas than required},
+    $ERROR_NOT_ENOUGH_REPLICAS_AFTER_APPEND         => q{Messages are written to the log, but to fewer in-sync replicas than required},
+    $ERROR_INVALID_REQUIRED_ACKS                    => q{Produce request specified an invalid value for required acks},
+    $ERROR_ILLEGAL_GENERATION                       => q{Specified group generation id is not valid},
+    $ERROR_INCONSISTENT_GROUP_PROTOCOL              => q{The group member's supported protocols are incompatible with those of existing members},
+    $ERROR_INVALID_GROUP_ID                         => q{The configured groupId is invalid},
+    $ERROR_UNKNOWN_MEMBER_ID                        => q{The coordinator is not aware of this member},
+    $ERROR_INVALID_SESSION_TIMEOUT                  => q{The session timeout is not within the range allowed by the broker},
+    $ERROR_REBALANCE_IN_PROGRESS                    => q{The group is rebalancing, so a rejoin is needed},
+    $ERROR_INVALID_COMMIT_OFFSET_SIZE               => q{The committing offset data size is not valid},
+    $ERROR_TOPIC_AUTHORIZATION_FAILED               => q{Not authorized to access topics},
+    $ERROR_GROUP_AUTHORIZATION_FAILED               => q{Not authorized to access group: Group authorization failed},
+    $ERROR_CLUSTER_AUTHORIZATION_FAILED             => q{Cluster authorization failed},
+    $ERROR_INVALID_TIMESTAMP                        => q{The timestamp of the message is out of acceptable range},
+    $ERROR_UNSUPPORTED_SASL_MECHANISM               => q{The broker does not support the requested SASL mechanism},
+    $ERROR_ILLEGAL_SASL_STATE                       => q{Request is not valid given the current SASL state},
+    $ERROR_UNSUPPORTED_VERSION                      => q{The version of API is not supported},
 );
 
 =over

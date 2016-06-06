@@ -69,6 +69,8 @@ use Kafka::TestInternals qw(
 
 #-- setting up facilities ------------------------------------------------------
 
+STDOUT->autoflush;
+
 #-- declarations ---------------------------------------------------------------
 
 # WARNING: must match the settings of your system
@@ -299,9 +301,14 @@ sub testing {
             $topic,
             $partition,
             [                           # messages
-                'The first message',
-                'The second message',
-                'The third message',
+# WARN: Next commented messages lead to error under kafka 0.10.0.0 with $COMPRESSION_SNAPPY
+# also look at https://issues.apache.org/jira/browse/KAFKA-3789
+#                'The first message',
+#                'The second message',
+#                'The third message',
+                'Message #1',
+                'Message #2',
+                'Message #3',
             ],
             undef,
             $compression_codec,

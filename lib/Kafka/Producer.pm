@@ -188,7 +188,7 @@ Indicates how many acknowledgements the servers should receive before responding
 
 If it is C<$NOT_SEND_ANY_RESPONSE> the server does not send any response.
 
-If it is C<$WAIT_WRITTEN_TO_LOCAL_LOG>,
+If it is C<$WAIT_WRITTEN_TO_LOCAL_LOG>, (default)
 the server will wait until the data is written to the local log before sending a response.
 
 If it is C<$BLOCK_UNTIL_IS_COMMITTED>

@@ -39,10 +39,15 @@ plan 'no_plan';
 
 use Kafka::Cluster;
 use Const::Fast;
+use Params::Util qw(
+    _ARRAY0
+    _HASH
+);
 use Sub::Install;
 
 use Kafka qw(
     $BLOCK_UNTIL_IS_COMMITTED
+    $DEFAULT_MAX_NUMBER_OF_OFFSETS
     %ERROR
     $ERROR_SEND_NO_ACK
     $MESSAGE_SIZE_OVERHEAD
@@ -109,6 +114,31 @@ sub next_offset {
         }
     }
 
+    sub send_with_response {
+        prepare_messages();
+        $start_offset = next_offset();
+
+        note "transmitted_messages = @transmitted_messages";
+        my $response = $producer->send(
+            $TOPIC,
+            $PARTITION,
+            \@transmitted_messages,
+        );
+        ok _HASH( $response ), 'response is received';
+
+        my $offsets = $consumer->offsets(
+            $TOPIC,
+            $PARTITION,
+            $RECEIVE_LATEST_OFFSET,             # time
+            $DEFAULT_MAX_NUMBER_OF_OFFSETS,     # max_number
+        );
+        if ( $offsets ) {
+            ok( _ARRAY0( $offsets ), 'offsets are obtained' );
+        } else {
+            fail 'offsets are not received';
+        }
+    }
+
     sub send_without_response {
         prepare_messages();
         $start_offset = next_offset();
@@ -135,6 +165,7 @@ sub next_offset {
         );
 
         my $response;
+        note "transmitted_messages = @transmitted_messages";
         eval {
                 $response = $producer->send(
                     $TOPIC,
@@ -173,10 +204,12 @@ sub next_offset {
             return;
         };
 
+        is scalar( @$messages ), $msgs_to_receive, 'all messages';
         my $i = 0;
         foreach my $message ( @$messages ) {
             if ( $message->valid ) {
-                is $message->payload, $transmitted_messages[ $i++ ], 'message ok';
+#                diag "MagicByte = ".$message->MagicByte if $message->MagicByte;
+                is $message->payload, $transmitted_messages[ $i++ ], 'message ok: '.$message->payload;
             } else {
                 fail 'message error: '.$message->error;
             }
@@ -323,6 +356,10 @@ $producer = Kafka::Producer->new(
 $consumer = Kafka::Consumer->new(
     Connection  => $connection,
 );
+
+#- receive a response to send messages (sending is successful, response is received)
+send_with_response();
+fetching_all_messages();
 
 #- not receive a response to send messages (sending is successful, but no response is received)
 send_without_response();

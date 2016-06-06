@@ -32,6 +32,7 @@ our @EXPORT = qw(
 #-- load the modules -----------------------------------------------------------
 
 use Carp;
+use Data::Dumper ();
 use Data::Validate::Domain qw(
     is_hostname
 );
@@ -75,20 +76,22 @@ use Kafka qw(
     $ERROR_OFFSET_OUT_OF_RANGE
     $ERROR_INVALID_MESSAGE
     $ERROR_UNKNOWN_TOPIC_OR_PARTITION
-    $ERROR_INVALID_MESSAGE_SIZE
+    $ERROR_INVALID_FETCH_SIZE
     $ERROR_LEADER_NOT_AVAILABLE
     $ERROR_NOT_LEADER_FOR_PARTITION
     $ERROR_REQUEST_TIMED_OUT
     $ERROR_BROKER_NOT_AVAILABLE
     $ERROR_REPLICA_NOT_AVAILABLE
-    $ERROR_MESSAGE_SIZE_TOO_LARGE
-    $ERROR_STALE_CONTROLLER_EPOCH_CODE
-    $ERROR_GROUP_LOAD_IN_PROGRESS_CODE
-    $ERROR_OFFSET_METADATA_TOO_LARGE_CODE
-    $ERROR_GROUP_COORDINATOR_NOT_AVAILABLE_CODE
-    $ERROR_NOT_COORDINATOR_FOR_GROUP_CODE
-    $ERROR_NOT_ENOUGH_REPLICAS_CODE
-    $ERROR_NOT_ENOUGH_REPLICAS_AFTER_APPEND_CODE
+    $ERROR_MESSAGE_TOO_LARGE
+    $ERROR_STALE_CONTROLLER_EPOCH
+    $ERROR_NETWORK_EXCEPTION
+    $ERROR_GROUP_LOAD_IN_PROGRESS
+    $ERROR_OFFSET_METADATA_TOO_LARGE
+    $ERROR_GROUP_COORDINATOR_NOT_AVAILABLE
+    $ERROR_NOT_COORDINATOR_FOR_GROUP
+    $ERROR_NOT_ENOUGH_REPLICAS
+    $ERROR_NOT_ENOUGH_REPLICAS_AFTER_APPEND
+    $ERROR_REBALANCE_IN_PROGRESS
 
     $ERROR_CANNOT_BIND
     $ERROR_CANNOT_GET_METADATA
@@ -226,39 +229,44 @@ another attempt to fetch data.
 =cut
 # When any of the following error happens, a possible change in meta-data on server is expected.
 const our %RETRY_ON_ERRORS => (
-#   $ERROR_NO_ERROR                         => 1,   # 0 - No error
+#    $ERROR_NO_ERROR                         => 1,   # 0 - No error
     $ERROR_UNKNOWN                          => 1,   # -1 - An unexpected server error
-#   $ERROR_OFFSET_OUT_OF_RANGE              => 1,   # 1 - The requested offset is outside the range of offsets available at the server for the given topic/partition
-   $ERROR_INVALID_MESSAGE                  => 1,   # 2 - Retriable - Message contents does not match its control sum
-   $ERROR_UNKNOWN_TOPIC_OR_PARTITION       => 1,   # 3 - Retriable - Unknown topic or partition
-#   $ERROR_INVALID_MESSAGE_SIZE             => 1,   # 4 - Message has invalid size
+#    $ERROR_OFFSET_OUT_OF_RANGE              => 1,   # 1 - The requested offset is not within the range of offsets maintained by the server
+    $ERROR_INVALID_MESSAGE                  => 1,   # 2 - Retriable - This message has failed its CRC checksum, exceeds the valid size, or is otherwise corrupt
+    $ERROR_UNKNOWN_TOPIC_OR_PARTITION       => 1,   # 3 - Retriable - This server does not host this topic-partition
+#    $ERROR_INVALID_FETCH_SIZE               => 1,   # 4 - The requested fetch size is invalid
     $ERROR_LEADER_NOT_AVAILABLE             => 1,   # 5 - Retriable - Unable to write due to ongoing Kafka leader selection
     $ERROR_NOT_LEADER_FOR_PARTITION         => 1,   # 6 - Retriable - Server is not a leader for partition
     $ERROR_REQUEST_TIMED_OUT                => 1,   # 7 - Retriable - Request time-out
     $ERROR_BROKER_NOT_AVAILABLE             => 1,   # 8 - Broker is not available
     $ERROR_REPLICA_NOT_AVAILABLE            => 1,   # 9 - Replica not available
-#   $ERROR_MESSAGE_SIZE_TOO_LARGE           => 1,   # 10 - Message is too big
-    $ERROR_STALE_CONTROLLER_EPOCH_CODE      => 1,   # 11 - Stale Controller Epoch Code
-#   $ERROR_OFFSET_METADATA_TOO_LARGE_CODE   => 1,   # 12 - Specified metadata offset is too big
-    $ERROR_GROUP_LOAD_IN_PROGRESS_CODE      => 1,   # 14 - Retriable - Still loading offsets
-    $ERROR_GROUP_COORDINATOR_NOT_AVAILABLE_CODE => 1,   # 15 - Retriable - Topic has not yet been created
-    $ERROR_NOT_COORDINATOR_FOR_GROUP_CODE   => 1,   # 16 - Retriable - Request for a consumer group that it is not a coordinator for
+#    $ERROR_MESSAGE_TOO_LARGE                => 1,   # 10 - The request included a message larger than the max message size the server will accept
+    $ERROR_STALE_CONTROLLER_EPOCH           => 1,   # 11 - The controller moved to another broker
+#    $ERROR_OFFSET_METADATA_TOO_LARGE        => 1,   # 12 - The metadata field of the offset request was too large
+    $ERROR_NETWORK_EXCEPTION                => 1,   # 13 Retriable - The server disconnected before a response was received
+    $ERROR_GROUP_LOAD_IN_PROGRESS           => 1,   # 14 - Retriable - The coordinator is loading and hence can't process requests for this group
+    $ERROR_GROUP_COORDINATOR_NOT_AVAILABLE  => 1,   # 15 - Retriable - The group coordinator is not available
+    $ERROR_NOT_COORDINATOR_FOR_GROUP        => 1,   # 16 - Retriable - This is not the correct coordinator for this group
 
-#    $ERROR_INVALID_TOPIC_CODE               => 1,   # 17 - A request which attempts to access an invalid topic
-#    $ERROR_RECORD_LIST_TOO_LARGE_CODE       => 1,   # 18 - A message batch in a produce request exceeds the maximum configured segment size
-    $ERROR_NOT_ENOUGH_REPLICAS_CODE         => 1,   # 19 - Retriable - The number of in-sync replicas is lower than the configured minimum and requiredAcks is -1
-    $ERROR_NOT_ENOUGH_REPLICAS_AFTER_APPEND_CODE    => 1,   # 20 - Retriable - The message was written to the log, but with fewer in-sync replicas than required
-#    $ERROR_INVALID_REQUIRED_ACKS_CODE       => 1,   # 21 - The requested requiredAcks is invalid (anything other than -1, 1, or 0)
-#    $ERROR_ILLEGAL_GENERATION_CODE          => 1,   # 22 - The generation id provided in the request is not the current generation
-#    $ERROR_INCONSISTENT_GROUP_PROTOCOL_CODE => 1,   # 23 - The member provides a protocol type or set of protocols which is not compatible with the current group
-#    $ERROR_INVALID_GROUP_ID_CODE            => 1,   # 24 - The groupId is empty or null
-#    $ERROR_UNKNOWN_MEMBER_ID_CODE           => 1,   # 25 - The memberId is not in the current generation
-#    $ERROR_INVALID_SESSION_TIMEOUT_CODE     => 1,   # 26 - The requested session timeout is outside of the allowed range on the broker
-#    $ERROR_REBALANCE_IN_PROGRESS_CODE       => 1,   # 27 - The coordinator has begun rebalancing the group
-#    $ERROR_INVALID_COMMIT_OFFSET_SIZE_CODE  => 1,   # 28 - An offset commit was rejected because of oversize metadata
-#    $ERROR_TOPIC_AUTHORIZATION_FAILED_CODE  => 1,   # 29 - The client is not authorized to access the requested topic
-#    $ERROR_GROUP_AUTHORIZATION_FAILED_CODE  => 1,   # 30 - The client is not authorized to access a particular groupId
-#    $ERROR_CLUSTER_AUTHORIZATION_FAILED_CODE    => 1,   # 31 - The client is not authorized to use an inter-broker or administrative API
+#    $ERROR_INVALID_TOPIC_EXCEPTION          => 1,   # 17 - The request attempted to perform an operation on an invalid topic
+#    $ERROR_RECORD_LIST_TOO_LARGE            => 1,   # 18 - The request included message batch larger than the configured segment size on the server
+    $ERROR_NOT_ENOUGH_REPLICAS              => 1,   # 19 - Retriable - Messages are rejected since there are fewer in-sync replicas than required
+    $ERROR_NOT_ENOUGH_REPLICAS_AFTER_APPEND => 1,   # 20 - Retriable - Messages are written to the log, but to fewer in-sync replicas than required
+#    $ERROR_INVALID_REQUIRED_ACKS            => 1,   # 21 - Produce request specified an invalid value for required acks
+#    $ERROR_ILLEGAL_GENERATION               => 1,   # 22 - Specified group generation id is not valid
+#    $ERROR_INCONSISTENT_GROUP_PROTOCOL      => 1,   # 23 - The group member's supported protocols are incompatible with those of existing members
+#    $ERROR_INVALID_GROUP_ID                 => 1,   # 24 - The configured groupId is invalid
+#    $ERROR_UNKNOWN_MEMBER_ID                => 1,   # 25 - The coordinator is not aware of this member
+#    $ERROR_INVALID_SESSION_TIMEOUT          => 1,   # 26 - The session timeout is not within the range allowed by the broker (as configured by group.min.session.timeout.ms and group.max.session.timeout.ms)
+    $ERROR_REBALANCE_IN_PROGRESS            => 1,   # 27 - The group is rebalancing, so a rejoin is needed
+#    $ERROR_INVALID_COMMIT_OFFSET_SIZE       => 1,   # 28 - The committing offset data size is not valid
+#    $ERROR_TOPIC_AUTHORIZATION_FAILED       => 1,   # 29 - Not authorized to access topics: Topic authorization failed
+#    $ERROR_GROUP_AUTHORIZATION_FAILED       => 1,   # 30 - Not authorized to access group: Group authorization failed
+#    $ERROR_CLUSTER_AUTHORIZATION_FAILED     => 1,   # 31 - Cluster authorization failed
+#    $ERROR_INVALID_TIMESTAMP                => 1,   # 32 - The timestamp of the message is out of acceptable range
+#    $ERROR_UNSUPPORTED_SASL_MECHANISM       => 1,   # 33 - The broker does not support the requested SASL mechanism
+#    $ERROR_ILLEGAL_SASL_STATE               => 1,   # 34 - Request is not valid given the current SASL state
+#    $ERROR_UNSUPPORTED_VERSION              => 1,   # 35 - The version of API is not supported
 );
 
 #-- constructor ----------------------------------------------------------------
@@ -690,6 +698,8 @@ L<$COMPRESSION_SNAPPY|Kafka/$COMPRESSION_SNAPPY>.
 sub receive_response_to_request {
     my ( $self, $request, $compression_codec ) = @_;
 
+    local $Data::Dumper::Sortkeys = 1 if $self->debug_level;
+
     my $api_key = $request->{ApiKey};
 
 # WARNING: The current version of the module limited to the following:
@@ -710,6 +720,12 @@ sub receive_response_to_request {
     my $encoded_request = $protocol{ $api_key }->{encode}->( $request, $compression_codec );
 
     my $CorrelationId = $request->{CorrelationId} // _get_CorrelationId;
+
+    say STDERR sprintf( '[%s] compression_codec = %d, request: %s',
+            scalar( localtime ),
+            $compression_codec // '<undef>',
+            Data::Dumper->Dump( [ $request ], [ 'request' ] )
+        ) if $self->debug_level;
 
     my $attempts = $self->{SEND_MAX_ATTEMPTS};
     my ( $ErrorCode, $partition_data, $server );
@@ -774,6 +790,10 @@ sub receive_response_to_request {
                     }
                     if ( length( $$encoded_response_ref ) > 4 ) {   # MessageSize => int32
                         $response = $protocol{ $api_key }->{decode}->( $encoded_response_ref );
+                        say STDERR sprintf( '[%s] response: %s',
+                                scalar( localtime ),
+                                Data::Dumper->Dump( [ $response ], [ 'response' ] )
+                            ) if $self->debug_level;
                     } else {
                         $self->_error( $ERROR_RESPONSEMESSAGE_NOT_RECEIVED );
                     }
@@ -1029,13 +1049,18 @@ sub _update_metadata {
     my ( $self, $topic, $is_recursive_call ) = @_;
 
     my $CorrelationId = $self->{CorrelationId};
-    my $encoded_request = $protocol{ $APIKEY_METADATA }->{encode}->( {
-            CorrelationId   => $CorrelationId,
-            ClientId        => q{},
-            topics          => [
-                $topic // (),
-            ],
-        } );
+    my $decoded_request = {
+        CorrelationId   => $CorrelationId,
+        ClientId        => q{},
+        topics          => [
+            $topic // (),
+        ],
+    };
+    say STDERR sprintf( '[%s] metadata request: %s',
+            scalar( localtime ),
+            Data::Dumper->Dump( [ $decoded_request ], [ 'request' ] )
+        ) if $self->debug_level;
+    my $encoded_request = $protocol{ $APIKEY_METADATA }->{encode}->( $decoded_request );
 
     my $encoded_response_ref;
     my @brokers = $self->_get_interviewed_servers;
@@ -1053,6 +1078,10 @@ sub _update_metadata {
     }
 
     my $decoded_response = $protocol{ $APIKEY_METADATA }->{decode}->( $encoded_response_ref );
+    say STDERR sprintf( '[%s] metadata response: %s',
+            scalar( localtime ),
+            Data::Dumper->Dump( [ $decoded_response ], [ 'response' ] )
+        ) if $self->debug_level;
     ( defined( $decoded_response->{CorrelationId} ) && $decoded_response->{CorrelationId} == $CorrelationId )
         # FATAL error
         or $self->_error( $ERROR_MISMATCH_CORRELATIONID );

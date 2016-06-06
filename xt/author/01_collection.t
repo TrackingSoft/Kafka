@@ -166,6 +166,7 @@ minimum_version_ok( $_, 5.010 ) foreach
 # POSTCONDITIONS ---------------------------------------------------------------
 
 __END__
+acks
 analyse
 Analysing
 api
@@ -178,6 +179,7 @@ bigint
 Backoff
 BigInteger
 bla
+checksum
 Checksum
 ClientId
 codec
@@ -227,6 +229,7 @@ ReplicaId
 requiredAcks
 RequiredAcks
 ResponseMessage
+SASL
 sec
 Sergey
 Sergiy

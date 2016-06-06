@@ -70,6 +70,8 @@ use Kafka::Consumer;
 
 #-- setting up facilities ------------------------------------------------------
 
+STDOUT->autoflush;
+
 #-- declarations ---------------------------------------------------------------
 
 # port to start the search Kafka server
