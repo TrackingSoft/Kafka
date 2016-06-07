@@ -1,6 +1,10 @@
 Revision history for Kafka package
 
+1.001001 Tue Jun  07 2016
     CHANGES:
+    - Version schema changed to reflect supported Kafka version.
+      N.XXYYZZ where XXYY - major Kafka version N and ZZ - major and minor
+      versions of Perl module.
     - Adapted for kafka 0.10.0.0 .
     - Added new Apache Kafka server error codes.
     - $MESSAGE_SIZE_OVERHEAD increased to 34.

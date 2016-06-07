@@ -6,7 +6,7 @@ Kafka::IO - Interface to network communication with the Apache Kafka server.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::IO> version 0.9012 .
+This documentation refers to C<Kafka::IO> version 1.001001 .
 
 =cut
 
@@ -20,7 +20,7 @@ use warnings;
 
 our $DEBUG = 0;
 
-our $VERSION = '0.9012';
+our $VERSION = '1.001001';
 
 #-- load the modules -----------------------------------------------------------
 
@@ -136,7 +136,7 @@ Provides an object oriented API for communication with Kafka.
 
 =item *
 
-This class allows you to create Kafka 0.9 clients.
+This class allows you to create Kafka 0.9+ clients.
 
 =back
 

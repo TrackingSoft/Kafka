@@ -1,9 +1,9 @@
-Kafka package version 0.9012
-============================
+Kafka package version 1.001001
+==============================
 
 The Kafka package is a set of Perl modules which provides a
 simple and consistent application programming interface (API) to the
-Apache Kafka 0.8+, a high-throughput distributed messaging system.
+Apache Kafka 0.9+, a high-throughput distributed messaging system.
 The main focus of the package is to provide classes
 and functions that allow you to write Apache Kafka clients.
 
@@ -94,7 +94,7 @@ TESTING
 
 The following environment variable changes the way Kafka Benchmark test behave:
 
-   # The root directory of the installation Kafka 0.8+
+   # The root directory of the installation Kafka 0.9+
    KAFKA_BASE_DIR
 
 SIMPLE BENCHMARK

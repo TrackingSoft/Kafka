@@ -7,7 +7,7 @@ protocol on 32 bit systems.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Int64> version 0.9012 .
+This documentation refers to C<Kafka::Int64> version 1.001001 .
 
 =cut
 
@@ -21,7 +21,7 @@ use bigint; # this allows integers of practially any size at the cost of signifi
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.9012';
+our $VERSION = '1.001001';
 
 use Exporter qw(
     import

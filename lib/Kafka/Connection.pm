@@ -6,7 +6,7 @@ Kafka::Connection - Object interface to connect to a kafka cluster.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Connection> version 0.9012 .
+This documentation refers to C<Kafka::Connection> version 1.001001 .
 
 =cut
 
@@ -20,7 +20,7 @@ use warnings;
 
 our $DEBUG = 0;
 
-our $VERSION = '0.9012';
+our $VERSION = '1.001001';
 
 use Exporter qw(
     import
@@ -181,7 +181,7 @@ The main features of the C<Kafka::Connection> class are:
 
 =item *
 
-Provides API for communication with Kafka 0.9 cluster.
+Provides API for communication with Kafka 0.9+ cluster.
 
 =item *
 

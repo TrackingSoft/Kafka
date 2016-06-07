@@ -9,7 +9,7 @@ Kafka - Apache Kafka interface for Perl.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka> package version 0.9012 .
+This documentation refers to C<Kafka> package version 1.001001 .
 
 =cut
 
@@ -21,7 +21,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.9012';
+our $VERSION = '1.001001';
 
 use Exporter qw(
     import
@@ -199,7 +199,7 @@ use Const::Fast;
 =head1 ABSTRACT
 
 The Kafka package is a set of Perl modules which provides a simple and
-consistent application programming interface (API) to Apache Kafka 0.9,
+consistent application programming interface (API) to Apache Kafka 0.9+,
 a high-throughput distributed messaging system.
 
 =head1 DESCRIPTION
@@ -260,7 +260,7 @@ Returns untainted data.
 
 =head1 APACHE KAFKA'S STYLE COMMUNICATION
 
-The Kafka package is based on Kafka's 0.9 Protocol specification document at
+The Kafka package is based on Kafka's 0.9+ Protocol specification document at
 L<https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol>
 
 =over 3
