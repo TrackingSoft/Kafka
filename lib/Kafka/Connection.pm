@@ -120,6 +120,8 @@ use Kafka::Internals qw(
     $APIKEY_METADATA
     $APIKEY_OFFSET
     $APIKEY_PRODUCE
+    $APIKEY_OFFSETCOMMIT
+    $APIKEY_OFFSETFETCH
     $MAX_CORRELATIONID
     $MAX_INT32
     debug_level
@@ -133,10 +135,14 @@ use Kafka::Protocol qw(
     decode_metadata_response
     decode_offset_response
     decode_produce_response
+    decode_offsetcommit_response
+    decode_offsetfetch_response
     encode_fetch_request
     encode_metadata_request
     encode_offset_request
     encode_produce_request
+    encode_offsetcommit_request
+    encode_offsetfetch_request
 );
 
 #-- declarations ---------------------------------------------------------------
@@ -212,6 +218,14 @@ my %protocol = (
     "$APIKEY_METADATA"  => {
         decode                  => \&decode_metadata_response,
         encode                  => \&encode_metadata_request,
+    },
+    "$APIKEY_OFFSETCOMMIT"  => {
+        decode                  => \&decode_offsetcommit_response,
+        encode                  => \&encode_offsetcommit_request,
+    },
+    "$APIKEY_OFFSETFETCH"  => {
+        decode                  => \&decode_offsetfetch_response,
+        encode                  => \&encode_offsetfetch_request,
     },
 );
 
