@@ -349,6 +349,8 @@ sub is_alive {
     my $socket = $self->{socket};
     return unless $socket;
 
+    return 1;
+
     socket( my $tmp_socket, $self->{pf}, SOCK_STREAM, IPPROTO_TCP );
     my $is_alive = connect( $tmp_socket, getpeername( $socket ) );
     CORE::close( $tmp_socket );
