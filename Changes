@@ -1,5 +1,8 @@
 Revision history for Kafka package
 
+    BUGFIXES:
+    - The dependency declaration corrected.
+
 1.001001 Tue Jun  07 2016
     CHANGES:
     - Version schema changed to reflect supported Kafka version.

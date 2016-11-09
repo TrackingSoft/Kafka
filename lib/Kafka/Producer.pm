@@ -306,7 +306,7 @@ Supported codecs:
 C<$COMPRESSION_NONE>,
 C<$COMPRESSION_GZIP>,
 C<$COMPRESSION_SNAPPY>.
-(the defaults that can be imported from the L<Kafka|Kafka> module.
+The defaults that can be imported from the L<Kafka|Kafka> module.
 
 =back
 

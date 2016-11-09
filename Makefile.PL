@@ -72,7 +72,7 @@ my %config = (
         'Test::Exception'           => '0.32',
         'Test::More'                => '0.72',
         'Test::NoWarnings'          => '1.04',
-        'Test::TCP'                 => '2.11',
+        'Test::TCP'                 => '2.08',
         'Time::HiRes'               => '1.9711',
         'Try::Tiny'                 => '0.21',
     },

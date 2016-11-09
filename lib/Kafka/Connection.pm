@@ -42,7 +42,6 @@ use Data::Validate::IP qw(
 );
 use Const::Fast;
 use List::Util qw(
-    all
     shuffle
 );
 use Params::Util qw(
