@@ -1,5 +1,6 @@
 Revision history for Kafka package
 
+1.001011 Wed Nov  09 2016
     CHANGES:
     - Decrease tcp connections creation.
     BUGFIXES:

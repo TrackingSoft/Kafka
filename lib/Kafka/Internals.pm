@@ -6,7 +6,7 @@ Kafka::Internals - Constants and functions used internally.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Internals> version 1.001001 .
+This documentation refers to C<Kafka::Internals> version 1.001011 .
 
 =cut
 
@@ -18,7 +18,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '1.001001';
+our $VERSION = '1.001011';
 
 use Exporter qw(
     import
