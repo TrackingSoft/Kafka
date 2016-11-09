@@ -1,5 +1,7 @@
 Revision history for Kafka package
 
+    CHANGES:
+    - Decrease tcp connections creation.
     BUGFIXES:
     - The dependency declaration corrected.
 

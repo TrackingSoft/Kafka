@@ -1218,7 +1218,7 @@ sub _connectIO {
 
     my $server_data = $self->{_IO_cache}->{ $server };
     my $io;
-    unless ( $server_data && ( $io = $server_data->{IO} ) && $io->is_alive ) {
+    unless ( $server_data && ( $io = $server_data->{IO} ) ) {
         try {
             $server_data->{IO} = Kafka::IO->new(
                 host        => $server_data->{host},
