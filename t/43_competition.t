@@ -158,7 +158,7 @@ sub sending {
         );
     };
     if ( $@ ) {
-        fail "'send' FATAL error: $@";
+#        fail "'send' FATAL error: $@";
         return 0;
     } else {
         return $msgs_to_send;

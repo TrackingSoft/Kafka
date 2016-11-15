@@ -1,5 +1,8 @@
 Revision history for Kafka package
 
+    BUGFIXES:
+    - Used $Kafka::SEND_MAX_ATTEMPTS = 1 with Kafka::Producer->send requests.
+
 1.001011 Wed Nov  09 2016
     CHANGES:
     - Decrease tcp connections creation.

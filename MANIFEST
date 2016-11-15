@@ -43,6 +43,7 @@ t/44_bad_sending.t
 t/45_compression.t
 t/46_destroy_connection.t
 t/47_kafka_usage_ipv6.t
+t/48_acknowledgement.t
 t/50_debug_level.t
 t/60_sockets.t
 t/90_mock_io.t

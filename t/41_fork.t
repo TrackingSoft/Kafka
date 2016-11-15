@@ -178,7 +178,7 @@ $SIG{USR2} = sub { ++$success };
 
 #-- Global data ----------------------------------------------------------------
 
-$partition  = $Kafka::MockIO::PARTITION;;
+$partition  = $Kafka::MockIO::PARTITION;
 $topic      = $DEFAULT_TOPIC;
 
 #-- Connecting to the Kafka server port (for example for node_id = 0)

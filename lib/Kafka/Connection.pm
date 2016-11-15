@@ -366,6 +366,8 @@ In some circumstances (leader is temporarily unavailable, outdated metadata, etc
 This property specifies the maximum number of attempts to send a message.
 The C<$attempts> should be an integer number.
 
+Used C<SEND_MAX_ATTEMPTS = 1> with Kafka::Producer->send requests.
+
 =item C<RECEIVE_MAX_ATTEMPTS =E<gt> $attempts>
 
 Optional, int32 signed integer, default = C<$Kafka::RECEIVE_MAX_ATTEMPTS> .
@@ -726,7 +728,7 @@ sub receive_response_to_request {
             Data::Dumper->Dump( [ $request ], [ 'request' ] )
         ) if $self->debug_level;
 
-    my $attempts = $self->{SEND_MAX_ATTEMPTS};
+    my $attempts = $api_key == $APIKEY_PRODUCE ? 1 : $self->{SEND_MAX_ATTEMPTS};
     my ( $ErrorCode, $partition_data, $server );
     ATTEMPTS:
     while ( $attempts-- ) {

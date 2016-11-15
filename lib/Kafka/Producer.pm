@@ -308,6 +308,8 @@ C<$COMPRESSION_GZIP>,
 C<$COMPRESSION_SNAPPY>.
 The defaults that can be imported from the L<Kafka|Kafka> module.
 
+NOTE: Used $Kafka::Connection::SEND_MAX_ATTEMPTS = 1 with Kafka::Producer->send requests.
+
 =back
 
 =cut

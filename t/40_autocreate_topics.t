@@ -182,8 +182,8 @@ for my $auto_create_topics_enable ( 'true', 'false' ) {
             my $next_topic = $topic;
             ++$next_topic;
             ok !$connection->exists_topic_partition( $next_topic, $partition ), 'not yet existing topic';
-            lives_ok    { $response = sending() } 'expecting to live';
-            ok _HASH( $response ), 'response is received';
+            dies_ok    { $response = sending() } 'expecting to live';
+            ok !_HASH( $response ), 'response is not received';
             $connection->get_metadata( $topic );
             ok $connection->exists_topic_partition( $next_topic, $partition ), 'autocreated topic';
         } else {

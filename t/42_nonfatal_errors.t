@@ -378,7 +378,7 @@ eval { $connection->receive_response_to_request( $decoded_produce_request ); };
 $error = $@;
 isa_ok( $error, 'Kafka::Exception::Connection' );
 is $error->code, $ERROR_LEADER_NOT_FOUND, 'non-fatal error: '.$ERROR{ $ERROR_LEADER_NOT_FOUND };
-is scalar( @{ $connection->nonfatal_errors } ), $SEND_MAX_ATTEMPTS, 'non-fatal errors are fixed';
+is scalar( @{ $connection->nonfatal_errors } ), 1, 'non-fatal errors are fixed';
 
 is scalar( @{ $connection->clear_nonfatals } ), 0, 'non-fatal errors are not fixed now';
 is scalar( @{ $connection->nonfatal_errors } ), 0, 'non-fatal errors are not fixed';
@@ -393,7 +393,7 @@ Kafka_IO_error(
     1,                  # skip calls
     $ERROR_CANNOT_BIND, # expected error code
     # because connection is not available
-    $SEND_MAX_ATTEMPTS, # expected non-fatal errors
+    1,                  # expected non-fatal errors
     $decoded_produce_request,
 );
 
@@ -498,7 +498,7 @@ foreach my $ErrorCode (
 
         if ( exists $RETRY_ON_ERRORS{ $ErrorCode } ) {
             is $error->code, $ErrorCode, 'non-fatal error: '.$ERROR{ $ErrorCode };
-            is scalar( @{ $connection->nonfatal_errors } ), $SEND_MAX_ATTEMPTS, 'non-fatal errors are fixed';
+            is scalar( @{ $connection->nonfatal_errors } ), 1, 'non-fatal errors are fixed';
         } else {
             is $error->code, $ErrorCode, 'FATAL error: '.$ERROR{ $ErrorCode };
             is scalar( @{ $connection->nonfatal_errors } ), 0, 'non-fatal errors are not fixed';
