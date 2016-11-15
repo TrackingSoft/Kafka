@@ -111,6 +111,7 @@ sub get_new_connection {
     return Kafka::Connection->new(
         host                    => $HOST,
         port                    => $PORT,
+        AutoCreateTopicsEnable  => 1,
         RETRY_BACKOFF           => $RETRY_BACKOFF * 2,
     );
 }
