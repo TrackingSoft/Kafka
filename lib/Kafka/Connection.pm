@@ -6,7 +6,7 @@ Kafka::Connection - Object interface to connect to a kafka cluster.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Connection> version 1.001011 .
+This documentation refers to C<Kafka::Connection> version 1.001012 .
 
 =cut
 
@@ -20,7 +20,7 @@ use warnings;
 
 our $DEBUG = 0;
 
-our $VERSION = '1.001011';
+our $VERSION = '1.001012';
 
 use Exporter qw(
     import
@@ -366,7 +366,7 @@ In some circumstances (leader is temporarily unavailable, outdated metadata, etc
 This property specifies the maximum number of attempts to send a message.
 The C<$attempts> should be an integer number.
 
-Used C<SEND_MAX_ATTEMPTS = 1> with Kafka::Producer->send requests.
+Do not use C<$Kafka::SEND_MAX_ATTEMPTS> in C<Kafka::Producer-<gt>send> request to prevent duplicates.
 
 =item C<RECEIVE_MAX_ATTEMPTS =E<gt> $attempts>
 

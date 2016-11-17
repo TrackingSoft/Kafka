@@ -1,7 +1,9 @@
 Revision history for Kafka package
 
+1.001012 Thu Nov  17 2016
     BUGFIXES:
-    - Used $Kafka::SEND_MAX_ATTEMPTS = 1 with Kafka::Producer->send requests.
+    - Do not use $Kafka::SEND_MAX_ATTEMPTS in Kafka::Producer->send request
+      to prevent duplicates.
 
 1.001011 Wed Nov  09 2016
     CHANGES:

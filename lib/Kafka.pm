@@ -9,7 +9,7 @@ Kafka - Apache Kafka interface for Perl.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka> package version 1.001011 .
+This documentation refers to C<Kafka> package version 1.001012 .
 
 =cut
 
@@ -21,7 +21,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '1.001011';
+our $VERSION = '1.001012';
 
 use Exporter qw(
     import
@@ -566,6 +566,8 @@ const our $DEFAULT_MAX_BYTES                    => 1_000_000;
 
 4 - The leader may be unavailable transiently, which can fail the sending of a message.
 This property specifies the number of attempts to send of a message.
+
+Do not use C<$Kafka::SEND_MAX_ATTEMPTS> in C<Kafka::Producer-<gt>send> request to prevent duplicates.
 
 =cut
 const our $SEND_MAX_RETRIES                     => 4;   # legacy, will be removed in future releases

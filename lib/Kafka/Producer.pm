@@ -6,7 +6,7 @@ Kafka::Producer - Perl interface for Kafka producer client.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Producer> version 1.001011 .
+This documentation refers to C<Kafka::Producer> version 1.001012 .
 
 =cut
 
@@ -18,7 +18,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '1.001011';
+our $VERSION = '1.001012';
 
 #-- load the modules -----------------------------------------------------------
 
@@ -308,7 +308,7 @@ C<$COMPRESSION_GZIP>,
 C<$COMPRESSION_SNAPPY>.
 The defaults that can be imported from the L<Kafka|Kafka> module.
 
-NOTE: Used $Kafka::Connection::SEND_MAX_ATTEMPTS = 1 with Kafka::Producer->send requests.
+Do not use C<$Kafka::SEND_MAX_ATTEMPTS> in C<Kafka::Producer-<gt>send> request to prevent duplicates.
 
 =back
 
