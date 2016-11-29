@@ -281,7 +281,7 @@ sub send {
     }
 
     ( defined( $sent ) && $sent == $len )
-        or $self->_error( $ERROR_CANNOT_SEND, "->send - $!" );
+        or $self->_error( $ERROR_CANNOT_SEND, format_message( "->send - '%s' (length %s, sent %s)", $!.'', $len, $sent ) );
 
     return $sent;
 }

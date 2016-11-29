@@ -1,5 +1,8 @@
 Revision history for Kafka package
 
+    CHANGES:
+    - Kafka::IO->send error diagnostic extended.
+
 1.001012 Thu Nov  17 2016
     BUGFIXES:
     - Do not use $Kafka::SEND_MAX_ATTEMPTS in Kafka::Producer->send request
