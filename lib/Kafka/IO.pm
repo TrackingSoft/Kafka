@@ -267,10 +267,23 @@ sub send {
 
     # accept not accepted earlier
     while ( select( my $mask = $self->{_select}, undef, undef, 0 ) ) {
-        my $received = $self->receive( $self->{not_accepted} || 1 );
-        return unless ( $received && defined( $$received ) );
+#FIXME:
+#        my $received = $self->receive( $self->{not_accepted} || 1, 1 ); # without exception
+        my $received = $self->receive( $self->{not_accepted} || 1 ); # with exception
+#FIXME:
+#        $self->{not_accepted} = 0;
+#FIXME:
+#say STDERR "# !!!!! not accepted: ";
+#use Data::Dumper;
+#$Data::Dumper::Sortkeys = 1;
+#say STDERR '# !!!!! DUMP: ', Data::Dumper->Dump( [ $received ], [ 'received' ] );
+#FXME: ? Пропустить отработку ошибки ?
+        $self->_error( $ERROR_CANNOT_SEND, format_message( "->send - ERRNO = '%s' (not accepted earlier %s, received %s)", $!.'', $self->{not_accepted}, $received ) )
+            unless $received && defined( $$received );
+#FIXME:
         $self->{not_accepted} = 0;
     }
+#FIXME:
     $self->{not_accepted} = 0;
 
     my ( $sent, $mask );
@@ -281,7 +294,7 @@ sub send {
     }
 
     ( defined( $sent ) && $sent == $len )
-        or $self->_error( $ERROR_CANNOT_SEND, format_message( "->send - '%s' (length %s, sent %s)", $!.'', $len, $sent ) );
+        or $self->_error( $ERROR_CANNOT_SEND, format_message( "->send - ERRNO = '%s' (length %s, sent %s)", $!.'', $len, $sent ) );
 
     return $sent;
 }
@@ -296,7 +309,7 @@ Returns a reference to the received message.
 
 =cut
 sub receive {
-    my ( $self, $length ) = @_;
+    my ( $self, $length, $_without_exception ) = @_;
 
     my ( $from_recv, $message, $buf, $mask );
     $message = q{};
@@ -309,8 +322,8 @@ sub receive {
     }
     $self->{not_accepted} = ( $length - length( $message ) ) * ( $self->{not_accepted} >= 0 );
 
-    ( defined( $from_recv ) && !$self->{not_accepted} )
-        or $self->_error( $ERROR_CANNOT_RECV, "->receive - $!" );
+    $self->_error( $ERROR_CANNOT_RECV, format_message( "->receive - ERRNO = '%s' (length %s, message length %s, from_recv %s, not accepted %s)", $!.'', $length, length( $message ), $from_recv, $self->{not_accepted} ) )
+        unless defined( $from_recv ) && !$self->{not_accepted} && !$_without_exception;
 
     $self->_debug_msg( $message, 'Response from', 'yellow' )
         if $self->debug_level >= 2;
