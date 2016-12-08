@@ -791,7 +791,7 @@ const our $ERROR_MISMATCH_ARGUMENT              => -1000;
 
 =item C<$ERROR_CANNOT_SEND>
 
--1001 - Can't send
+-1001 - Cannot send
 
 =cut
 const our $ERROR_CANNOT_SEND                    => -1001;
@@ -805,14 +805,14 @@ const our $ERROR_SEND_NO_ACK                    => -1002;
 
 =item C<ERROR_CANNOT_RECV>
 
--1003 - Can't recv
+-1003 - Cannot recv
 
 =cut
 const our $ERROR_CANNOT_RECV                    => -1003;
 
 =item C<ERROR_CANNOT_BIND>
 
--1004 - Can't bind
+-1004 - Cannot bind
 
 =cut
 const our $ERROR_CANNOT_BIND                    => -1004;
@@ -833,7 +833,7 @@ const our $ERROR_UNKNOWN_APIKEY                 => -1006;
 
 =item C<$ERROR_CANNOT_GET_METADATA>
 
--1007 - Can't get Metadata
+-1007 - Cannot get Metadata
 
 =cut
 const our $ERROR_CANNOT_GET_METADATA            => -1007;
@@ -1286,13 +1286,13 @@ Contains the descriptions for possible error codes.
 our %ERROR = (
     # Errors fixed by Kafka package
     $ERROR_MISMATCH_ARGUMENT                        => q{Invalid argument},
-    $ERROR_CANNOT_SEND                              => q{Can't send},
+    $ERROR_CANNOT_SEND                              => q{Cannot send},
     $ERROR_SEND_NO_ACK                              => q{No acknowledgement for sent request},
-    $ERROR_CANNOT_RECV                              => q{Can't recv},
-    $ERROR_CANNOT_BIND                              => q{Can't bind},
+    $ERROR_CANNOT_RECV                              => q{Cannot recv},
+    $ERROR_CANNOT_BIND                              => q{Cannot bind},
     $ERROR_METADATA_ATTRIBUTES                      => q{Unknown metadata attributes},
     $ERROR_UNKNOWN_APIKEY                           => q{Unknown ApiKey},
-    $ERROR_CANNOT_GET_METADATA                      => q{Can't get metadata},
+    $ERROR_CANNOT_GET_METADATA                      => q{Cannot get metadata},
     $ERROR_LEADER_NOT_FOUND                         => q{Leader not found},
     $ERROR_MISMATCH_CORRELATIONID                   => q{Mismatch CorrelationId},
     $ERROR_NO_KNOWN_BROKERS                         => q{There are no known brokers},

@@ -1359,19 +1359,19 @@ Here is the list of possible error messages that C<Kafka::Connection> may produc
 
 Invalid argument was provided to C<new> L<constructor|/CONSTRUCTOR> or to other L<method|/METHODS>.
 
-=item C<Can't send>
+=item C<Cannot send>
 
 Request cannot be sent to Kafka.
 
-=item C<Can't recv>
+=item C<Cannot recv>
 
 Response cannot be received from Kafka.
 
-=item C<Can't bind>
+=item C<Cannot bind>
 
-A successful TCP connection can't be established on given host and port.
+A successful TCP connection cannot be established on given host and port.
 
-=item C<Can't get metadata>
+=item C<Cannot get metadata>
 
 Error detected during parsing of response from Kafka.
 
@@ -1387,7 +1387,7 @@ Mismatch of C<CorrelationId> of request and response.
 
 Failed to locate cluster broker.
 
-=item C<Can't get metadata>
+=item C<Cannot get metadata>
 
 Received meta data is incorrect or missing.
 

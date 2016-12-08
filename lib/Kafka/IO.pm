@@ -700,17 +700,17 @@ Here is the list of possible error messages that C<Kafka::IO> may produce:
 
 Invalid arguments were passed to a method.
 
-=item C<Can't send>
+=item C<Cannot send>
 
-Message can't be sent on a C<Kafka::IO> object socket.
+Message cannot be sent on a C<Kafka::IO> object socket.
 
-=item C<Can't recv>
+=item C<Cannot recv>
 
-Message can't be received.
+Message cannot be received.
 
-=item C<Can't bind>
+=item C<Cannot bind>
 
-TCP connection can't be established on given host and port.
+TCP connection cannot be established on given host and port.
 
 =back
 

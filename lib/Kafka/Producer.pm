@@ -404,19 +404,19 @@ working with L<Kafka|Kafka> package.
 Invalid arguments were provided to a C<new>
 L<constructor|/CONSTRUCTOR> or to other L<method|/METHODS>.
 
-=item C<Can't send>
+=item C<Cannot send>
 
 Request cannot be sent.
 
-=item C<Can't recv>
+=item C<Cannot recv>
 
 Response cannot be received.
 
-=item C<Can't bind>
+=item C<Cannot bind>
 
-TCP connection can't be established on a given host and port.
+TCP connection cannot be established on a given host and port.
 
-=item C<Can't get metadata>
+=item C<Cannot get metadata>
 
 IO error is present, errors found in the structure of the reply or the reply contains a non-zero error codes.
 
@@ -432,7 +432,7 @@ C<CorrelationId> of response doesn't match one in request.
 
 Information about brokers in the cluster is missing.
 
-=item C<Can't get metadata>
+=item C<Cannot get metadata>
 
 Obtained metadata is incorrect or failed to obtain metadata.
 

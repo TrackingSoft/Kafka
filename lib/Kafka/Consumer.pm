@@ -556,19 +556,19 @@ working with L<Kafka|Kafka> package.
 
 Invalid argument passed to a C<new> L<constructor|/CONSTRUCTOR> or other L<method|/METHODS>.
 
-=item C<Can't send>
+=item C<Cannot send>
 
 Request cannot be sent.
 
-=item C<Can't recv>
+=item C<Cannot recv>
 
 Response cannot be received.
 
-=item C<Can't bind>
+=item C<Cannott bind>
 
 TCP connection can't be established on the given host and port.
 
-=item C<Can't get metadata>
+=item C<Cannot get metadata>
 
 Failed to obtain metadata from Kafka servers.
 
@@ -584,7 +584,7 @@ C<CorrelationId> of response doesn't match one in request.
 
 Resulting metadata has no information about cluster brokers.
 
-=item C<Can't get metadata>
+=item C<Cannot get metadata>
 
 Received metadata has incorrect internal structure.
 

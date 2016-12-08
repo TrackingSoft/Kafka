@@ -278,7 +278,7 @@ sub new {
     my ( $inifile, $cfg, $zookeeper_client_port, $replication_factor );
 
     opendir( my $dh, $kafka_data_dir )
-        or confess "can't opendir $kafka_data_dir: $!";
+        or confess "cannot opendir $kafka_data_dir: $!";
     foreach my $file ( readdir( $dh ) ) {
         next if $file !~ /^$KAFKA_LOGS_DIR_MASK/;
         ++$replication_factor;
