@@ -395,7 +395,8 @@ SKIP: {
 
     undef $server;
     ok $io, 'IO exists';
-    throws_ok { $sent = $io->send( $test_message ); } 'Kafka::Exception::IO', 'error thrown';
+    ok !$io->is_alive, 'socket not alive';
+#    throws_ok { $sent = $io->send( $test_message ); } 'Kafka::Exception::IO', 'error thrown';
 }
 
 # POSTCONDITIONS ---------------------------------------------------------------

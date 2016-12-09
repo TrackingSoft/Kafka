@@ -38,6 +38,8 @@ plan 'no_plan';
 #-- load the modules -----------------------------------------------------------
 
 use Const::Fast;
+use Data::Dumper;
+use Try::Tiny;
 
 use Kafka qw(
     $BLOCK_UNTIL_IS_COMMITTED
@@ -70,129 +72,176 @@ my $cluster = Kafka::Cluster->new(
 const my $PARTITION             => $Kafka::MockIO::PARTITION;
 const my $TOPIC                 => $DEFAULT_TOPIC;
 const my $MESSAGE               => 'simple message';
-const my $SEND_NO_ACK_REPEATS   => 200;
+const my $SEND_NO_ACK_REPEATS   => 10;
 const my $SEND_NO_ACK_ERROR     => $ERROR{ $ERROR_SEND_NO_ACK };
 
-my ( $CONNECTION, $PRODUCER, $CONSUMER, $TIMEOUT );
-my ( $port, $response, $previous_offset, $next_offset, $send_no_ack_errors, $success_sendings );
+const my $TIMEOUT_DIVIDER       => 2;
+const my $RETRIES               => 2;
 
-$send_no_ack_errors = 0;
-$TIMEOUT            = $REQUEST_TIMEOUT;
-$success_sendings   = 0;
+my ( $CONNECTION, $PRODUCER, $CONSUMER, $TIMEOUT );
+my ( $port, $response, $previous_offset, $next_offset, $success_sendings );
+
+$TIMEOUT                        = $REQUEST_TIMEOUT; # normal timeout
+$success_sendings               = 0;
+
+# report variables
+my $TOTAL_SENDINGS              = 0;
+my $send_with_NO_ACK_errors     = 0;
+my $NO_ACK_message_stored       = 0;
+my $NO_ACK_message_not_stored   = 0;
+my $send_with_other_errors      = 0;
+my $other_message_stored        = 0;
+my $other_message_not_stored    = 0;
+my %found_ERRORS;
 
 sub sending {
-    my $retries = 0;
     my $response;
-    ++$retries;
-    eval {
+    my $error;
+    ++$TOTAL_SENDINGS;
+    try {
         $response = $PRODUCER->send(
             $TOPIC,
             $PARTITION,
             $MESSAGE,
         );
+    } catch {
+        $error = $_;
     };
-    my $error = $@;
 
-    if ( $error ) {
-        $TIMEOUT = $REQUEST_TIMEOUT;
+    # control fetching stored messages
+    my $prev_timeout = $TIMEOUT;
+    $TIMEOUT = $REQUEST_TIMEOUT;    # restore normal timeout
+    my $stored_messages;
+    my $retries = $RETRIES;
+    while ( $retries-- ) {
         get_new_objects();
-        my $stored_messages = fetching();
-        my $_received = scalar( @$stored_messages );
+        last if $stored_messages = fetching();
+        sleep 1;
+    }
+    BAIL_OUT( 'sending - Cannot fetch messages' ) unless $stored_messages;
 
-        if ( $error->message =~ /$SEND_NO_ACK_ERROR/ ) {
-            ++$send_no_ack_errors;
-            pass "expected sending error: $error";
+    my $stored = scalar @$stored_messages;
+    my $prev_success_sendings = $success_sendings;
+    $success_sendings = $stored;
 
-            if ( $_received == $success_sendings ) {
-                fail 'unexpected no received on SEND_NO_ACK_ERROR';
-                return;
-            } elsif ( $_received == $success_sendings + 1 ) {
-                ok 'success receive on SEND_NO_ACK_ERROR';
-                $success_sendings = $_received;
-                return 1;
-            } elsif ( $_received > $success_sendings + 1 ) {
-                fail 'unexpected additional receives on SEND_NO_ACK_ERROR: '.( $_received - $success_sendings + 1 );
-                $success_sendings = $_received;
-            }
+    return 1 unless $error;
+
+    ++$found_ERRORS{ $error }->{total};
+
+    if ( $error->message =~ /$SEND_NO_ACK_ERROR/ ) {
+        ++$send_with_NO_ACK_errors;
+        diag "[$send_with_NO_ACK_errors/$SEND_NO_ACK_REPEATS] expected SEND_NO_ACK_ERROR: $error";
+
+        if ( $stored == $prev_success_sendings ) {
+            ++$NO_ACK_message_not_stored;
+            pass 'possible not stored on SEND_NO_ACK_ERROR';
+            ++$found_ERRORS{ $error }->{not_stored};
+            $found_ERRORS{ $error }->{last_not_stored_timeout} = $prev_timeout;
+        } elsif ( $stored == $prev_success_sendings + 1 ) {
+            ++$NO_ACK_message_stored;
+            pass 'success stored on SEND_NO_ACK_ERROR';
+            ++$found_ERRORS{ $error }->{stored};
+            $found_ERRORS{ $error }->{last_stored_timeout} = $prev_timeout;
         } else {
-            pass "acceptable not SEND_NO_ACK_ERROR sending error = '$error'";
-
-            if ( $_received == $success_sendings + 1 ) {
-                ++$success_sendings;
-                return 1;
-            } elsif ( $_received > $success_sendings + 1 ) {
-                fail 'unexpected additional receives: '.( $_received - $success_sendings + 1 );
-                $success_sendings = $_received;
-            } else {
-                return;
-            }
+            fail "unexpected stored on SEND_NO_ACK_ERROR: fetched $stored, prev_success_sendings $prev_success_sendings";
         }
     } else {
-        ++$success_sendings;
-        return 1;
+        ++$send_with_other_errors;
+#        diag "sending - ignore possible not SEND_NO_ACK_ERROR error: '$error'";
+
+        if ( $stored == $prev_success_sendings ) {
+            ++$other_message_not_stored;
+            pass 'possible not stored on error';
+            ++$found_ERRORS{ $error }->{not_stored};
+            $found_ERRORS{ $error }->{last_not_stored_timeout} = $prev_timeout;
+        } elsif ( $stored == $prev_success_sendings + 1 ) {
+            pass 'possible stored on error';
+            ++$other_message_stored;
+            ++$found_ERRORS{ $error }->{stored};
+            $found_ERRORS{ $error }->{last_stored_timeout} = $prev_timeout;
+        } else {
+            fail "unexpected stored on error: fetched $stored, prev_success_sendings $prev_success_sendings";
+        }
     }
+
+    return;
 }
 
 sub next_offset {
-    my $offsets;
-    eval {
-        $offsets = $CONSUMER->offsets(
-            $TOPIC,
-            $PARTITION,
-            $RECEIVE_LATEST_OFFSET,             # time
-        );
-    };
-    fail "offsets are not received: $@" if $@;
-
-    if ( $offsets ) {
-        return $offsets->[0];
-    } else {
-        return;
+    $TIMEOUT = $REQUEST_TIMEOUT;    # restore normal timeout
+    my ( $error, $offsets );
+    my $retries = $RETRIES;
+    while ( $retries-- ) {
+        get_new_objects();
+        try {
+            $offsets = $CONSUMER->offsets(
+                $TOPIC,
+                $PARTITION,
+                $RECEIVE_LATEST_OFFSET,
+            );
+        } catch {
+            $error = $_;
+        };
+        last if @$offsets;
+        sleep 1;
     }
+    BAIL_OUT( 'next_offset - offsets are not received' ) unless @$offsets;
+
+    return $offsets->[0];
 }
 
 sub fetching {
     my $messages;
-    eval {
+    my $error;
+    try {
         $messages = $CONSUMER->fetch( $TOPIC, $PARTITION, 0 );
+    } catch {
+        $error = $_;
     };
-    fail "messages are not fetched: $@" if $@;
+    fail "fetching - messages are not fetched: '$error'" if $error;
 
-    if ( $messages ) {
-        foreach my $i ( 0 .. $#$messages ) {
-            my $message = $messages->[ $i ];
-            return unless $message->valid && $message->payload;
+    return unless @$messages;
+
+    foreach my $i ( 0 .. $#$messages ) {
+        my $message = $messages->[ $i ];
+        unless ( $message->valid && $message->payload ) {
+            fail "fetching - not valid message: message error '".$message->error."'";
+            return;
         }
-    } else {
-        return;
     }
 
     return $messages;
 }
 
 sub get_new_objects {
-    pass "TIMEOUT = ".sprintf( "%.6f", $TIMEOUT );
+    pass "get_new_objects - TIMEOUT = ".sprintf( "%.6f", $TIMEOUT );
 
     $CONNECTION->close if $CONNECTION;
     undef $CONSUMER;
     undef $PRODUCER;
     undef $CONNECTION;
 
-    $CONNECTION = Kafka::Connection->new(
-        host                    => 'localhost',
-        port                    => $port,
-        timeout                 => $TIMEOUT,
-        RECEIVE_MAX_ATTEMPTS    => 1,
-    );
-    $PRODUCER = Kafka::Producer->new(
-        Connection      => $CONNECTION,
-        # Ensure that all messages sent and recorded
-        RequiredAcks    => $BLOCK_UNTIL_IS_COMMITTED,
-        Timeout         => $TIMEOUT,
-    );
-    $CONSUMER = Kafka::Consumer->new(
-        Connection  => $CONNECTION,
-    );
+    lives_ok {
+        $CONNECTION = Kafka::Connection->new(
+            host                    => 'localhost',
+            port                    => $port,
+            timeout                 => $TIMEOUT,
+            RECEIVE_MAX_ATTEMPTS    => 1,
+        );
+    } 'Expecting to live new CONNECTION';
+    lives_ok {
+        $PRODUCER = Kafka::Producer->new(
+            Connection      => $CONNECTION,
+            # Ensure that all messages sent and recorded
+            RequiredAcks    => $BLOCK_UNTIL_IS_COMMITTED,
+            Timeout         => $TIMEOUT,
+        );
+    } 'Expecting to live new PRODUCER';
+    lives_ok {
+        $CONSUMER = Kafka::Consumer->new(
+            Connection  => $CONNECTION,
+        );
+    } 'Expecting to live new CONSUMER';
 }
 
 #-- Global data ----------------------------------------------------------------
@@ -203,30 +252,41 @@ sub get_new_objects {
 # INSTRUCTIONS -----------------------------------------------------------------
 
 my $stored_messages;
-while ( $send_no_ack_errors < $SEND_NO_ACK_REPEATS ) {
+my $work_timeout = $TIMEOUT;
+my $error_timeout = $work_timeout;
+while ( $send_with_NO_ACK_errors < $SEND_NO_ACK_REPEATS ) {
     my $prev_success_sendings = $success_sendings;
 
+    $TIMEOUT = $work_timeout;
     get_new_objects();
-    my $response = sending();
+    my $success_sending = sending();
 
-    my $work_timeout = $TIMEOUT;
-    $TIMEOUT = $REQUEST_TIMEOUT;
-    get_new_objects();
-    if ( $response ) {
-        ok( $stored_messages = fetching(), 'fetching ok' );
-        is scalar( @$stored_messages ), $success_sendings, 'only registered receives';
-        is $prev_success_sendings + 1, $success_sendings, 'one sending';
+    if ( $success_sending ) {
+        $work_timeout /= $TIMEOUT_DIVIDER;
+    } else {
+        $error_timeout = $work_timeout;
+        $work_timeout = $TIMEOUT;   # return to normal timeout
     }
-
-    $TIMEOUT = $work_timeout / 2;
 }
 
-$TIMEOUT = $REQUEST_TIMEOUT;
-get_new_objects();
-ok( $stored_messages = fetching(), 'fetching ok' );
-is $send_no_ack_errors, $SEND_NO_ACK_REPEATS, "SEND_NO_ACK_ERROR found: $send_no_ack_errors";
-ok $stored_messages, 'messages are stored';
-is scalar( @$stored_messages ), $success_sendings, 'receives on SEND_NO_ACK_ERROR registered';
+ok $success_sendings, 'messages stored';
+is $TOTAL_SENDINGS, $success_sendings + $NO_ACK_message_not_stored + $other_message_not_stored, 'all sendings accounted';
+is $send_with_NO_ACK_errors, $NO_ACK_message_stored + $NO_ACK_message_not_stored, 'all NO_ACK_ERROR sendings accounted';
+is $send_with_other_errors, $other_message_stored + $other_message_not_stored, 'all other errors accounted';
+
+# report
+diag "total sendings $TOTAL_SENDINGS";
+diag "stored messages $success_sendings";
+diag "last error timeout $error_timeout";
+diag "sendings with NO_ACK_ERROR $send_with_NO_ACK_errors";
+diag "sendings with NO_ACK_ERROR stored $NO_ACK_message_stored";
+diag "sendings with NO_ACK_ERROR not stored $NO_ACK_message_not_stored";
+diag "sendings with other errors $send_with_other_errors";
+diag "sendings with other errors stored $other_message_stored";
+diag "sendings with other errors not stored $other_message_not_stored";
+
+$Data::Dumper::Sortkeys = 1;
+diag( Data::Dumper->Dump( [ \%found_ERRORS ], [ 'found_ERRORS' ] ) );
 
 # POSTCONDITIONS ---------------------------------------------------------------
 

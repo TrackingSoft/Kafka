@@ -1,7 +1,8 @@
 Revision history for Kafka package
 
     CHANGES:
-    - Kafka::IO->send error diagnostic extended.
+    - Kafka::IO system call processing improved.
+    - Kafka::IO error diagnostic extended.
 
 1.001012 Thu Nov  17 2016
     BUGFIXES:

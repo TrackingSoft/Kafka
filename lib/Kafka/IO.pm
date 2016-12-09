@@ -266,35 +266,38 @@ sub send {
         if $self->debug_level >= 2;
 
     # accept not accepted earlier
-    while ( select( my $mask = $self->{_select}, undef, undef, 0 ) ) {
-#FIXME:
-#        my $received = $self->receive( $self->{not_accepted} || 1, 1 ); # without exception
-        my $received = $self->receive( $self->{not_accepted} || 1 ); # with exception
-#FIXME:
-#        $self->{not_accepted} = 0;
-#FIXME:
-#say STDERR "# !!!!! not accepted: ";
-#use Data::Dumper;
-#$Data::Dumper::Sortkeys = 1;
-#say STDERR '# !!!!! DUMP: ', Data::Dumper->Dump( [ $received ], [ 'received' ] );
-#FXME: ? Пропустить отработку ошибки ?
-        $self->_error( $ERROR_CANNOT_SEND, format_message( "->send - ERRNO = '%s' (not accepted earlier %s, received %s)", $!.'', $self->{not_accepted}, $received ) )
-            unless $received && defined( $$received );
-#FIXME:
+    {
+        my $_nfound = select( my $mask = $self->{_select}, undef, undef, 0 );
+#FIXME: remove next 'warn'
+warn( format_message( "# preliminary receive/select: ERRNO '%s', nfound %s, not_accepted %s", $!.'', $_nfound, $self->{not_accepted} ) ) if $_nfound == -1;
+        last if !$_nfound || $_nfound == -1;
+
+#FIXME: remove next 'warn'
+warn( format_message( "# preliminary receive/receive: not_accepted %s)", $self->{not_accepted} ) ) if $self->{not_accepted};
+        my $received = $self->receive( $self->{not_accepted} || 1, 1 ); # without receive exception
         $self->{not_accepted} = 0;
+        last unless $$received;
+
+        redo;
     }
-#FIXME:
     $self->{not_accepted} = 0;
 
-    my ( $sent, $mask );
-    {
-        last unless ( select( undef, $mask = $self->{_select}, undef, $self->{timeout} // $REQUEST_TIMEOUT ) );
-        $sent += send( $self->{socket}, $message, 0 ) // 0;
-        redo if $sent < $len;
+    my ( $sent, $mask, $chars_sent, $nfound, $errno );
+    SEND: {
+        $nfound = select( undef, $mask = $self->{_select}, undef, $self->{timeout} // $REQUEST_TIMEOUT );
+        last if !$nfound || $nfound == -1;
+        $chars_sent = CORE::send( $self->{socket}, $message, 0 );
+        last unless defined $chars_sent;
+        $sent += $chars_sent;
+        if ( $sent < $len ) {
+            $message = substr( $message, $chars_sent );
+            redo SEND;
+        }
     }
+    $errno = $!.'';
 
-    ( defined( $sent ) && $sent == $len )
-        or $self->_error( $ERROR_CANNOT_SEND, format_message( "->send - ERRNO = '%s' (length %s, sent %s)", $!.'', $len, $sent ) );
+    ( defined( $nfound ) && $nfound > 0 && defined( $sent ) && defined( $chars_sent ) && $sent == $len )
+        or $self->_error( $ERROR_CANNOT_SEND, format_message( "->send - ERRNO = '%s' (nfound %s, length %s, sent %s)", $errno, $nfound, $len, $sent ) );
 
     return $sent;
 }
@@ -311,19 +314,27 @@ Returns a reference to the received message.
 sub receive {
     my ( $self, $length, $_without_exception ) = @_;
 
-    my ( $from_recv, $message, $buf, $mask );
+    my ( $from_recv, $message, $buf, $mask, $nfound, $errno );
     $message = q{};
     {
-        last unless ( select( $mask = $self->{_select}, undef, undef, $self->{timeout} // $REQUEST_TIMEOUT ) );
-        $from_recv = recv( $self->{socket}, $buf = q{}, $length, 0 );
+        undef $from_recv;
+        $nfound = select( $mask = $self->{_select}, undef, undef, $self->{timeout} // $REQUEST_TIMEOUT );
+        last if !defined( $nfound ) || $nfound == -1;
+        $from_recv = CORE::recv( $self->{socket}, $buf = q{}, $length - length( $message ), 0 );
         last if !defined( $from_recv ) || $buf eq q{};
         $message .= $buf;
         redo if length( $message ) < $length;
     }
-    $self->{not_accepted} = ( $length - length( $message ) ) * ( $self->{not_accepted} >= 0 );
+    $errno = $!.'';
 
-    $self->_error( $ERROR_CANNOT_RECV, format_message( "->receive - ERRNO = '%s' (length %s, message length %s, from_recv %s, not accepted %s)", $!.'', $length, length( $message ), $from_recv, $self->{not_accepted} ) )
-        unless defined( $from_recv ) && !$self->{not_accepted} && !$_without_exception;
+    if ( $self->{not_accepted} >= 0 ) {
+        $self->{not_accepted} = $length - length( $message );
+    } else {
+        $self->{not_accepted} = 0;
+    }
+
+    $self->_error( $ERROR_CANNOT_RECV, format_message( "->receive - ERRNO = '%s' (nfound %s, length %s, message length %s, from_recv %s, not accepted %s)", $errno, $nfound, $length, length( $message ), $from_recv, $self->{not_accepted} ) )
+        unless defined( $nfound ) && $nfound != -1 && defined( $from_recv ) && ( !$self->{not_accepted} || $_without_exception );
 
     $self->_debug_msg( $message, 'Response from', 'yellow' )
         if $self->debug_level >= 2;
