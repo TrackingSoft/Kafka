@@ -267,10 +267,11 @@ sub send {
 
     # accept not accepted earlier
     {
+        undef $!;
         my $_nfound = select( my $mask = $self->{_select}, undef, undef, 0 );
 #FIXME: remove next 'warn'
 warn( format_message( "# preliminary receive/select: ERRNO '%s', nfound %s, not_accepted %s", $!.'', $_nfound, $self->{not_accepted} ) ) if $_nfound == -1;
-        last if !$_nfound || $_nfound == -1;
+        last if $! || !$_nfound || $_nfound == -1;
 
 #FIXME: remove next 'warn'
 warn( format_message( "# preliminary receive/receive: not_accepted %s)", $self->{not_accepted} ) ) if $self->{not_accepted};
@@ -284,8 +285,9 @@ warn( format_message( "# preliminary receive/receive: not_accepted %s)", $self->
 
     my ( $sent, $mask, $chars_sent, $nfound, $errno );
     SEND: {
+        undef $!;
         $nfound = select( undef, $mask = $self->{_select}, undef, $self->{timeout} // $REQUEST_TIMEOUT );
-        last if !$nfound || $nfound == -1;
+        last if $! || !$nfound || $nfound == -1;
         $chars_sent = CORE::send( $self->{socket}, $message, 0 );
         last unless defined $chars_sent;
         $sent += $chars_sent;
@@ -318,8 +320,9 @@ sub receive {
     $message = q{};
     {
         undef $from_recv;
+        undef $!;
         $nfound = select( $mask = $self->{_select}, undef, undef, $self->{timeout} // $REQUEST_TIMEOUT );
-        last if !defined( $nfound ) || $nfound == -1;
+        last if $! || !defined( $nfound ) || $nfound == -1;
         $from_recv = CORE::recv( $self->{socket}, $buf = q{}, $length - length( $message ), 0 );
         last if !defined( $from_recv ) || $buf eq q{};
         $message .= $buf;
