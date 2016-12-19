@@ -71,8 +71,8 @@ my $cluster = Kafka::Cluster->new(
 
 const my $PARTITION             => $Kafka::MockIO::PARTITION;
 const my $TOPIC                 => $DEFAULT_TOPIC;
-const my $MESSAGE               => 'simple message';
-const my $SEND_NO_ACK_REPEATS   => 10;
+const my $MESSAGE               => '*' x 200;
+const my $SEND_NO_ACK_REPEATS   => 20;
 const my $SEND_NO_ACK_ERROR     => $ERROR{ $ERROR_SEND_NO_ACK };
 
 const my $TIMEOUT_DIVIDER       => 2;
@@ -92,6 +92,7 @@ my $NO_ACK_message_not_stored   = 0;
 my $send_with_other_errors      = 0;
 my $other_message_stored        = 0;
 my $other_message_not_stored    = 0;
+my $not_stored_without_error    = 0;
 my %found_ERRORS;
 
 sub sending {
@@ -115,22 +116,47 @@ sub sending {
     my $retries = $RETRIES;
     while ( $retries-- ) {
         get_new_objects();
-        last if $stored_messages = fetching();
+#        last if $stored_messages = fetching();
+        last if $stored_messages = next_offset();
         sleep 1;
     }
     BAIL_OUT( 'sending - Cannot fetch messages' ) unless $stored_messages;
 
-    my $stored = scalar @$stored_messages;
+#    my $stored = scalar @$stored_messages;
+    my $stored = $stored_messages;
     my $prev_success_sendings = $success_sendings;
     $success_sendings = $stored;
 
-    return 1 unless $error;
+    unless ( $error ) {
+        if ( $stored == $prev_success_sendings + 1 ) {
+            return 1;
+        } else {
+            ++$not_stored_without_error;
+            diag( sprintf( "\n%s WARN: data not stored! Sending %d, expected %d but got %d stored records. Timeout %.5f",
+                    localtime.'',
+                    $TOTAL_SENDINGS,
+                    $prev_success_sendings + 1,
+                    $stored,
+                    $prev_timeout,
+                )
+            );
+            return -1;
+        }
+    }
 
     ++$found_ERRORS{ $error }->{total};
 
     if ( $error->message =~ /$SEND_NO_ACK_ERROR/ ) {
         ++$send_with_NO_ACK_errors;
-        diag "[$send_with_NO_ACK_errors/$SEND_NO_ACK_REPEATS] expected SEND_NO_ACK_ERROR: $error";
+        diag( sprintf( "\r[%d/%d] %s: stored %d, not stored without error %d, timeout %.5f\r",
+                $send_with_NO_ACK_errors,
+                $SEND_NO_ACK_REPEATS,
+                localtime.'',
+                $success_sendings,
+                $not_stored_without_error,
+                $prev_timeout,
+            )
+        );
 
         if ( $stored == $prev_success_sendings ) {
             ++$NO_ACK_message_not_stored;
@@ -190,28 +216,28 @@ sub next_offset {
     return $offsets->[0];
 }
 
-sub fetching {
-    my $messages;
-    my $error;
-    try {
-        $messages = $CONSUMER->fetch( $TOPIC, $PARTITION, 0 );
-    } catch {
-        $error = $_;
-    };
-    fail "fetching - messages are not fetched: '$error'" if $error;
-
-    return unless @$messages;
-
-    foreach my $i ( 0 .. $#$messages ) {
-        my $message = $messages->[ $i ];
-        unless ( $message->valid && $message->payload ) {
-            fail "fetching - not valid message: message error '".$message->error."'";
-            return;
-        }
-    }
-
-    return $messages;
-}
+#sub fetching {
+#    my $messages;
+#    my $error;
+#    try {
+#        $messages = $CONSUMER->fetch( $TOPIC, $PARTITION, 0 );
+#    } catch {
+#        $error = $_;
+#    };
+#    fail "fetching - messages are not fetched: '$error'" if $error;
+#
+#    return unless @$messages;
+#
+#    foreach my $i ( 0 .. $#$messages ) {
+#        my $message = $messages->[ $i ];
+#        unless ( $message->valid && $message->payload ) {
+#            fail "fetching - not valid message: message error '".$message->error."'";
+#            return;
+#        }
+#    }
+#
+#    return $messages;
+#}
 
 sub get_new_objects {
     pass "get_new_objects - TIMEOUT = ".sprintf( "%.6f", $TIMEOUT );
@@ -251,6 +277,7 @@ sub get_new_objects {
 
 # INSTRUCTIONS -----------------------------------------------------------------
 
+diag 'Started at '.localtime."\n";
 my $stored_messages;
 my $work_timeout = $TIMEOUT;
 my $error_timeout = $work_timeout;
@@ -262,21 +289,31 @@ while ( $send_with_NO_ACK_errors < $SEND_NO_ACK_REPEATS ) {
     my $success_sending = sending();
 
     if ( $success_sending ) {
+        last if $success_sending == -1;
         $work_timeout /= $TIMEOUT_DIVIDER;
     } else {
         $error_timeout = $work_timeout;
         $work_timeout = $TIMEOUT;   # return to normal timeout
     }
 }
+diag "\nFinished at ".localtime;
 
 ok $success_sendings, 'messages stored';
-is $TOTAL_SENDINGS, $success_sendings + $NO_ACK_message_not_stored + $other_message_not_stored, 'all sendings accounted';
-is $send_with_NO_ACK_errors, $NO_ACK_message_stored + $NO_ACK_message_not_stored, 'all NO_ACK_ERROR sendings accounted';
-is $send_with_other_errors, $other_message_stored + $other_message_not_stored, 'all other errors accounted';
+is $TOTAL_SENDINGS,
+      $success_sendings
+    + $NO_ACK_message_not_stored
+    + $other_message_not_stored,
+    'all sendings accounted';
+is $send_with_NO_ACK_errors,
+      $NO_ACK_message_stored
+    + $NO_ACK_message_not_stored,
+    'all NO_ACK_ERROR sendings accounted';
+is $send_with_other_errors, $other_message_stored + $other_message_not_stored + $not_stored_without_error, 'all other errors accounted';
 
 # report
 diag "total sendings $TOTAL_SENDINGS";
 diag "stored messages $success_sendings";
+fail( "NOT STORED WITHOUT ERROR $not_stored_without_error" ) if $not_stored_without_error;
 diag "last error timeout $error_timeout";
 diag "sendings with NO_ACK_ERROR $send_with_NO_ACK_errors";
 diag "sendings with NO_ACK_ERROR stored $NO_ACK_message_stored";

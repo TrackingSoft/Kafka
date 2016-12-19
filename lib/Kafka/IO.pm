@@ -266,8 +266,10 @@ sub send {
         if $self->debug_level >= 2;
 
     # accept not accepted earlier
+    my $last_operation = '';
     {
         undef $!;
+        $last_operation = 'not accepted earlier select';
         my $_nfound = select( my $mask = $self->{_select}, undef, undef, 0 );
 #FIXME: remove next 'warn'
 warn( format_message( "# preliminary receive/select: ERRNO '%s', nfound %s, not_accepted %s", $!.'', $_nfound, $self->{not_accepted} ) ) if $_nfound == -1;
@@ -275,6 +277,7 @@ warn( format_message( "# preliminary receive/select: ERRNO '%s', nfound %s, not_
 
 #FIXME: remove next 'warn'
 warn( format_message( "# preliminary receive/receive: not_accepted %s)", $self->{not_accepted} ) ) if $self->{not_accepted};
+        $last_operation = 'not accepted earlier receive';
         my $received = $self->receive( $self->{not_accepted} || 1, 1 ); # without receive exception
         $self->{not_accepted} = 0;
         last unless $$received;
@@ -283,11 +286,13 @@ warn( format_message( "# preliminary receive/receive: not_accepted %s)", $self->
     }
     $self->{not_accepted} = 0;
 
-    my ( $sent, $mask, $chars_sent, $nfound, $errno );
+    my ( $sent, $mask, $chars_sent, $nfound, $errno_str, $errno_num );
     SEND: {
         undef $!;
+        $last_operation = 'select';
         $nfound = select( undef, $mask = $self->{_select}, undef, $self->{timeout} // $REQUEST_TIMEOUT );
         last if $! || !$nfound || $nfound == -1;
+        $last_operation = 'send';
         $chars_sent = CORE::send( $self->{socket}, $message, 0 );
         last unless defined $chars_sent;
         $sent += $chars_sent;
@@ -296,10 +301,11 @@ warn( format_message( "# preliminary receive/receive: not_accepted %s)", $self->
             redo SEND;
         }
     }
-    $errno = $!.'';
+    $errno_str = $!.'';
+    $errno_num = $! + 0;
 
     ( defined( $nfound ) && $nfound > 0 && defined( $sent ) && defined( $chars_sent ) && $sent == $len )
-        or $self->_error( $ERROR_CANNOT_SEND, format_message( "->send - ERRNO = '%s' (nfound %s, length %s, sent %s)", $errno, $nfound, $len, $sent ) );
+        or $self->_error( $ERROR_CANNOT_SEND, format_message( "->send - ERRNO = %d(%s)/'%s' (last_operation '%s', nfound %s, length %s, sent %s)", $errno_num, _get_errno_name(), $errno_str, $last_operation, $nfound, $len, $sent ) );
 
     return $sent;
 }
@@ -316,19 +322,23 @@ Returns a reference to the received message.
 sub receive {
     my ( $self, $length, $_without_exception ) = @_;
 
-    my ( $from_recv, $message, $buf, $mask, $nfound, $errno );
+    my ( $from_recv, $message, $buf, $mask, $nfound, $errno_str, $errno_num );
+    my $last_operation = '';
     $message = q{};
     {
         undef $from_recv;
         undef $!;
+        $last_operation = 'select';
         $nfound = select( $mask = $self->{_select}, undef, undef, $self->{timeout} // $REQUEST_TIMEOUT );
         last if $! || !defined( $nfound ) || $nfound == -1;
+        $last_operation = 'recv';
         $from_recv = CORE::recv( $self->{socket}, $buf = q{}, $length - length( $message ), 0 );
         last if !defined( $from_recv ) || $buf eq q{};
         $message .= $buf;
         redo if length( $message ) < $length;
     }
-    $errno = $!.'';
+    $errno_str = $!.'';
+    $errno_num = $! + 0;
 
     if ( $self->{not_accepted} >= 0 ) {
         $self->{not_accepted} = $length - length( $message );
@@ -336,8 +346,8 @@ sub receive {
         $self->{not_accepted} = 0;
     }
 
-    $self->_error( $ERROR_CANNOT_RECV, format_message( "->receive - ERRNO = '%s' (nfound %s, length %s, message length %s, from_recv %s, not accepted %s)", $errno, $nfound, $length, length( $message ), $from_recv, $self->{not_accepted} ) )
-        unless defined( $nfound ) && $nfound != -1 && defined( $from_recv ) && ( !$self->{not_accepted} || $_without_exception );
+    $self->_error( $ERROR_CANNOT_RECV, format_message( "->receive - ERRNO = %d(%s)/'%s' (last_operation '%s', nfound %s, length %s, message length %s, from_recv %s, not accepted %s)", $errno_num, _get_errno_name(), $errno_str, $last_operation, $nfound, $length, length( $message ), $from_recv, $self->{not_accepted} ) )
+        unless ( defined( $nfound ) && $nfound != -1 && defined( $from_recv ) && !$self->{not_accepted} ) || $_without_exception;
 
     $self->_debug_msg( $message, 'Response from', 'yellow' )
         if $self->debug_level >= 2;
@@ -688,6 +698,14 @@ sub _error {
     return;
 }
 
+sub _get_errno_name {
+    foreach my $errno_name ( keys %! ) {
+        return( $errno_name ) if $!{ $errno_name };
+    }
+
+    return '';
+}
+
 #-- Closes and cleans up -------------------------------------------------------
 
 1;
@@ -718,7 +736,7 @@ Invalid arguments were passed to a method.
 
 Message cannot be sent on a C<Kafka::IO> object socket.
 
-=item C<Cannot recv>
+=item C<Cannot receive>
 
 Message cannot be received.
 

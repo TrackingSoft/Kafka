@@ -560,7 +560,7 @@ Invalid argument passed to a C<new> L<constructor|/CONSTRUCTOR> or other L<metho
 
 Request cannot be sent.
 
-=item C<Cannot recv>
+=item C<Cannot receive>
 
 Response cannot be received.
 

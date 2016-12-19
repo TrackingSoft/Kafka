@@ -408,7 +408,7 @@ L<constructor|/CONSTRUCTOR> or to other L<method|/METHODS>.
 
 Request cannot be sent.
 
-=item C<Cannot recv>
+=item C<Cannot receive>
 
 Response cannot be received.
 

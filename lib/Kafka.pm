@@ -805,7 +805,7 @@ const our $ERROR_SEND_NO_ACK                    => -1002;
 
 =item C<ERROR_CANNOT_RECV>
 
--1003 - Cannot recv
+-1003 - Cannot receive
 
 =cut
 const our $ERROR_CANNOT_RECV                    => -1003;
@@ -1288,7 +1288,7 @@ our %ERROR = (
     $ERROR_MISMATCH_ARGUMENT                        => q{Invalid argument},
     $ERROR_CANNOT_SEND                              => q{Cannot send},
     $ERROR_SEND_NO_ACK                              => q{No acknowledgement for sent request},
-    $ERROR_CANNOT_RECV                              => q{Cannot recv},
+    $ERROR_CANNOT_RECV                              => q{Cannot receive},
     $ERROR_CANNOT_BIND                              => q{Cannot bind},
     $ERROR_METADATA_ATTRIBUTES                      => q{Unknown metadata attributes},
     $ERROR_UNKNOWN_APIKEY                           => q{Unknown ApiKey},

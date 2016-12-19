@@ -1363,7 +1363,7 @@ Invalid argument was provided to C<new> L<constructor|/CONSTRUCTOR> or to other 
 
 Request cannot be sent to Kafka.
 
-=item C<Cannot recv>
+=item C<Cannot receive>
 
 Response cannot be received from Kafka.
 
