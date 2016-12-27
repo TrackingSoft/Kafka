@@ -468,7 +468,7 @@ sub _connect {
     }
 
     # Create socket.
-    socket( my $connection, $self->{pf}, SOCK_STREAM, getprotobyname( 'tcp' ) ) or die( "socket: $!\n" );
+    socket( my $connection, $self->{pf}, SOCK_STREAM, scalar getprotobyname( 'tcp' ) ) or die( "socket: $!\n" );
 
     # Set autoflushing.
     $_ = select( $connection ); $| = 1; select $_;
