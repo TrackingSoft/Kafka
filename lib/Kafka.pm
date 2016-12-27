@@ -894,7 +894,7 @@ const our $ERROR_NOT_BINARY_STRING              => -1014;
 =cut
 const our $ERROR_COMPRESSION                    => -1015;
 
-=item C<$ERROR_RESPOSE_BODY_NOT_RECEIVED>
+=item C<$ERROR_RESPONSEMESSAGE_NOT_RECEIVED>
 
 -1016 - 'ResponseMessage' not received
 

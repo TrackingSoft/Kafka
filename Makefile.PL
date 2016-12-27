@@ -31,6 +31,7 @@ my %config = (
         'Exception::Class'          => '1.37',
         'Exporter'                  => '5.62',
         'IO::Compress::Gzip'        => '2.008',
+        'IO::Select'                => '1.17',
         'IO::Uncompress::Gunzip'    => '2.008',
         'List::Util'                => '1.19',
         'Params::Util'              => '1.07',

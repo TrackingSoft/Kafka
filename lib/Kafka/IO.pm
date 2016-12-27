@@ -33,8 +33,17 @@ use Data::Validate::IP qw(
     is_ipv4
     is_ipv6
 );
-use Errno;
+use Errno qw(
+    EAGAIN
+    ECONNRESET
+    EINTR
+    EWOULDBLOCK
+);
 use Fcntl;
+use IO::Select;
+use Params::Util qw(
+    _STRING
+);
 use POSIX qw(
     ceil
 );
@@ -45,6 +54,7 @@ use Socket qw(
     AF_INET
     AF_INET6
     IPPROTO_TCP
+    MSG_DONTWAIT
     NI_NUMERICHOST
     NIx_NOSERV
     PF_INET
@@ -65,6 +75,7 @@ use Socket qw(
 use Sys::SigAction qw(
     set_sig_handler
 );
+use Time::HiRes ();
 use Try::Tiny;
 
 use Kafka qw(
@@ -227,8 +238,8 @@ sub new {
     ( $self->{host} ) = $self->{host} =~ /\A(.+)\z/;
     ( $self->{port} ) = $self->{port} =~ /\A(.+)\z/;
 
-    $self->{not_accepted} = 0;
-    $self->{socket} = undef;
+    $self->{socket}     = undef;
+    $self->{_io_select} = undef;
     try {
         $self->_connect();
     } catch {
@@ -259,53 +270,58 @@ Returns the number of characters sent.
 sub send {
     my ( $self, $message ) = @_;
 
-    ( my $len = length( $message ) ) <= $MAX_SOCKET_REQUEST_BYTES
-        or $self->_error( $ERROR_MISMATCH_ARGUMENT, '->send' );
+    defined( _STRING( $message ) ) && ( my $len = length( $message ) ) <= $MAX_SOCKET_REQUEST_BYTES
+        || $self->_error( $ERROR_MISMATCH_ARGUMENT, '->send' );
 
     $self->_debug_msg( $message, 'Request to', 'green' )
         if $self->debug_level >= 2;
 
-    # accept not accepted earlier
-    my $last_operation = '';
-    {
-        undef $!;
-        $last_operation = 'not accepted earlier select';
-        my $_nfound = select( my $mask = $self->{_select}, undef, undef, 0 );
-#FIXME: remove next 'warn'
-warn( format_message( "# preliminary receive/select: ERRNO '%s', nfound %s, not_accepted %s", $!.'', $_nfound, $self->{not_accepted} ) ) if $_nfound == -1;
-        last if $! || !$_nfound || $_nfound == -1;
+    my ( $sent, $chars_sent, $errno_num, $error_str, $errno );
 
-#FIXME: remove next 'warn'
-warn( format_message( "# preliminary receive/receive: not_accepted %s)", $self->{not_accepted} ) ) if $self->{not_accepted};
-        $last_operation = 'not accepted earlier receive';
-        my $received = $self->receive( $self->{not_accepted} || 1, 1 ); # without receive exception
-        $self->{not_accepted} = 0;
-        last unless $$received;
+    my $timeout = $self->{timeout} // $REQUEST_TIMEOUT;
+    my $s       = $self->{_io_select};
+    my $started = Time::HiRes::time();
 
-        redo;
-    }
-    $self->{not_accepted} = 0;
-
-    my ( $sent, $mask, $chars_sent, $nfound, $errno_str, $errno_num );
     SEND: {
         undef $!;
-        $last_operation = 'select';
-        $nfound = select( undef, $mask = $self->{_select}, undef, $self->{timeout} // $REQUEST_TIMEOUT );
-        last if $! || !$nfound || $nfound == -1;
-        $last_operation = 'send';
-        $chars_sent = CORE::send( $self->{socket}, $message, 0 );
-        last unless defined $chars_sent;
-        $sent += $chars_sent;
-        if ( $sent < $len ) {
-            $message = substr( $message, $chars_sent );
+        while ( $timeout >= 0 && $s->can_write( $timeout ) ) {
+            undef $!;
+            $chars_sent = CORE::send( $self->{socket}, $message, MSG_DONTWAIT );
+            $errno = $!;
+            undef $!;
+
+            last SEND unless defined $chars_sent;
+
+            $sent += $chars_sent;
+            if ( $sent < $len ) {
+                $message = substr( $message, $chars_sent );
+            } else {
+                last SEND;
+            }
+
+            ( $timeout, $started ) = _update_timeout( $timeout, $started );
+        }
+        if ( defined( $! ) && $! == EINTR ) {
+            ( $timeout, $started ) = _update_timeout( $timeout, $started );
             redo SEND;
         }
     }
-    $errno_str = $!.'';
-    $errno_num = $! + 0;
 
-    ( defined( $nfound ) && $nfound > 0 && defined( $sent ) && defined( $chars_sent ) && $sent == $len )
-        or $self->_error( $ERROR_CANNOT_SEND, format_message( "->send - ERRNO = %d(%s)/'%s' (last_operation '%s', nfound %s, length %s, sent %s)", $errno_num, _get_errno_name(), $errno_str, $last_operation, $nfound, $len, $sent ) );
+    if ( defined $errno ) {
+        $error_str = $errno.'';
+        $errno_num = $errno + 0;
+    }
+
+    $self->_error( $ERROR_CANNOT_SEND,
+        format_message( "->send - ERRNO/ERROR = %s(%s)/'%s' (length %s, sent %s)",
+            $errno_num,
+            _get_errno_name(),
+            $error_str,
+            $len,
+            $sent,
+        )
+    ) unless !$error_str && defined( $sent ) && defined( $chars_sent ) && $sent == $len;
+
 
     return $sent;
 }
@@ -320,34 +336,63 @@ Returns a reference to the received message.
 
 =cut
 sub receive {
-    my ( $self, $length, $_without_exception ) = @_;
+    my ( $self, $length ) = @_;
 
-    my ( $from_recv, $message, $buf, $mask, $nfound, $errno_str, $errno_num );
-    my $last_operation = '';
-    $message = q{};
-    {
-        undef $from_recv;
+    my ( $errno_num, $error_str, $errno, $been_read );
+    my $message = q{};
+
+    my $timeout = $self->{timeout} // $REQUEST_TIMEOUT;
+    my $s       = $self->{_io_select};
+    my $started = Time::HiRes::time();
+
+    RECEIVE: {
+        my $len_to_read = $length - length( $message );
         undef $!;
-        $last_operation = 'select';
-        $nfound = select( $mask = $self->{_select}, undef, undef, $self->{timeout} // $REQUEST_TIMEOUT );
-        last if $! || !defined( $nfound ) || $nfound == -1;
-        $last_operation = 'recv';
-        $from_recv = CORE::recv( $self->{socket}, $buf = q{}, $length - length( $message ), 0 );
-        last if !defined( $from_recv ) || $buf eq q{};
-        $message .= $buf;
-        redo if length( $message ) < $length;
-    }
-    $errno_str = $!.'';
-    $errno_num = $! + 0;
+        TRY_RECV: while ( $len_to_read > 0 && $timeout >= 0 && $s->can_read( $timeout ) ) {
+            my $buf = q{};
+            undef $!;
+            my $from_recv = CORE::recv( $self->{socket}, $buf, $len_to_read, MSG_DONTWAIT );
+            $errno = $!;
+            $been_read = defined( $from_recv ) && length( $buf );
+            if ( $been_read ) {
+                $message .= $buf;
+            } elsif ( $errno && $errno == EINTR ) {
+                ( $timeout, $started ) = _update_timeout( $timeout, $started );
+                next TRY_RECV;
+            }
 
-    if ( $self->{not_accepted} >= 0 ) {
-        $self->{not_accepted} = $length - length( $message );
-    } else {
-        $self->{not_accepted} = 0;
+            last RECEIVE if
+                   !$been_read
+                && $errno != EAGAIN
+                && $errno != EWOULDBLOCK
+                ## on freebsd, if we got ECONNRESET, it's a timeout from the other side
+                && !( $errno == ECONNRESET && $^O eq 'freebsd' )
+            ;
+
+            $len_to_read = $length - length( $message );
+
+            ( $timeout, $started ) = _update_timeout( $timeout, $started );
+        }
+        if ( defined( $! ) && $! == EINTR ) {
+            ( $timeout, $started ) = _update_timeout( $timeout, $started );
+            redo RECEIVE;
+        }
     }
 
-    $self->_error( $ERROR_CANNOT_RECV, format_message( "->receive - ERRNO = %d(%s)/'%s' (last_operation '%s', nfound %s, length %s, message length %s, from_recv %s, not accepted %s)", $errno_num, _get_errno_name(), $errno_str, $last_operation, $nfound, $length, length( $message ), $from_recv, $self->{not_accepted} ) )
-        unless ( defined( $nfound ) && $nfound != -1 && defined( $from_recv ) && !$self->{not_accepted} ) || $_without_exception;
+    if ( defined $errno ) {
+        $error_str = $errno.'';
+        $errno_num = $errno + 0;
+    }
+
+    $self->_error( $ERROR_CANNOT_RECV,
+        format_message( "->receive - ERRNO/ERROR = %s(%s)/'%s' (length %s, message length %s)",
+            $errno_num,
+            _get_errno_name(),
+            $error_str,
+            $length,
+            length( $message ),
+        )
+    ) unless !$error_str && length( $message ) >= $length;
 
     $self->_debug_msg( $message, 'Response from', 'yellow' )
         if $self->debug_level >= 2;
@@ -367,9 +412,9 @@ sub close {
 
     my $ret = 1;
     if ( $self->{socket} ) {
-        $self->{_select} = undef;
         $ret = CORE::close( $self->{socket} );
-        $self->{socket} = undef;
+        $self->{socket}     = undef;
+        $self->{_io_select} = undef;
     }
 
     return $ret;
@@ -402,7 +447,8 @@ sub is_alive {
 sub _connect {
     my ( $self ) = @_;
 
-    $self->{socket} = undef;
+    $self->{socket}     = undef;
+    $self->{_io_select} = undef;
 
     my $name    = $self->{host};
     my $port    = $self->{port};
@@ -488,9 +534,6 @@ sub _connect {
     ;
     connect( $connection, $sockaddr ) || $!{EINPROGRESS} || die( format_message( "connect ip = %s, port = %s: %s\n", $ip, $port, $! ) );
 
-    $self->{socket}     = $connection;
-    $self->{_select}    = undef;
-
     # Reset O_NONBLOCK.
     $flags = fcntl( $connection, F_GETFL, 0 ) or die "fcntl F_GETFL: $!\n";  # 0 for error, 0e0 for 0.
     fcntl( $connection, F_SETFL, $flags & ~ O_NONBLOCK ) or die "fcntl F_SETFL not O_NONBLOCK: $!\n";  # 0 for error, 0e0 for 0.
@@ -524,7 +567,9 @@ sub _connect {
     setsockopt( $connection, SOL_SOCKET, SO_SNDTIMEO, $timeval ) // die "setsockopt SOL_SOCKET, SO_SNDTIMEO: $!\n";
     setsockopt( $connection, SOL_SOCKET, SO_RCVTIMEO, $timeval ) // die "setsockopt SOL_SOCKET, SO_RCVTIMEO: $!\n";
 
-    vec( $self->{_select} = q{}, fileno( $self->{socket} ), 1 ) = 1;
+    $self->{socket} = $connection;
+    my $s = $self->{_io_select} = IO::Select->new;
+    $s->add( $self->{socket} );
 
     return $connection;
 }
@@ -691,9 +736,11 @@ sub _debug_msg {
 
 # Handler for errors
 sub _error {
-    my $self = shift;
+    my ( $self, @args ) = @_;
 
-    Kafka::Exception::IO->throw( throw_args( @_ ) );
+    $self->close if $args[0] != $ERROR_MISMATCH_ARGUMENT;
+
+    Kafka::Exception::IO->throw( throw_args( @args ) );
 
     return;
 }
@@ -704,6 +751,20 @@ sub _get_errno_name {
     }
 
     return '';
+}
+
+# update timeout before next attempt
+sub _update_timeout {
+    my ( $timeout, $started ) = @_;
+
+    my $errno = $!;
+    my $now = Time::HiRes::time();
+    $! = $errno;
+
+    $timeout -= $now - $started;
+    $started = $now;
+
+    return( $timeout, $started );
 }
 
 #-- Closes and cleans up -------------------------------------------------------

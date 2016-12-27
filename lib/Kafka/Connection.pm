@@ -1272,7 +1272,7 @@ sub _receiveIO {
         try {
             my $io = $server_data->{IO};
             $response_ref   = $io->receive( 4 ) unless $response_ref;
-            $$response_ref .= ${ $io->receive( unpack( 'l>', $$response_ref ) ) };
+            $$response_ref .= ${ $io->receive( unpack( 'l>', $$response_ref ) // 0 ) };
         } catch {
             $error = $_;
         };

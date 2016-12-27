@@ -38,6 +38,7 @@ Kafka:
    Exception::Class
    Exporter
    IO::Compress::Gzip
+   IO::Select
    IO::Uncompress::Gunzip
    List::Util
    Params::Util

@@ -39,6 +39,7 @@ plan 'no_plan';
 
 use Const::Fast;
 use Data::Dumper;
+use Time::HiRes ();
 use Try::Tiny;
 
 use Kafka qw(
@@ -115,10 +116,10 @@ sub sending {
     my $stored_messages;
     my $retries = $RETRIES;
     while ( $retries-- ) {
+        Time::HiRes::sleep 0.5;
         get_new_objects();
 #        last if $stored_messages = fetching();
         last if $stored_messages = next_offset();
-        sleep 1;
     }
     BAIL_OUT( 'sending - Cannot fetch messages' ) unless $stored_messages;
 
@@ -132,7 +133,7 @@ sub sending {
             return 1;
         } else {
             ++$not_stored_without_error;
-            diag( sprintf( "\n%s WARN: data not stored! Sending %d, expected %d but got %d stored records. Timeout %.5f",
+            diag( sprintf( "\n%s WARN: data not stored without error! Sending %d, expected %d but got %d stored records. Timeout %.5f",
                     localtime.'',
                     $TOTAL_SENDINGS,
                     $prev_success_sendings + 1,
@@ -162,12 +163,12 @@ sub sending {
             ++$NO_ACK_message_not_stored;
             pass 'possible not stored on SEND_NO_ACK_ERROR';
             ++$found_ERRORS{ $error }->{not_stored};
-            $found_ERRORS{ $error }->{last_not_stored_timeout} = $prev_timeout;
+            $found_ERRORS{ $error }->{max_not_stored_timeout} = $prev_timeout if !exists( $found_ERRORS{ $error }->{max_not_stored_timeout} ) || $prev_timeout > $found_ERRORS{ $error }->{max_not_stored_timeout};
         } elsif ( $stored == $prev_success_sendings + 1 ) {
             ++$NO_ACK_message_stored;
             pass 'success stored on SEND_NO_ACK_ERROR';
             ++$found_ERRORS{ $error }->{stored};
-            $found_ERRORS{ $error }->{last_stored_timeout} = $prev_timeout;
+            $found_ERRORS{ $error }->{max_stored_timeout} = $prev_timeout if !exists( $found_ERRORS{ $error }->{max_stored_timeout} ) || $prev_timeout > $found_ERRORS{ $error }->{max_stored_timeout};
         } else {
             fail "unexpected stored on SEND_NO_ACK_ERROR: fetched $stored, prev_success_sendings $prev_success_sendings";
         }
@@ -179,12 +180,12 @@ sub sending {
             ++$other_message_not_stored;
             pass 'possible not stored on error';
             ++$found_ERRORS{ $error }->{not_stored};
-            $found_ERRORS{ $error }->{last_not_stored_timeout} = $prev_timeout;
+            $found_ERRORS{ $error }->{max_not_stored_timeout} = $prev_timeout if !exists( $found_ERRORS{ $error }->{max_not_stored_timeout} ) || $prev_timeout > $found_ERRORS{ $error }->{max_not_stored_timeout};
         } elsif ( $stored == $prev_success_sendings + 1 ) {
             pass 'possible stored on error';
             ++$other_message_stored;
             ++$found_ERRORS{ $error }->{stored};
-            $found_ERRORS{ $error }->{last_stored_timeout} = $prev_timeout;
+            $found_ERRORS{ $error }->{max_stored_timeout} = $prev_timeout if !exists( $found_ERRORS{ $error }->{max_stored_timeout} ) || $prev_timeout > $found_ERRORS{ $error }->{max_stored_timeout};
         } else {
             fail "unexpected stored on error: fetched $stored, prev_success_sendings $prev_success_sendings";
         }
@@ -208,10 +209,10 @@ sub next_offset {
         } catch {
             $error = $_;
         };
-        last if @$offsets;
+        last if $offsets && @$offsets;
         sleep 1;
     }
-    BAIL_OUT( 'next_offset - offsets are not received' ) unless @$offsets;
+    BAIL_OUT( 'next_offset - offsets are not received' ) unless $offsets && @$offsets;
 
     return $offsets->[0];
 }
@@ -280,7 +281,7 @@ sub get_new_objects {
 diag 'Started at '.localtime."\n";
 my $stored_messages;
 my $work_timeout = $TIMEOUT;
-my $error_timeout = $work_timeout;
+my $max_error_timeout = 0;
 while ( $send_with_NO_ACK_errors < $SEND_NO_ACK_REPEATS ) {
     my $prev_success_sendings = $success_sendings;
 
@@ -292,7 +293,7 @@ while ( $send_with_NO_ACK_errors < $SEND_NO_ACK_REPEATS ) {
         last if $success_sending == -1;
         $work_timeout /= $TIMEOUT_DIVIDER;
     } else {
-        $error_timeout = $work_timeout;
+        $max_error_timeout = $work_timeout if $work_timeout > $max_error_timeout;
         $work_timeout = $TIMEOUT;   # return to normal timeout
     }
 }
@@ -301,20 +302,24 @@ diag "\nFinished at ".localtime;
 ok $success_sendings, 'messages stored';
 is $TOTAL_SENDINGS,
       $success_sendings
+    - $not_stored_without_error
     + $NO_ACK_message_not_stored
     + $other_message_not_stored,
     'all sendings accounted';
+is $send_with_other_errors,
+      $other_message_stored
+    + $other_message_not_stored,
+    'all other errors accounted';
 is $send_with_NO_ACK_errors,
       $NO_ACK_message_stored
     + $NO_ACK_message_not_stored,
     'all NO_ACK_ERROR sendings accounted';
-is $send_with_other_errors, $other_message_stored + $other_message_not_stored + $not_stored_without_error, 'all other errors accounted';
 
 # report
 diag "total sendings $TOTAL_SENDINGS";
 diag "stored messages $success_sendings";
 fail( "NOT STORED WITHOUT ERROR $not_stored_without_error" ) if $not_stored_without_error;
-diag "last error timeout $error_timeout";
+diag "max error timeout $max_error_timeout";
 diag "sendings with NO_ACK_ERROR $send_with_NO_ACK_errors";
 diag "sendings with NO_ACK_ERROR stored $NO_ACK_message_stored";
 diag "sendings with NO_ACK_ERROR not stored $NO_ACK_message_not_stored";

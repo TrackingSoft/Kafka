@@ -73,6 +73,22 @@ const my $PARTITION         => 0;
 
 my ( $cluster, $port, $connection, $producer, $consumer, $error );
 
+sub get_new_objects {
+    $connection = Kafka::Connection->new(
+        host            => $HOST,
+        port            => $port,
+        RETRY_BACKOFF   => $RETRY_BACKOFF * 2,
+    );
+    $producer = Kafka::Producer->new(
+        Connection      => $connection,
+        # Ensure that all messages sent and recorded
+        RequiredAcks    => $BLOCK_UNTIL_IS_COMMITTED,
+    );
+    $consumer = Kafka::Consumer->new(
+        Connection  => $connection,
+    );
+}
+
 sub next_offset {
     my $offsets;
     eval {
@@ -343,19 +359,7 @@ isa_ok( $cluster, 'Kafka::Cluster' );
 
 ( $port )   =  $cluster->servers;
 
-$connection = Kafka::Connection->new(
-    host            => $HOST,
-    port            => $port,
-    RETRY_BACKOFF   => $RETRY_BACKOFF * 2,
-);
-$producer = Kafka::Producer->new(
-    Connection      => $connection,
-    # Ensure that all messages sent and recorded
-    RequiredAcks    => $BLOCK_UNTIL_IS_COMMITTED,
-);
-$consumer = Kafka::Consumer->new(
-    Connection  => $connection,
-);
+get_new_objects();
 
 #- receive a response to send messages (sending is successful, response is received)
 send_with_response();
@@ -363,6 +367,7 @@ fetching_all_messages();
 
 #- not receive a response to send messages (sending is successful, but no response is received)
 send_without_response();
+get_new_objects();
 fetching_all_messages();
 
 #- server received a not complete message (the connection is not lost)
@@ -371,6 +376,7 @@ fetching_no_messages();
 
 #- server received a not complete message (server not received the full message (connection is lost before receiving the response))
 send_not_complete_messages_with_lost_connection();
+get_new_objects();
 fetching_no_messages();
 
 #-- Closes and cleans up
