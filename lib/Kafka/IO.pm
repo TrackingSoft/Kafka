@@ -270,6 +270,9 @@ Returns the number of characters sent.
 sub send {
     my ( $self, $message ) = @_;
 
+    my $s = $self->{_io_select};
+    $self->_error( $ERROR_CANNOT_SEND, 'Attempt to work with a closed socket' ) unless $s;
+
     defined( _STRING( $message ) ) && ( my $len = length( $message ) ) <= $MAX_SOCKET_REQUEST_BYTES
         || $self->_error( $ERROR_MISMATCH_ARGUMENT, '->send' );
 
@@ -277,11 +280,9 @@ sub send {
         if $self->debug_level >= 2;
 
     my ( $sent, $chars_sent, $errno_num, $error_str, $errno );
-
     my $timeout = $self->{timeout} // $REQUEST_TIMEOUT;
-    my $s       = $self->{_io_select};
-    my $started = Time::HiRes::time();
 
+    my $started = Time::HiRes::time();
     SEND: {
         undef $!;
         while ( $timeout >= 0 && $s->can_write( $timeout ) ) {
@@ -338,13 +339,14 @@ Returns a reference to the received message.
 sub receive {
     my ( $self, $length ) = @_;
 
+    my $s = $self->{_io_select};
+    $self->_error( $ERROR_CANNOT_RECV, 'Attempt to work with a closed socket' ) unless $s;
+
     my ( $errno_num, $error_str, $errno, $been_read );
     my $message = q{};
-
     my $timeout = $self->{timeout} // $REQUEST_TIMEOUT;
-    my $s       = $self->{_io_select};
-    my $started = Time::HiRes::time();
 
+    my $started = Time::HiRes::time();
     RECEIVE: {
         my $len_to_read = $length - length( $message );
         undef $!;
@@ -737,8 +739,6 @@ sub _debug_msg {
 # Handler for errors
 sub _error {
     my ( $self, @args ) = @_;
-
-    $self->close if $args[0] != $ERROR_MISMATCH_ARGUMENT;
 
     Kafka::Exception::IO->throw( throw_args( @args ) );
 
