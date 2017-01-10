@@ -43,6 +43,7 @@ use Exception::Class (
         isa     => 'Kafka::Exception',
     },
     'Kafka::Exception::IO' => {
+        fields  => [ 'errno' ],
         isa     => 'Kafka::Exception',
     },
     'Kafka::Exception::Producer' => {

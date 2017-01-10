@@ -354,7 +354,7 @@ sub receive {
             my $buf = q{};
             undef $!;
             my $from_recv = CORE::recv( $self->{socket}, $buf, $len_to_read, MSG_DONTWAIT );
-            $errno = $!;
+
             $been_read = defined( $from_recv ) && length( $buf );
             if ( $been_read ) {
                 $message .= $buf;
@@ -365,6 +365,7 @@ sub receive {
 
             last RECEIVE if
                    !$been_read
+                && defined( $errno )
                 && $errno != EAGAIN
                 && $errno != EWOULDBLOCK
                 ## on freebsd, if we got ECONNRESET, it's a timeout from the other side
@@ -393,7 +394,8 @@ sub receive {
             $error_str,
             $length,
             length( $message ),
-        )
+        ),
+        $errno_num,
     ) unless !$error_str && length( $message ) >= $length;
 
     $self->_debug_msg( $message, 'Response from', 'yellow' )

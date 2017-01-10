@@ -41,6 +41,10 @@ use Data::Validate::IP qw(
     is_ipv6
 );
 use Const::Fast;
+use Errno qw(
+    ECONNABORTED
+    ECONNRESET
+);
 use List::Util qw(
     shuffle
 );
@@ -266,6 +270,11 @@ const our %RETRY_ON_ERRORS => (
 #    $ERROR_UNSUPPORTED_SASL_MECHANISM       => 1,   # 33 - The broker does not support the requested SASL mechanism
 #    $ERROR_ILLEGAL_SASL_STATE               => 1,   # 34 - Request is not valid given the current SASL state
 #    $ERROR_UNSUPPORTED_VERSION              => 1,   # 35 - The version of API is not supported
+);
+
+const my %fatal_recv_errno => (
+    ECONNABORTED    => 1,
+    ECONNRESET      => 1,
 );
 
 #-- constructor ----------------------------------------------------------------
@@ -747,6 +756,7 @@ sub receive_response_to_request {
                     $ErrorCode = $ERROR_CANNOT_BIND;
                 } elsif ( !$self->_sendIO( $server, $encoded_request ) ) {
                     $ErrorCode = $ERROR_CANNOT_SEND;
+                    $self->{_IO_cache}->{ $server }->{IO} = undef;
                 }
                 if ( $ErrorCode != $ERROR_NO_ERROR ) {
                     $self->_remember_nonfatal_error( $ErrorCode, $self->{_IO_cache}->{ $server }->{error}, $server, $topic_name, $partition );
@@ -1266,17 +1276,20 @@ sub _receiveIO {
 
     my $error;
     my $attempts = $self->{RECEIVE_MAX_ATTEMPTS};
+    my $io = $server_data->{IO};
     ATTEMPTS:
     while ( $attempts-- ) {
         $error = undef;
         try {
-            my $io = $server_data->{IO};
             $response_ref   = $io->receive( 4 ) unless $response_ref;
             $$response_ref .= ${ $io->receive( unpack( 'l>', $$response_ref ) // 0 ) };
         } catch {
             $error = $_;
         };
         last unless $error;
+
+        my $last_recv_errno = $error->errno;
+        last if $last_recv_errno && $fatal_recv_errno{ $last_recv_errno };
 
         say STDERR sprintf( "[%s] sleeping for %d ms before making receive attempt #%d (error '%s')",
                 scalar( localtime ),
