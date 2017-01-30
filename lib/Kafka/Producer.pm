@@ -30,6 +30,9 @@ use Params::Util qw(
     _NUMBER
     _STRING
 );
+use Scalar::Util qw(
+    blessed
+);
 use Scalar::Util::Numeric qw(
     isint
 );
@@ -363,7 +366,22 @@ sub send {
         };
     }
 
-    return $self->{Connection}->receive_response_to_request( $request, $compression_codec );
+    my $result = try {
+        $self->{Connection}->receive_response_to_request( $request, $compression_codec );
+    } catch {
+        my $error = $_;
+        if ( blessed( $error ) && $error->isa( 'Kafka::Exception' ) ) {
+            my $message = $error->message;
+            $message .= format_message( " (Kafka::Producer Timeout %s, RequiredAcks %s)",
+                $self->{Timeout},
+                $self->{RequiredAcks},
+            );
+            $error->message( $message );
+        }
+        die $error;
+    };
+
+    return $result;
 }
 
 #-- private attributes ---------------------------------------------------------

@@ -1218,6 +1218,14 @@ sub _on_io_error {
         $message = $error->message;
     }
 
+    $message .= format_message( " (Kafka::Connection timeout %s, SEND_MAX_ATTEMPTS %s, RECEIVE_MAX_ATTEMPTS %s, RETRY_BACKOFF %s)",
+        $self->{timeout},
+        $self->{SEND_MAX_ATTEMPTS},
+        $self->{SEND_MAX_ATTEMPTS},
+        $self->{RETRY_BACKOFF},
+    );
+    $error->message( $message ) if blessed( $error ) && $error->isa( 'Kafka::Exception' );
+
     $server_data->{error}   = $message;
     $server_data->{IO}      = undef;
 
