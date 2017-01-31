@@ -358,6 +358,7 @@ sub receive {
 
     my $started = Time::HiRes::time();
     my $retries = 0;
+    my $_before = $started;
     RECEIVE: {
         my $len_to_read = $length - length( $message );
         TRY_RECV: while ( $len_to_read > 0 && $timeout >= 0 ) {
@@ -400,6 +401,7 @@ sub receive {
             redo RECEIVE;
         }
     }
+    my $_after = Time::HiRes::time();
 
     if ( defined $errno ) {
         $error_str = $errno.'';
@@ -407,7 +409,7 @@ sub receive {
     }
 
     $self->_error( $ERROR_CANNOT_RECV,
-        format_message( "->receive - ERRNO/ERROR = %s(%s)/'%s' (length %s, message length %s, timeout %s, REQUEST_TIMEOUT %s, retries %s)",
+    format_message( "->receive - ERRNO/ERROR = %s(%s)/'%s' (length %s, message length %s, timeout %s, REQUEST_TIMEOUT %s, retries %s, secs %s)",
             $errno_num,
             _get_errno_name(),
             $error_str,
@@ -416,6 +418,7 @@ sub receive {
             $self->{timeout},
             $REQUEST_TIMEOUT,
             $retries,
+            $_after - $_before,
         ),
         $errno_num,
     ) unless !$error_str && length( $message ) >= $length;
