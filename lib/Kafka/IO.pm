@@ -289,6 +289,7 @@ sub send {
             undef $!;
             my $can_write = $s->can_write( $timeout );
             $errno = $!;
+            last if $errno;
             if ( $can_write ) {
                 ++$retries;
                 undef $!;
@@ -365,6 +366,7 @@ sub receive {
             undef $!;
             my $can_read = $s->can_read( $timeout );
             $errno = $!;
+            last if $errno;
             if ( $can_read ) {
                 my $buf = q{};
                 ++$retries;
