@@ -210,7 +210,7 @@ sub fetch_messages {
             $messages = $consumer->fetch( $topic, $partition, $offset, $max_size );
         } catch {
             $error = $_;
-            diag "fetch ERROR: $error";
+#            diag "fetch ERROR: $error";
             sleep 1;
         };
         redo if $error;

@@ -26,6 +26,7 @@ our $VERSION = '1.001012';
 
 use Carp;
 use Config;
+use Const::Fast;
 use Data::Validate::Domain qw(
     is_hostname
 );
@@ -152,6 +153,8 @@ This class allows you to create Kafka 0.9+ clients.
 =back
 
 =cut
+
+const my $MAX_RETRIES => 16;
 
 our $_hdr;
 
@@ -284,36 +287,33 @@ sub send {
 
     my $started = Time::HiRes::time();
     my $retries = 0;
-    SEND: {
-        while ( $timeout >= 0 ) {
+    while ( $timeout >= 0 && $retries++ < $MAX_RETRIES ) {
+        undef $!;
+        my $can_write = $s->can_write( $timeout );
+        $errno = $!;
+        if ( $errno ) {
+            if ( $errno == EINTR ) {
+                next;
+            }
+            last;
+        }
+
+        if ( $can_write ) {
             undef $!;
-            my $can_write = $s->can_write( $timeout );
+            $chars_sent = CORE::send( $self->{socket}, $message, MSG_DONTWAIT );
             $errno = $!;
-            last if $errno;
-            if ( $can_write ) {
-                ++$retries;
-                undef $!;
-                $chars_sent = CORE::send( $self->{socket}, $message, MSG_DONTWAIT );
-                $errno = $!;
 
-                last SEND unless defined $chars_sent;
+            last unless defined $chars_sent;
 
-                $sent += $chars_sent;
-                if ( $sent < $len ) {
-                    $message = substr( $message, $chars_sent );
-                } else {
-                    last SEND;
-                }
-
-                ( $timeout, $started ) = _update_timeout( $timeout, $started );
+            $sent += $chars_sent;
+            if ( $sent < $len ) {
+                $message = substr( $message, $chars_sent );
             } else {
                 last;
             }
         }
-        if ( defined( $errno ) && $errno == EINTR ) {
-            ( $timeout, $started ) = _update_timeout( $timeout, $started );
-            redo SEND;
-        }
+    } continue {
+        ( $timeout, $started ) = _update_timeout( $timeout, $started );
     }
 
     if ( defined $errno ) {
@@ -360,48 +360,44 @@ sub receive {
     my $started = Time::HiRes::time();
     my $retries = 0;
     my $_before = $started;
-    RECEIVE: {
-        my $len_to_read = $length - length( $message );
-        TRY_RECV: while ( $len_to_read > 0 && $timeout >= 0 ) {
+    my $len_to_read = $length - length( $message );
+    while ( $len_to_read > 0 && $timeout >= 0 && $retries++ < $MAX_RETRIES ) {
+        undef $!;
+        my $can_read = $s->can_read( $timeout );
+        $errno = $!;
+        if ( $errno ) {
+            if ( $errno == EINTR ) {
+                next;
+            }
+            last;
+        }
+
+        if ( $can_read ) {
+            my $buf = q{};
             undef $!;
-            my $can_read = $s->can_read( $timeout );
+            my $from_recv = CORE::recv( $self->{socket}, $buf, $len_to_read, MSG_DONTWAIT );
             $errno = $!;
-            last if $errno;
-            if ( $can_read ) {
-                my $buf = q{};
-                ++$retries;
-                undef $!;
-                my $from_recv = CORE::recv( $self->{socket}, $buf, $len_to_read, MSG_DONTWAIT );
-                $errno = $!;
 
-                $been_read = defined( $from_recv ) && length( $buf );
-                if ( $been_read ) {
-                    $message .= $buf;
-                } elsif ( $errno && $errno == EINTR ) {
-                    ( $timeout, $started ) = _update_timeout( $timeout, $started );
-                    next TRY_RECV;
-                }
-
-                last RECEIVE if
-                       !$been_read
-                    && defined( $errno )
-                    && $errno != EAGAIN
-                    && $errno != EWOULDBLOCK
-                    ## on freebsd, if we got ECONNRESET, it's a timeout from the other side
-                    && !( $errno == ECONNRESET && $^O eq 'freebsd' )
-                ;
-
+            $been_read = defined( $from_recv ) && length( $buf );
+            if ( $been_read ) {
+                $message .= $buf;
                 $len_to_read = $length - length( $message );
-
-                ( $timeout, $started ) = _update_timeout( $timeout, $started );
-            } else {
-                last TRY_RECV;
+            }
+            if ( $errno ) {
+                if ( $errno == EINTR ) {
+                    next;
+                } elsif (
+                           $errno != EAGAIN
+                        && $errno != EWOULDBLOCK
+                        ## on freebsd, if we got ECONNRESET, it's a timeout from the other side
+                        && !( $errno == ECONNRESET && $^O eq 'freebsd' )
+                    ) {
+                    last;
+                }
             }
         }
-        if ( defined( $errno ) && $errno == EINTR ) {
-            ( $timeout, $started ) = _update_timeout( $timeout, $started );
-            redo RECEIVE;
-        }
+    } continue {
+        ( $timeout, $started ) = _update_timeout( $timeout, $started );
     }
     my $_after = Time::HiRes::time();
 
@@ -411,7 +407,7 @@ sub receive {
     }
 
     $self->_error( $ERROR_CANNOT_RECV,
-    format_message( "->receive - ERRNO/ERROR = %s(%s)/'%s' (length %s, message length %s, timeout %s, REQUEST_TIMEOUT %s, retries %s, secs %s)",
+    format_message( "->receive - ERRNO/ERROR = %s(%s)/'%s' (length %s, message length %s, timeout %s, REQUEST_TIMEOUT %s, retries %s, secs %.6f)",
             $errno_num,
             _get_errno_name(),
             $error_str,
