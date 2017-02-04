@@ -1294,7 +1294,7 @@ sub _receiveIO {
         } catch {
             $error = $_;
         };
-        last unless $error;
+        last unless $error && blessed $error && $error->isa( 'Kafka::Exception::IO' );
 
         my $last_recv_errno = $error->errno;
         last if $last_recv_errno && $fatal_recv_errno{ $last_recv_errno };

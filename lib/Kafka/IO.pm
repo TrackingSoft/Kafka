@@ -395,6 +395,19 @@ sub receive {
                     last;
                 }
             }
+            elsif( length( $buf ) == 0 )
+            {
+                if( my $remaining_attempts = $MAX_RETRIES - $retries )
+                {
+                    my $remaining_time = $timeout - ( Time::HiRes::time() - $_before );
+                    if( $remaining_time > 0 )
+                    {
+                        my $micro_seconds = int( $remaining_time / $remaining_attempts * 10**6 );
+                        warn sprintf( "sleeping (remaining attempts %d, time %.6f): %d microseconds\n", $remaining_attempts, $remaining_time, $micro_seconds );
+                        Time::HiRes::usleep( $micro_seconds );
+                    }
+                }
+            }
         }
     } continue {
         ( $timeout, $started ) = _update_timeout( $timeout, $started );
