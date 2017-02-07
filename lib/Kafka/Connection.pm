@@ -41,10 +41,6 @@ use Data::Validate::IP qw(
     is_ipv6
 );
 use Const::Fast;
-use Errno qw(
-    ECONNABORTED
-    ECONNRESET
-);
 use List::Util qw(
     shuffle
 );
@@ -112,7 +108,6 @@ use Kafka qw(
     $IP_V6
     $KAFKA_SERVER_PORT
     $NOT_SEND_ANY_RESPONSE
-    $RECEIVE_MAX_ATTEMPTS
     $REQUEST_TIMEOUT
     $RETRY_BACKOFF
     $SEND_MAX_ATTEMPTS
@@ -272,11 +267,6 @@ const our %RETRY_ON_ERRORS => (
 #    $ERROR_UNSUPPORTED_VERSION              => 1,   # 35 - The version of API is not supported
 );
 
-const my %fatal_recv_errno => (
-    ECONNABORTED    => 1,
-    ECONNRESET      => 1,
-);
-
 #-- constructor ----------------------------------------------------------------
 
 =head2 CONSTRUCTOR
@@ -379,6 +369,8 @@ Do not use C<$Kafka::SEND_MAX_ATTEMPTS> in C<Kafka::Producer-<gt>send> request t
 
 =item C<RECEIVE_MAX_ATTEMPTS =E<gt> $attempts>
 
+WARN: Only for backward compatibility. C<$RECEIVE_MAX_ATTEMPTS> not used now!
+
 Optional, int32 signed integer, default = C<$Kafka::RECEIVE_MAX_ATTEMPTS> .
 
 In some circumstances (temporarily network issues, server high load, socket error, etc) we may fail to
@@ -433,7 +425,6 @@ sub new {
         ip_version              => undef,
         CorrelationId           => undef,
         SEND_MAX_ATTEMPTS       => $SEND_MAX_ATTEMPTS,
-        RECEIVE_MAX_ATTEMPTS    => $RECEIVE_MAX_ATTEMPTS,
         RETRY_BACKOFF           => $RETRY_BACKOFF,
         AutoCreateTopicsEnable  => 0,
         MaxLoggedErrors         => 100,
@@ -446,9 +437,6 @@ sub new {
         if ( $k eq 'SEND_MAX_RETRIES' ) {
             carp "Parameter 'SEND_MAX_RETRIES' is deprecated, use 'SEND_MAX_ATTEMPTS' instead";
             $k = 'SEND_MAX_ATTEMPTS';
-        } elsif ( $k eq 'RECEIVE_MAX_RETRIES' ) {
-            $k = 'RECEIVE_MAX_ATTEMPTS';
-            carp "Parameter 'RECEIVE_MAX_RETRIES' is deprecated, use 'RECEIVE_MAX_ATTEMPTS' instead";
         }
 
         $self->{ $k } = shift @args if exists $self->{ $k };
@@ -468,8 +456,6 @@ sub new {
         unless isint( $self->{CorrelationId} ) && $self->{CorrelationId} <= $MAX_CORRELATIONID;
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'SEND_MAX_ATTEMPTS' )
         unless _POSINT( $self->{SEND_MAX_ATTEMPTS} );
-    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'RECEIVE_MAX_ATTEMPTS' )
-        unless _POSINT( $self->{RECEIVE_MAX_ATTEMPTS} );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'RETRY_BACKOFF' )
         unless _POSINT( $self->{RETRY_BACKOFF} );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'MaxLoggedErrors' )
@@ -614,13 +600,10 @@ sub is_server_known {
     return exists $self->{_IO_cache}->{ $server };
 }
 
-=head3 C<is_server_alive( $server )>
-
-Returns true, if known C<$server> (host:port or [IPv6_host]:port) is accessible.
-Checks the accessibility of the server.
-
-=cut
-sub is_server_alive {
+# Returns true, if known C<$server> (host:port or [IPv6_host]:port) is accessible.
+# Checks the accessibility of the server.
+# NOTE: It's open and close new socket.
+sub _is_server_alive {
     my ( $self, $server ) = @_;
 
     $self->_error( $ERROR_MISMATCH_ARGUMENT )
@@ -634,7 +617,7 @@ sub is_server_alive {
         unless exists( $io_cache->{ $server } );
 
     if ( my $io = $self->_connectIO( $server ) ) {
-        return $io->is_alive;
+        return $io->_is_alive;
     } else {
         return;
     }
@@ -657,7 +640,7 @@ sub is_server_connected {
         return;
     }
 
-    return $io->is_alive;
+    return $io->_is_alive;
 }
 
 =head3 C<receive_response_to_request( $request, $compression_codec )>
@@ -1187,7 +1170,7 @@ sub _attempt_update_metadata {
         say STDERR sprintf( '[%s] sleeping for %d ms before making update metadata attempt #%d',
                 scalar( localtime ),
                 $self->{RETRY_BACKOFF},
-                $self->{RECEIVE_MAX_ATTEMPTS} - $attempts + 1,
+                $self->{SEND_MAX_ATTEMPTS} - $attempts + 1,
             ) if $self->debug_level;
         sleep $self->{RETRY_BACKOFF} / 1000;
         return( 1 ) if $self->_update_metadata( $topic, 1 );
@@ -1218,9 +1201,8 @@ sub _on_io_error {
         $message = $error->message;
     }
 
-    $message .= format_message( " (Kafka::Connection timeout %s, SEND_MAX_ATTEMPTS %s, RECEIVE_MAX_ATTEMPTS %s, RETRY_BACKOFF %s)",
+    $message .= format_message( " (Kafka::Connection timeout %s, SEND_MAX_ATTEMPTS %s, RETRY_BACKOFF %s)",
         $self->{timeout},
-        $self->{SEND_MAX_ATTEMPTS},
         $self->{SEND_MAX_ATTEMPTS},
         $self->{RETRY_BACKOFF},
     );
@@ -1237,8 +1219,8 @@ sub _connectIO {
     my ( $self, $server ) = @_;
 
     my $server_data = $self->{_IO_cache}->{ $server };
-    my $io;
-    unless ( $server_data && ( $io = $server_data->{IO} ) ) {
+    unless ( $server_data && $server_data->{IO} ) {
+        my $error;
         try {
             $server_data->{IO} = Kafka::IO->new(
                 host        => $server_data->{host},
@@ -1249,10 +1231,10 @@ sub _connectIO {
             $server_data->{error} = undef;
         } catch {
             # NOTE: it is possible to repeat the operation here
-            my $error = $_;
+            $error = $_;
             $self->_on_io_error( $server_data, $error );
-            return;
         };
+        return if $error;
     }
 
     return $server_data->{IO};
@@ -1280,33 +1262,23 @@ sub _receiveIO {
     my ( $self, $server ) = @_;
 
     my $server_data = $self->{_IO_cache}->{ $server };
-    my $response_ref;
 
     my $error;
-    my $attempts = $self->{RECEIVE_MAX_ATTEMPTS};
     my $io = $server_data->{IO};
-    ATTEMPTS:
-    while ( $attempts-- ) {
-        $error = undef;
-        try {
-            $response_ref   = $io->receive( 4 ) unless $response_ref;
-            $$response_ref .= ${ $io->receive( unpack( 'l>', $$response_ref ) // 0 ) };
-        } catch {
-            $error = $_;
-        };
-        last unless $error && blessed $error && $error->isa( 'Kafka::Exception::IO' );
-
-        my $last_recv_errno = $error->errno;
-        last if $last_recv_errno && $fatal_recv_errno{ $last_recv_errno };
-
-        say STDERR sprintf( "[%s] sleeping for %d ms before making receive attempt #%d (error '%s')",
-                scalar( localtime ),
-                $self->{RETRY_BACKOFF},
-                $self->{RECEIVE_MAX_ATTEMPTS} - $attempts + 1,
-                $error,
-            ) if $self->debug_level;
-        sleep $self->{RETRY_BACKOFF} / 1000;
-    }
+    my $response_ref;
+    try {
+        $response_ref = $io->receive( 4 );
+        my $message_size = $$response_ref;
+        if ( length( $message_size ) == 4 ) {
+            my $message_body_ref = $io->receive( unpack( 'l>', $message_size ) );
+            $$response_ref .= $$message_body_ref;
+        } else {
+            $self->_closeIO( $server );
+            $self->_error( $ERROR_RESPONSEMESSAGE_NOT_RECEIVED );
+        }
+    } catch {
+        $error = $_;
+    };
     $self->_on_io_error( $server_data, $error )
         if $error;
 

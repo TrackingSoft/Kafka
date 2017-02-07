@@ -313,7 +313,7 @@ SKIP: {
 
     debug_msg( "external 'alarm' tested" );
 
-    #-- is_alive
+    #-- _is_alive
 
     $io = Kafka::IO->new(
         host    => $hostname,
@@ -321,7 +321,7 @@ SKIP: {
         timeout => $REQUEST_TIMEOUT,
     );
 
-    ok $io->is_alive, 'socket alive';
+    ok $io->_is_alive, 'socket alive';
 
     #-- close
 
@@ -329,9 +329,9 @@ SKIP: {
     $io->close;
     ok !$io->{socket}, 'socket not defined';
 
-    #-- is_alive
+    #-- _is_alive
 
-    ok !$io->is_alive, 'socket not alive';
+    ok !$io->_is_alive, 'socket not alive';
 
     #-- send
 
@@ -395,7 +395,7 @@ SKIP: {
 
     undef $server;
     ok $io, 'IO exists';
-    ok !$io->is_alive, 'socket not alive';
+    ok !$io->_is_alive, 'socket not alive';
 #    throws_ok { $sent = $io->send( $test_message ); } 'Kafka::Exception::IO', 'error thrown';
 }
 

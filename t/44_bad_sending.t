@@ -172,7 +172,7 @@ sub next_offset {
                     $$response_ref .= ${ $self->receive( unpack( 'l>', $$response_ref ) ) };
 
                     $self->close;
-                    ok !$self->is_alive, 'is not alive';
+                    ok !$self->_is_alive, 'is not alive';
                     return $ret;
                 },
                 into    => 'Kafka::IO',

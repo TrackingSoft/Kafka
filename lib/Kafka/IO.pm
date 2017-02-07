@@ -394,16 +394,13 @@ sub receive {
                     ) {
                     last;
                 }
-            }
-            elsif( length( $buf ) == 0 )
-            {
-                if( my $remaining_attempts = $MAX_RETRIES - $retries )
-                {
+            } elsif ( length( $buf ) == 0 ) {
+                if ( my $remaining_attempts = $MAX_RETRIES - $retries ) {
                     my $remaining_time = $timeout - ( Time::HiRes::time() - $_before );
-                    if( $remaining_time > 0 )
-                    {
-                        my $micro_seconds = int( $remaining_time / $remaining_attempts * 10**6 );
-                        warn sprintf( "sleeping (remaining attempts %d, time %.6f): %d microseconds\n", $remaining_attempts, $remaining_time, $micro_seconds );
+                    my $micro_seconds = int( $remaining_time / $remaining_attempts * 10**6 );
+                    if ( $micro_seconds > 0 ) {
+                        $self->_debug_msg( format_message( 'sleeping (remaining attempts %d, time %.6f): %d microseconds', $remaining_attempts, $remaining_time, $micro_seconds ) )
+                            if $self->debug_level;
                         Time::HiRes::usleep( $micro_seconds );
                     }
                 }
@@ -460,12 +457,8 @@ sub close {
     return $ret;
 }
 
-=head3 C<is_alive>
-
-The method verifies whether we are connected to Kafka server.
-
-=cut
-sub is_alive {
+# The method verifies whether we are connected to Kafka server.
+sub _is_alive {
     my ( $self ) = @_;
 
     my $socket = $self->{socket};

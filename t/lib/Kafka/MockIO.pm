@@ -139,7 +139,7 @@ my %_reinstall = (
     send                        => [ \&Kafka::IO::send,     \&send ],
     receive                     => [ \&Kafka::IO::receive,  \&receive ],
     close                       => [ \&Kafka::IO::close,    \&close ],
-    is_alive                    => [ \&Kafka::IO::is_alive, \&is_alive ],
+    _is_alive                   => [ \&Kafka::IO::_is_alive, \&_is_alive ],
     _decoded_topic_partition    => [ sub {},                \&_decoded_topic_partition ],
     _verify_string              => [ sub {},                \&_verify_string ],
     add_special_case            => [ sub {},                \&add_special_case ],
@@ -637,12 +637,8 @@ sub close {
     return;
 }
 
-=head3 C<is_alive>
-
-Method emulation (C<Kafka::IO::is_alive>).
-
-=cut
-sub is_alive {
+# Method emulation (C<Kafka::IO::_is_alive>).
+sub _is_alive {
     my ( $self ) = @_;
 
     return !!$self->{socket};

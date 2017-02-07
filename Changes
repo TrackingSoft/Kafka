@@ -3,6 +3,8 @@ Revision history for Kafka package
     CHANGES:
     - Kafka::IO system call processing improved.
     - Kafka::IO error diagnostic extended.
+    - $Kafka::RECEIVE_MAX_ATTEMPTS not used now.
+    - Kafka::Connection->is_server_alive, Kafka::IO->is_alive are private now.
 
 1.001012 Thu Nov  17 2016
     BUGFIXES:

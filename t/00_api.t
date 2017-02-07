@@ -202,7 +202,6 @@ BEGIN {
         $NOT_SEND_ANY_RESPONSE
         $RECEIVE_EARLIEST_OFFSETS
         $RECEIVE_LATEST_OFFSET
-        $RECEIVE_MAX_ATTEMPTS
         $REQUEST_TIMEOUT
         $RETRY_BACKOFF
         $SEND_MAX_ATTEMPTS
@@ -345,7 +344,7 @@ BEGIN {
 
     $methods_Kafka_IO = [ qw(
         close
-        is_alive
+        _is_alive
         new
         receive
         send
@@ -365,7 +364,7 @@ BEGIN {
         add_special_case
         close
         del_special_case
-        is_alive
+        _is_alive
         new
         override
         receive
@@ -395,7 +394,6 @@ BEGIN {
         cluster_errors
         debug_level
         get_known_servers
-        is_server_alive
         is_server_connected
         is_server_known
         new

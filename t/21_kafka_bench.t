@@ -126,7 +126,6 @@ unless ( $connect = Kafka::Connection->new(
     host    => 'localhost',
     port    => $port,
     SEND_MAX_ATTEMPTS       => $attempts,
-    RECEIVE_MAX_ATTEMPTS    => $attempts,
     RETRY_BACKOFF           => $RETRY_BACKOFF * 2,
     ) ) {
     BAIL_OUT 'connection is not created';

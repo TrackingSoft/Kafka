@@ -145,7 +145,7 @@ sub doit {
                 port    => $port,
 #                timeout => $REQUEST_TIMEOUT,
             );
-            ok $io->is_alive, 'socket alive';
+            ok $io->_is_alive, 'socket alive';
             is $io->{af}, $af, 'Address family ok';
             is $io->{pf}, $pf, 'Protocol family ok';
 

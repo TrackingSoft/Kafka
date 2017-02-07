@@ -60,7 +60,7 @@ my @IO_API_names = qw(
     send
     receive
     close
-    is_alive
+    _is_alive
 );
 
 $test_message   = "Test message\n";
@@ -121,9 +121,9 @@ $io = Kafka::IO->new(
 );
 isa_ok( $io, 'Kafka::IO' );
 
-#-- is_alive
+#-- _is_alive
 
-ok $io->is_alive, 'socket alive';
+ok $io->_is_alive, 'socket alive';
 
 #-- close
 
@@ -131,9 +131,9 @@ ok $io->{socket}, 'socket defined';
 $io->close;
 ok !$io->{socket}, 'socket not defined';
 
-#-- is_alive
+#-- _is_alive
 
-ok !$io->is_alive, 'socket not alive';
+ok !$io->_is_alive, 'socket not alive';
 
 undef $io;
 dies_ok {
@@ -209,14 +209,14 @@ foreach my $bad_message ( @not_string ) {
         port    => $KAFKA_SERVER_PORT,
         timeout => $REQUEST_TIMEOUT,
     );
-    ok $io->is_alive, 'socket alive';
+    ok $io->_is_alive, 'socket alive';
 
     dies_ok { $io->send( $bad_message ); } 'expecting to die';
 }
 
 #-- receive
 
-ok $io->is_alive, 'socket alive';
+ok $io->_is_alive, 'socket alive';
 
 foreach my $bad_len ( @not_posint ) {
     dies_ok { $io->receive( $bad_len ); } 'expecting to die';

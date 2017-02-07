@@ -80,19 +80,19 @@ sub testing {
 
 #-- stop leader
     my ( $leader_server, $leader_port ) = get_leader( $connect );
-    ok $connect->is_server_alive( $leader_server ), 'leader is alive';
+    ok $connect->_is_server_alive( $leader_server ), 'leader is alive';
     ok $connect->is_server_connected( $leader_server ), 'leader is connected';
     $cluster->stop( $leader_port );
-    ok !$connect->is_server_alive( $leader_server ), 'leader is not alive';
+    ok !$connect->_is_server_alive( $leader_server ), 'leader is not alive';
     ok !$connect->is_server_connected( $leader_server ), 'leader is connected';
     my ( $next_leader_server ) = get_leader( $connect );
-    ok $connect->is_server_alive( $next_leader_server ), 'new leader is alive';
+    ok $connect->_is_server_alive( $next_leader_server ), 'new leader is alive';
     ok $connect->is_server_connected( $next_leader_server ), 'new leader is connected';
 
 #-- start previous leader
     $cluster->_remove_log_tree( $leader_port );
     $cluster->start( $leader_port );
-    ok $connect->is_server_alive( $leader_server ), 'leader is alive';
+    ok $connect->_is_server_alive( $leader_server ), 'leader is alive';
 
 #-- close
     $connect->close;

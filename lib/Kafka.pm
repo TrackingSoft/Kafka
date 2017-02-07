@@ -575,6 +575,8 @@ const our $SEND_MAX_ATTEMPTS                    => 4;
 
 =item C<$RECEIVE_MAX_ATTEMPTS>
 
+WARN: Only for backward compatibility. C<$RECEIVE_MAX_ATTEMPTS> not used now!
+
 4 - The leader may be unavailable transiently, which can fail the receiving of a response.
 This property specifies the number of attempts to receive of a response.
 

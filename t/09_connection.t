@@ -50,7 +50,6 @@ use Kafka qw(
     $NOT_SEND_ANY_RESPONSE
     $RECEIVE_EARLIEST_OFFSETS
     $RECEIVE_LATEST_OFFSET
-    $RECEIVE_MAX_ATTEMPTS
     $REQUEST_TIMEOUT
     $RETRY_BACKOFF
     $SEND_MAX_ATTEMPTS
@@ -100,7 +99,6 @@ sub new_ERROR_MISMATCH_ARGUMENT {
                 port                => $port,
                 CorrelationId       => undef,
                 SEND_MAX_ATTEMPTS   => $SEND_MAX_ATTEMPTS,
-                RECEIVE_MAX_ATTEMPTS => $RECEIVE_MAX_ATTEMPTS,
                 RETRY_BACKOFF       => $RETRY_BACKOFF,
                 $field              => $bad_value,
             );
@@ -206,18 +204,6 @@ sub testing {
             SEND_MAX_RETRIES    => 5,
         );
     } 'SEND_MAX_RETRIES OK';
-
-# RECEIVE_MAX_ATTEMPTS
-    new_ERROR_MISMATCH_ARGUMENT( 'RECEIVE_MAX_ATTEMPTS', @not_posint );
-
-    lives_ok {
-        $connect = Kafka::Connection->new(
-            host                => 'localhost',
-            port                => $port,
-            # legacy, will be removed in future releases
-            RECEIVE_MAX_RETRIES => 5,
-        );
-    } 'RECEIVE_MAX_RETRIES OK';
 
 # RETRY_BACKOFF
     new_ERROR_MISMATCH_ARGUMENT( 'RETRY_BACKOFF', @not_posint );
@@ -358,14 +344,14 @@ sub testing {
     }
     is_ERROR_MISMATCH_ARGUMENT( 'is_server_connected' );
 
-#-- is_server_alive
+#-- _is_server_alive
     foreach my $server ( $connect->get_known_servers() ) {
-        ok $connect->is_server_alive( $server ), 'server is alive';
+        ok $connect->_is_server_alive( $server ), 'server is alive';
         ok $connect->close_connection( $server ), 'close connection';
-        ok $connect->is_server_alive( $server ), 'server is alive';
+        ok $connect->_is_server_alive( $server ), 'server is alive';
     }
-    is_ERROR_MISMATCH_ARGUMENT( 'is_server_alive' );
-    throws_ok { $connect->is_server_alive( 'nothing:9999' ) } 'Kafka::Exception::Connection', 'error thrown';
+    is_ERROR_MISMATCH_ARGUMENT( '_is_server_alive' );
+    throws_ok { $connect->_is_server_alive( 'nothing:9999' ) } 'Kafka::Exception::Connection', 'error thrown';
 
 #-- get_metadata
     my $metadata = $connect->get_metadata( $topic );
@@ -374,14 +360,14 @@ sub testing {
     if ( $kafka_base_dir ) {
         $metadata = $connect->get_metadata();
         ok $metadata, 'metadata received (all topics)';
-        ok scalar( keys %$metadata ) > 1 && exists( $metadata->{ $topic } ), 'metadata for all topics';
+        ok scalar( keys %$metadata ) >= 1 && exists( $metadata->{ $topic } ), 'metadata for all topics';
         $metadata = $connect->get_metadata( $topic );
         ok $metadata, 'metadata received';
         ok scalar( keys %$metadata ) == 1 && exists( $metadata->{ $topic } ), "metadata for '$topic' only";
-        ok scalar( keys %{ $connect->{_metadata} } ) > 1 && exists( $connect->{_metadata}->{ $topic } ), 'metadata for all topics present';
+        ok scalar( keys %{ $connect->{_metadata} } ) >= 1 && exists( $connect->{_metadata}->{ $topic } ), 'metadata for all topics present';
         delete $connect->{_metadata}->{ $topic };
         $metadata = $connect->get_metadata( $topic );
-        ok scalar( keys %{ $connect->{_metadata} } ) > 1 && exists( $connect->{_metadata}->{ $topic } ), 'metadata for all topics';
+        ok scalar( keys %{ $connect->{_metadata} } ) >= 1 && exists( $connect->{_metadata}->{ $topic } ), 'metadata for all topics';
         ok $metadata, 'metadata received';
         throws_ok { $connect->get_metadata( '' ) } 'Kafka::Exception::Connection', 'error thrown';
     }
