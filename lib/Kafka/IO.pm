@@ -282,17 +282,21 @@ sub send {
     $self->_debug_msg( $message, 'Request to', 'green' )
         if $self->debug_level >= 2;
 
-    my ( $sent, $chars_sent, $errno_num, $error_str, $errno );
+    my ( $sent, $chars_sent, $errno );
     my $timeout = $self->{timeout} // $REQUEST_TIMEOUT;
 
     my $started = Time::HiRes::time();
+    my $_before = $started;
     my $retries = 0;
+    my $interrupts = 0;
     while ( $timeout >= 0 && $retries++ < $MAX_RETRIES ) {
         undef $!;
         my $can_write = $s->can_write( $timeout );
         $errno = $!;
         if ( $errno ) {
             if ( $errno == EINTR ) {
+                --$retries; # this attempt does not count
+                ++$interrupts;
                 next;
             }
             last;
@@ -316,24 +320,22 @@ sub send {
         ( $timeout, $started ) = _update_timeout( $timeout, $started );
     }
 
-    if ( defined $errno ) {
-        $error_str = $errno.'';
-        $errno_num = $errno + 0;
-    }
+    my $_after = Time::HiRes::time();
 
     $self->_error( $ERROR_CANNOT_SEND,
-        format_message( "Kafka::IO->send - ERRNO/ERROR = %s(%s)/'%s' (length %s, sent %s, timeout %s, REQUEST_TIMEOUT %s, retries %s)",
-            $errno_num,
-            _get_errno_name(),
-            $error_str,
+        format_message( "Kafka::IO->send: ERRNO=%s ERROR='%s' (length=%s, sent=%s, timeout=%s, REQUEST_TIMEOUT=%s, retries=%s, interrupts=%s, secs=%.6f)",
+            $errno,
+            defined $errno ? $errno.'' : '',
             $len,
             $sent,
             $self->{timeout},
             $REQUEST_TIMEOUT,
             $retries,
-        )
-    ) unless !$error_str && defined( $sent ) && defined( $chars_sent ) && $sent == $len;
-
+            $interrupts,
+            $_after - $_before,
+        ),
+        $errno
+    ) unless !$errno && defined( $sent ) && defined( $chars_sent ) && $sent == $len;
 
     return $sent;
 }
@@ -353,13 +355,14 @@ sub receive {
     my $s = $self->{_io_select};
     $self->_error( $ERROR_CANNOT_RECV, 'Attempt to work with a closed socket' ) unless $s;
 
-    my ( $errno_num, $error_str, $errno, $been_read );
+    my ( $errno, $been_read );
     my $message = q{};
     my $timeout = $self->{timeout} // $REQUEST_TIMEOUT;
 
     my $started = Time::HiRes::time();
-    my $retries = 0;
     my $_before = $started;
+    my $retries = 0;
+    my $interrupts = 0;
     my $len_to_read = $length - length( $message );
     while ( $len_to_read > 0 && $timeout >= 0 && $retries++ < $MAX_RETRIES ) {
         undef $!;
@@ -367,6 +370,8 @@ sub receive {
         $errno = $!;
         if ( $errno ) {
             if ( $errno == EINTR ) {
+                --$retries; # this attempt does not count
+                ++$interrupts;
                 next;
             }
             last;
@@ -385,6 +390,8 @@ sub receive {
             }
             if ( $errno ) {
                 if ( $errno == EINTR ) {
+                    --$retries; # this attempt does not count
+                    ++$interrupts;
                     next;
                 } elsif (
                            $errno != EAGAIN
@@ -411,25 +418,20 @@ sub receive {
     }
     my $_after = Time::HiRes::time();
 
-    if ( defined $errno ) {
-        $error_str = $errno.'';
-        $errno_num = $errno + 0;
-    }
-
     $self->_error( $ERROR_CANNOT_RECV,
-    format_message( "->receive - ERRNO/ERROR = %s(%s)/'%s' (length %s, message length %s, timeout %s, REQUEST_TIMEOUT %s, retries %s, secs %.6f)",
-            $errno_num,
-            _get_errno_name(),
-            $error_str,
+        format_message( "Kafka::IO->receive: ERRNO=%s ERROR='%s' (length=%s, received=%s, timeout=%s, REQUEST_TIMEOUT=%s, retries=%s, interrupts=%s, secs=%.6f)",
+            $errno,
+            defined $errno ? $errno . '' : '',
             $length,
             length( $message ),
             $self->{timeout},
             $REQUEST_TIMEOUT,
             $retries,
+            $interrupts,
             $_after - $_before,
         ),
-        $errno_num,
-    ) unless !$error_str && length( $message ) >= $length;
+        $errno,
+    ) unless !$errno && length( $message ) >= $length;
 
     $self->_debug_msg( $message, 'Response from', 'yellow' )
         if $self->debug_level >= 2;
@@ -774,14 +776,6 @@ sub _error {
     Kafka::Exception::IO->throw( throw_args( @args ) );
 
     return;
-}
-
-sub _get_errno_name {
-    foreach my $errno_name ( keys %! ) {
-        return( $errno_name ) if $!{ $errno_name };
-    }
-
-    return '';
 }
 
 # update timeout before next attempt
