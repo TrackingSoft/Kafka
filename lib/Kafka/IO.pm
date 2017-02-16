@@ -154,7 +154,8 @@ This class allows you to create Kafka 0.9+ clients.
 
 =cut
 
-const my $MAX_RETRIES => 16;
+# Hard limit of IO operation retry attempts, to prevent high CPU usage in IO retry loop
+const my $MAX_RETRIES => 30;
 
 our $_hdr;
 
@@ -272,26 +273,33 @@ Returns the number of characters sent.
 =cut
 sub send {
     my ( $self, $message ) = @_;
-
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, '->send' )
+        unless defined( _STRING( $message ) )
+    ;
+    my $length = length( $message );
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, '->send' )
+        unless $length <= $MAX_SOCKET_REQUEST_BYTES
+    ;
     my $s = $self->{_io_select};
     $self->_error( $ERROR_CANNOT_SEND, 'Attempt to work with a closed socket' ) unless $s;
 
-    defined( _STRING( $message ) ) && ( my $len = length( $message ) ) <= $MAX_SOCKET_REQUEST_BYTES
-        || $self->_error( $ERROR_MISMATCH_ARGUMENT, '->send' );
-
     $self->_debug_msg( $message, 'Request to', 'green' )
-        if $self->debug_level >= 2;
-
-    my ( $sent, $chars_sent, $errno );
-    my $timeout = $self->{timeout} // $REQUEST_TIMEOUT;
+        if $self->debug_level >= 2
+    ;
+    my $sent = 0;
 
     my $started = Time::HiRes::time();
-    my $_before = $started;
+    my $until = $started + ( $self->{timeout} // $REQUEST_TIMEOUT );
+
+    my $errno;
     my $retries = 0;
     my $interrupts = 0;
-    while ( $timeout >= 0 && $retries++ < $MAX_RETRIES ) {
+    while ( $sent < $length && $retries++ < $MAX_RETRIES ) {
+        my $remaining_time = $until - Time::HiRes::time();
+        last if $remaining_time <= 0; # timeout expired
+
         undef $!;
-        my $can_write = $s->can_write( $timeout );
+        my $can_write = $s->can_write( $remaining_time );
         $errno = $!;
         if ( $errno ) {
             if ( $errno == EINTR ) {
@@ -304,38 +312,36 @@ sub send {
 
         if ( $can_write ) {
             undef $!;
-            $chars_sent = CORE::send( $self->{socket}, $message, MSG_DONTWAIT );
+            my $wrote = CORE::send( $self->{socket}, $message, MSG_DONTWAIT );
             $errno = $!;
 
-            last unless defined $chars_sent;
+            last unless defined $wrote;
 
-            $sent += $chars_sent;
-            if ( $sent < $len ) {
-                $message = substr( $message, $chars_sent );
-            } else {
-                last;
+            $sent += $wrote;
+            if ( $sent < $length ) {
+                # remove written data from message
+                $message = substr( $message, $wrote );
             }
         }
-    } continue {
-        ( $timeout, $started ) = _update_timeout( $timeout, $started );
     }
 
-    my $_after = Time::HiRes::time();
-
-    $self->_error( $ERROR_CANNOT_SEND,
-        format_message( "Kafka::IO->send: ERRNO=%s ERROR='%s' (length=%s, sent=%s, timeout=%s, REQUEST_TIMEOUT=%s, retries=%s, interrupts=%s, secs=%.6f)",
-            $errno,
-            defined $errno ? $errno.'' : '',
-            $len,
-            $sent,
-            $self->{timeout},
-            $REQUEST_TIMEOUT,
-            $retries,
-            $interrupts,
-            $_after - $_before,
-        ),
-        $errno
-    ) unless !$errno && defined( $sent ) && defined( $chars_sent ) && $sent == $len;
+    unless( !$errno && defined( $sent ) && $sent == $length )
+    {
+        my $finished = Time::HiRes::time();
+        $self->_error( $ERROR_CANNOT_SEND,
+            format_message( "Kafka::IO->send: ERRNO=%s ERROR='%s' (length=%s, sent=%s, timeout=%s, retries=%s, interrupts=%s, secs=%.6f)",
+                $errno,
+                defined $errno ? $errno.'' : '<none>',
+                $length,
+                $sent,
+                ( $self->{timeout} // $REQUEST_TIMEOUT ),
+                $retries,
+                $interrupts,
+                $finished - $started,
+            ),
+            $errno
+        );
+    }
 
     return $sent;
 }
@@ -351,22 +357,27 @@ Returns a reference to the received message.
 =cut
 sub receive {
     my ( $self, $length ) = @_;
-
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, '->receive' )
+        unless $length > 0
+    ;
     my $s = $self->{_io_select};
     $self->_error( $ERROR_CANNOT_RECV, 'Attempt to work with a closed socket' ) unless $s;
 
-    my ( $errno, $been_read );
     my $message = q{};
-    my $timeout = $self->{timeout} // $REQUEST_TIMEOUT;
+    my $len_to_read = $length;
 
     my $started = Time::HiRes::time();
-    my $_before = $started;
+    my $until = $started + ( $self->{timeout} // $REQUEST_TIMEOUT );
+
+    my $errno;
     my $retries = 0;
     my $interrupts = 0;
-    my $len_to_read = $length - length( $message );
-    while ( $len_to_read > 0 && $timeout >= 0 && $retries++ < $MAX_RETRIES ) {
+    while ( $len_to_read > 0 && $retries++ < $MAX_RETRIES ) {
+        my $remaining_time = $until - Time::HiRes::time();
+        last if $remaining_time <= 0; # timeout expired
+
         undef $!;
-        my $can_read = $s->can_read( $timeout );
+        my $can_read = $s->can_read( $remaining_time );
         $errno = $!;
         if ( $errno ) {
             if ( $errno == EINTR ) {
@@ -383,8 +394,7 @@ sub receive {
             my $from_recv = CORE::recv( $self->{socket}, $buf, $len_to_read, MSG_DONTWAIT );
             $errno = $!;
 
-            $been_read = defined( $from_recv ) && length( $buf );
-            if ( $been_read ) {
+            if ( defined( $from_recv ) && length( $buf ) ) {
                 $message .= $buf;
                 $len_to_read = $length - length( $message );
             }
@@ -401,10 +411,13 @@ sub receive {
                     ) {
                     last;
                 }
-            } elsif ( length( $buf ) == 0 ) {
+            }
+
+            if ( length( $buf ) == 0 ) {
+                # we did not read anything on this attempt: wait a bit before the next one
                 if ( my $remaining_attempts = $MAX_RETRIES - $retries ) {
-                    my $remaining_time = $timeout - ( Time::HiRes::time() - $_before );
-                    my $micro_seconds = int( $remaining_time / $remaining_attempts * 10**6 );
+                    $remaining_time = $until - Time::HiRes::time();
+                    my $micro_seconds = int( $remaining_time * 1e6 / $remaining_attempts );
                     if ( $micro_seconds > 0 ) {
                         $self->_debug_msg( format_message( 'sleeping (remaining attempts %d, time %.6f): %d microseconds', $remaining_attempts, $remaining_time, $micro_seconds ) )
                             if $self->debug_level;
@@ -413,26 +426,26 @@ sub receive {
                 }
             }
         }
-    } continue {
-        ( $timeout, $started ) = _update_timeout( $timeout, $started );
     }
-    my $_after = Time::HiRes::time();
 
-    $self->_error( $ERROR_CANNOT_RECV,
-        format_message( "Kafka::IO->receive: ERRNO=%s ERROR='%s' (length=%s, received=%s, timeout=%s, REQUEST_TIMEOUT=%s, retries=%s, interrupts=%s, secs=%.6f)",
+    unless( !$errno && length( $message ) >= $length )
+    {
+        my $finished = Time::HiRes::time();
+
+        $self->_error( $ERROR_CANNOT_RECV,
+            format_message( "Kafka::IO->receive: ERRNO=%s ERROR='%s' (length=%s, received=%s, timeout=%s, retries=%s, interrupts=%s, secs=%.6f)",
+                $errno,
+                defined $errno ? $errno . '' : '<none>',
+                $length,
+                length( $message ),
+                ( $self->{timeout} // $REQUEST_TIMEOUT ),
+                $retries,
+                $interrupts,
+                $finished - $started,
+            ),
             $errno,
-            defined $errno ? $errno . '' : '',
-            $length,
-            length( $message ),
-            $self->{timeout},
-            $REQUEST_TIMEOUT,
-            $retries,
-            $interrupts,
-            $_after - $_before,
-        ),
-        $errno,
-    ) unless !$errno && length( $message ) >= $length;
-
+        );
+    }
     $self->_debug_msg( $message, 'Response from', 'yellow' )
         if $self->debug_level >= 2;
 
@@ -776,18 +789,6 @@ sub _error {
     Kafka::Exception::IO->throw( throw_args( @args ) );
 
     return;
-}
-
-# update timeout before next attempt
-sub _update_timeout {
-    my ( $timeout, $started ) = @_;
-
-    my $now = Time::HiRes::time();
-
-    $timeout -= $now - $started;
-    $started = $now;
-
-    return( $timeout, $started );
 }
 
 #-- Closes and cleans up -------------------------------------------------------
