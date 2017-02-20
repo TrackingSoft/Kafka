@@ -103,6 +103,7 @@ use Kafka qw(
     $ERROR_RESPONSEMESSAGE_NOT_RECEIVED
     $ERROR_SEND_NO_ACK
     $ERROR_UNKNOWN_APIKEY
+    $ERROR_INCOMPATIBLE_HOST_IP_VERSION
 
     $IP_V4
     $IP_V6
@@ -345,18 +346,6 @@ Default C<$REQUEST_TIMEOUT> is used for the rest of IO operations.
 
 =over 3
 
-=item C<CorrelationId =E<gt> $correlation_id>
-
-Optional, default = C<undef> .
-
-C<Correlation> is a user-supplied integer. It will be passed back with the response by
-the server, unmodified. The C<$correlation_id> should be an integer number.
-
-An exception is thrown if C<CorrelationId> in response does not match the one supplied
-in request.
-
-If C<CorrelationId> is not provided, it is set to a random negative integer.
-
 =item C<SEND_MAX_ATTEMPTS =E<gt> $attempts>
 
 Optional, int32 signed integer, default = C<$Kafka::SEND_MAX_ATTEMPTS> .
@@ -423,7 +412,6 @@ sub new {
         broker_list             => [],
         timeout                 => $REQUEST_TIMEOUT,
         ip_version              => undef,
-        CorrelationId           => undef,
         SEND_MAX_ATTEMPTS       => $SEND_MAX_ATTEMPTS,
         RETRY_BACKOFF           => $RETRY_BACKOFF,
         AutoCreateTopicsEnable  => 0,
@@ -432,17 +420,8 @@ sub new {
 
     while ( @args ) {
         my $k = shift @args;
-
-        # legacy, will be removed in future releases
-        if ( $k eq 'SEND_MAX_RETRIES' ) {
-            carp "Parameter 'SEND_MAX_RETRIES' is deprecated, use 'SEND_MAX_ATTEMPTS' instead";
-            $k = 'SEND_MAX_ATTEMPTS';
-        }
-
         $self->{ $k } = shift @args if exists $self->{ $k };
     }
-
-    $self->{CorrelationId} //= _get_CorrelationId;
 
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'host' )
         unless defined( $self->{host} ) && ( $self->{host} eq q{} || defined( _STRING( $self->{host} ) ) ) && !utf8::is_utf8( $self->{host} );
@@ -452,8 +431,6 @@ sub new {
         unless ( _NUMBER( $self->{timeout} ) && $self->{timeout} > 0 && $self->{timeout} <= $MAX_INT32 ) || !defined( $self->{timeout} );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'broker_list' )
         unless _ARRAY0( $self->{broker_list} );
-    $self->_error( $ERROR_MISMATCH_ARGUMENT, format_message( 'CorrelationId (%s)', $self->{CorrelationId} ) )
-        unless isint( $self->{CorrelationId} ) && $self->{CorrelationId} <= $MAX_CORRELATIONID;
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'SEND_MAX_ATTEMPTS' )
         unless _POSINT( $self->{SEND_MAX_ATTEMPTS} );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'RETRY_BACKOFF' )
@@ -689,14 +666,14 @@ L<$COMPRESSION_SNAPPY|Kafka/$COMPRESSION_SNAPPY>.
 
 =cut
 sub receive_response_to_request {
-    my ( $self, $request, $compression_codec ) = @_;
+    my ( $self, $request, $compression_codec, $response_timeout ) = @_;
 
     local $Data::Dumper::Sortkeys = 1 if $self->debug_level;
 
     my $api_key = $request->{ApiKey};
 
-# WARNING: The current version of the module limited to the following:
-# supports queries with only one combination of topic + partition (first and only).
+    # WARNING: The current version of the module limited to the following:
+    # supports queries with only one combination of topic + partition (first and only).
 
     my $topic_data  = $request->{topics}->[0];
     my $topic_name  = $topic_data->{TopicName};
@@ -710,106 +687,116 @@ sub receive_response_to_request {
             # FATAL error
             or $self->_error( $ERROR_CANNOT_GET_METADATA, format_message( "topic = '%s'", $topic_name ) );
     }
+
+    $request->{CorrelationId} = _get_CorrelationId() unless exists $request->{CorrelationId};
+
     my $encoded_request = $protocol{ $api_key }->{encode}->( $request, $compression_codec );
 
-    my $CorrelationId = $request->{CorrelationId} // _get_CorrelationId;
-
-    say STDERR sprintf( '[%s] compression_codec = %d, request: %s',
+    say STDERR sprintf( '[%s] compression_codec = %s, request: %s',
             scalar( localtime ),
             $compression_codec // '<undef>',
             Data::Dumper->Dump( [ $request ], [ 'request' ] )
         ) if $self->debug_level;
 
     my $attempts = $api_key == $APIKEY_PRODUCE ? 1 : $self->{SEND_MAX_ATTEMPTS};
-    my ( $ErrorCode, $partition_data, $server );
+    my ( $ErrorCode, $partition_data );
     ATTEMPTS:
     while ( $attempts-- ) {
         REQUEST:
         {
             $ErrorCode = $ERROR_NO_ERROR;
-            if ( defined( my $leader = $self->{_metadata}->{ $topic_name }->{ $partition }->{Leader} ) ) {   # hash metadata could be updated
-                unless ( $server = $self->{_leaders}->{ $leader } ) {
-                    $ErrorCode = $ERROR_LEADER_NOT_FOUND;
-                    $self->_remember_nonfatal_error( $ErrorCode, $ERROR{ $ErrorCode }, $server, $topic_name, $partition );
-                    last REQUEST;       # go to the next attempt
-                }
+            # hash metadata could be updated
+            my $leader = $self->{_metadata}->{ $topic_name }->{ $partition }->{Leader};
+            last REQUEST unless defined $leader; # go to the next attempt
 
-                # Send a request to the leader
-                if ( !$self->_connectIO( $server ) ) {
-                    $ErrorCode = $ERROR_CANNOT_BIND;
-                } elsif ( !$self->_sendIO( $server, $encoded_request ) ) {
+            my $server = $self->{_leaders}->{ $leader };
+            unless ( $server ) {
+                $ErrorCode = $ERROR_LEADER_NOT_FOUND;
+                $self->_remember_nonfatal_error( $ErrorCode, $ERROR{ $ErrorCode }, $server, $topic_name, $partition );
+                last REQUEST;       # go to the next attempt
+            }
+
+            # Send a request to the leader
+            if ( $self->_connectIO( $server ) ) {
+                unless ( $self->_sendIO( $server, $encoded_request ) ) {
                     $ErrorCode = $ERROR_CANNOT_SEND;
-                    $self->{_IO_cache}->{ $server }->{IO} = undef;
-                }
-                if ( $ErrorCode != $ERROR_NO_ERROR ) {
-                    $self->_remember_nonfatal_error( $ErrorCode, $self->{_IO_cache}->{ $server }->{error}, $server, $topic_name, $partition );
-                    last REQUEST;    # go to the next attempt
-                }
-
-                my $response;
-                if ( $api_key == $APIKEY_PRODUCE && $request->{RequiredAcks} == $NOT_SEND_ANY_RESPONSE ) {
-
-                    # Do not receive a response, self-forming own response
-                    $response = {
-                        CorrelationId                           => $CorrelationId,
-                        topics                                  => [
-                            {
-                                TopicName                       => $topic_name,
-                                partitions                      => [
-                                    {
-                                        Partition               => $partition,
-                                        ErrorCode               => 0,
-                                        Offset                  => $BAD_OFFSET,
-                                    },
-                                ],
-                            },
-                        ],
-                    };
-                } else {
-                    my $encoded_response_ref;
-                    unless ( $encoded_response_ref = $self->_receiveIO( $server ) ) {
-                        if ( $api_key == $APIKEY_PRODUCE ) {
-# WARNING: Unfortunately, the sent package (one or more messages) does not have a unique identifier
-# and there is no way to verify the delivery of data
-                            $ErrorCode = $ERROR_SEND_NO_ACK;
-
-                            # Should not be allowed to re-send data on the next attempt
-                            # FATAL error
-                            $self->_error( $ErrorCode, $self->{_IO_cache}->{ $server }->{error} );
-                        } else {
-                            $ErrorCode = $ERROR_CANNOT_RECV;
-                            $self->_remember_nonfatal_error( $ErrorCode, $self->{_IO_cache}->{ $server }->{error}, $server, $topic_name, $partition );
-                            last REQUEST;   # go to the next attempt
-                        }
-                    }
-                    if ( length( $$encoded_response_ref ) > 4 ) {   # MessageSize => int32
-                        $response = $protocol{ $api_key }->{decode}->( $encoded_response_ref );
-                        say STDERR sprintf( '[%s] response: %s',
-                                scalar( localtime ),
-                                Data::Dumper->Dump( [ $response ], [ 'response' ] )
-                            ) if $self->debug_level;
-                    } else {
-                        $self->_error( $ERROR_RESPONSEMESSAGE_NOT_RECEIVED );
-                    }
-                }
-
-                $response->{CorrelationId} == $CorrelationId
-                    # FATAL error
-                    or $self->_error( $ERROR_MISMATCH_CORRELATIONID );
-                $topic_data     = $response->{topics}->[0];
-                $partition_data = $topic_data->{ $api_key == $APIKEY_OFFSET ? 'PartitionOffsets' : 'partitions' }->[0];
-
-                if ( ( $ErrorCode = $partition_data->{ErrorCode} ) == $ERROR_NO_ERROR ) {
-                    return $response;
-                } elsif ( exists $RETRY_ON_ERRORS{ $ErrorCode } ) {
-                    $self->_remember_nonfatal_error( $ErrorCode, $ERROR{ $ErrorCode }, $server, $topic_name, $partition );
-                    last REQUEST;   # go to the next attempt
-                } else {
-                    # FATAL error
-                    $self->_error( $ErrorCode, format_message( "topic = '%s', partition = %s", $topic_name, $partition ) );
+                    $self->_closeIO( $server, 1 );
                 }
             }
-        }
+            else {
+                $ErrorCode = $ERROR_CANNOT_BIND;
+            }
+
+            if ( $ErrorCode != $ERROR_NO_ERROR ) {
+                $self->_remember_nonfatal_error( $ErrorCode, $self->_io_error( $server ), $server, $topic_name, $partition );
+                last REQUEST;    # go to the next attempt
+            }
+
+            my $response;
+            if ( $api_key == $APIKEY_PRODUCE && $request->{RequiredAcks} == $NOT_SEND_ANY_RESPONSE ) {
+
+                # Do not receive a response, self-forming own response
+                $response = {
+                    CorrelationId                           => $request->{CorrelationId},
+                    topics                                  => [
+                        {
+                            TopicName                       => $topic_name,
+                            partitions                      => [
+                                {
+                                    Partition               => $partition,
+                                    ErrorCode               => 0,
+                                    Offset                  => $BAD_OFFSET,
+                                },
+                            ],
+                        },
+                    ],
+                };
+            } else {
+                my $encoded_response_ref;
+                unless ( $encoded_response_ref = $self->_receiveIO( $server, $response_timeout ) ) {
+                    if ( $api_key == $APIKEY_PRODUCE ) {
+                        # WARNING: Unfortunately, the sent package (one or more messages) does not have a unique identifier
+                        # and there is no way to verify the delivery of data
+                        $ErrorCode = $ERROR_SEND_NO_ACK;
+
+                        # Should not be allowed to re-send data on the next attempt
+                        # FATAL error
+                        $self->_error( $ErrorCode, $self->_io_error( $server ), request => $request );
+                    } else {
+                        $ErrorCode = $ERROR_CANNOT_RECV;
+                        $self->_remember_nonfatal_error( $ErrorCode, $self->_io_error( $server ), $server, $topic_name, $partition );
+                        last REQUEST;   # go to the next attempt
+                    }
+                }
+                if ( length( $$encoded_response_ref ) > 4 ) {   # MessageSize => int32
+                    $response = $protocol{ $api_key }->{decode}->( $encoded_response_ref );
+                    say STDERR sprintf( '[%s] response: %s',
+                            scalar( localtime ),
+                            Data::Dumper->Dump( [ $response ], [ 'response' ] )
+                        ) if $self->debug_level;
+                } else {
+                    $self->_error( $ERROR_RESPONSEMESSAGE_NOT_RECEIVED );
+                }
+            }
+
+            $response->{CorrelationId} == $request->{CorrelationId}
+                # FATAL error
+                or $self->_error( $ERROR_MISMATCH_CORRELATIONID, "$response->{CorrelationId} != $request->{CorrelationId}", request => $request, response => $response );
+            $topic_data     = $response->{topics}->[0];
+            $partition_data = $topic_data->{ $api_key == $APIKEY_OFFSET ? 'PartitionOffsets' : 'partitions' }->[0];
+
+            $ErrorCode = $partition_data->{ErrorCode};
+
+            return $response if $ErrorCode == $ERROR_NO_ERROR;
+
+            if ( exists $RETRY_ON_ERRORS{ $ErrorCode } ) {
+                $self->_remember_nonfatal_error( $ErrorCode, $ERROR{ $ErrorCode }, $server, $topic_name, $partition );
+                last REQUEST;   # go to the next attempt
+            }
+
+            # FATAL error
+            $self->_error( $ErrorCode, format_message( "topic = '%s', partition = %s", $topic_name, $partition ) );
+        } # end of REQUEST block
 
         # Expect to possible changes in the situation, such as restoration of connection
         say STDERR sprintf( '[%s] sleeping for %d ms before making request attempt #%d (%s)',
@@ -915,9 +902,8 @@ sub cluster_errors {
     my ( $self ) = @_;
 
     my %errors;
-    my $io_cache = $self->{_IO_cache};
-    foreach my $server ( keys %$io_cache ) {
-        if ( my $error = $io_cache->{ $server }->{error} ) {
+    foreach my $server ( $self->get_known_servers ) {
+        if ( my $error = $self->_io_error( $server ) ) {
             $errors{ $server } = $error;
         }
     }
@@ -1042,7 +1028,7 @@ sub _get_interviewed_servers {
 sub _update_metadata {
     my ( $self, $topic, $is_recursive_call ) = @_;
 
-    my $CorrelationId = $self->{CorrelationId};
+    my $CorrelationId = _get_CorrelationId();
     my $decoded_request = {
         CorrelationId   => $CorrelationId,
         ClientId        => q{},
@@ -1193,25 +1179,27 @@ sub _build_server_name {
 # remembers error communicating with the server
 sub _on_io_error {
     my ( $self, $server_data, $error ) = @_;
-
-    my $message;
-    if ( !blessed( $error ) || !$error->isa( 'Kafka::Exception' ) ) {
-        $message = $error;
-    } else {
-        $message = $error->message;
+    $server_data->{error} = $error;
+    if( $server_data->{IO} ) {
+        $server_data->{IO}->close;
+        $server_data->{IO} = undef;
     }
 
-    $message .= format_message( " (Kafka::Connection timeout %s, SEND_MAX_ATTEMPTS %s, RETRY_BACKOFF %s)",
-        $self->{timeout},
-        $self->{SEND_MAX_ATTEMPTS},
-        $self->{RETRY_BACKOFF},
-    );
-    $error->message( $message ) if blessed( $error ) && $error->isa( 'Kafka::Exception' );
-
-    $server_data->{error}   = $message;
-    $server_data->{IO}      = undef;
+    if( blessed( $error ) && $error->isa('Kafka::Exception') ) {
+        if( $error->code == $ERROR_MISMATCH_ARGUMENT || $error->code == $ERROR_INCOMPATIBLE_HOST_IP_VERSION )
+        {
+            # rethrow known fatal errors
+            die $error;
+        }
+    }
 
     return;
+}
+
+sub _io_error {
+    my( $self, $server ) = @_;
+    my $server_data = $self->{_IO_cache}->{ $server };
+    return $server_data && $server_data->{error};
 }
 
 # connects to a server (host:port or [IPv6_host]:port)
@@ -1259,41 +1247,45 @@ sub _sendIO {
 
 # Receive response from a given server
 sub _receiveIO {
-    my ( $self, $server ) = @_;
+    my ( $self, $server, $response_timeout ) = @_;
 
     my $server_data = $self->{_IO_cache}->{ $server };
 
     my $error;
     my $io = $server_data->{IO};
     my $response_ref;
+    my $error_code;
     try {
-        $response_ref = $io->receive( 4 );
+        $response_ref = $io->receive( 4, $response_timeout ); # response header must arrive within request-sepcific timeout if provided
         my $message_size = $$response_ref;
         if ( length( $message_size ) == 4 ) {
             my $message_body_ref = $io->receive( unpack( 'l>', $message_size ) );
             $$response_ref .= $$message_body_ref;
         } else {
-            $self->_closeIO( $server );
-            $self->_error( $ERROR_RESPONSEMESSAGE_NOT_RECEIVED );
+            $error_code = $ERROR_RESPONSEMESSAGE_NOT_RECEIVED;
         }
     } catch {
         $error = $_;
+        $self->_on_io_error( $server_data, $error );
     };
-    $self->_on_io_error( $server_data, $error )
-        if $error;
+
+    if( $error_code ) {
+        $self->_closeIO( $server );
+        $self->_error( $error_code );
+    }
 
     return $response_ref;
 }
 
 # Close connectino to $server
 sub _closeIO {
-    my ( $self, $server ) = @_;
+    my ( $self, $server, $keep_error ) = @_;
 
     if ( my $server_data = $self->{_IO_cache}->{ $server } ) {
         if ( my $io = $server_data->{IO} ) {
             $io->close;
-            $server_data->{error}   = undef;
-            $server_data->{IO}      = undef;
+            $server_data->{error} = undef unless $keep_error;
+            $server_data->{IO}    = undef;
         }
     }
 

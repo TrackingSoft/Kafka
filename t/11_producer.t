@@ -81,7 +81,6 @@ sub new_ERROR_MISMATCH_ARGUMENT {
         throws_ok {
             $producer = Kafka::Producer->new(
                 Connection      => $connect,
-                CorrelationId   => undef,
                 ClientId        => 'producer',
                 RequiredAcks    => $WAIT_WRITTEN_TO_LOCAL_LOG,
                 Timeout         => $REQUEST_TIMEOUT * 1000, # This provides a maximum time (ms) the server can await the receipt of the number of acknowledgements in RequiredAcks
@@ -191,9 +190,6 @@ sub testing {
 
 # Connection
     new_ERROR_MISMATCH_ARGUMENT( 'Connection', @not_right_object );
-
-# CorrelationId
-    new_ERROR_MISMATCH_ARGUMENT( 'CorrelationId', @not_isint );
 
 # ClientId
     new_ERROR_MISMATCH_ARGUMENT( 'ClientId', @not_empty_string );

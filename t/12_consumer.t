@@ -46,7 +46,7 @@ use Kafka qw(
     $DEFAULT_MAX_BYTES
     $DEFAULT_MAX_NUMBER_OF_OFFSETS
     $DEFAULT_MAX_WAIT_TIME
-    $ERROR_MISMATCH_ARGUMENT
+    $ERROR_CANNOT_RECV
     $MESSAGE_SIZE_OVERHEAD
     $MIN_BYTES_RESPOND_IMMEDIATELY
     $RECEIVE_EARLIEST_OFFSETS
@@ -86,7 +86,6 @@ sub new_ERROR_MISMATCH_ARGUMENT {
         throws_ok {
             $consumer = Kafka::Consumer->new(
                 Connection          => $connect,
-                CorrelationId       => undef,
                 ClientId            => undef,
                 MaxWaitTime         => $DEFAULT_MAX_WAIT_TIME,
                 MinBytes            => $MIN_BYTES_RESPOND_IMMEDIATELY,
@@ -146,7 +145,7 @@ sub communication_error {
     Sub::Install::reinstall_sub( {
         code    => sub {
             my ( $self ) = @_;
-            $self->_error( $ERROR_MISMATCH_ARGUMENT );
+            $self->_error( $ERROR_CANNOT_RECV );
         },
         into    => $module,
         as      => $name,
@@ -229,9 +228,6 @@ sub testing {
 
 # Connection
     new_ERROR_MISMATCH_ARGUMENT( 'Connection', @not_right_object );
-
-# CorrelationId
-    new_ERROR_MISMATCH_ARGUMENT( 'CorrelationId', @not_isint );
 
 # ClientId
     new_ERROR_MISMATCH_ARGUMENT( 'ClientId', @not_empty_string );

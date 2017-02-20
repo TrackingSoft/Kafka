@@ -80,12 +80,10 @@ use Time::HiRes ();
 use Try::Tiny;
 
 use Kafka qw(
-    %ERROR
     $ERROR_CANNOT_BIND
     $ERROR_CANNOT_RECV
     $ERROR_CANNOT_SEND
     $ERROR_MISMATCH_ARGUMENT
-    $ERROR_NOT_BINARY_STRING
     $ERROR_INCOMPATIBLE_HOST_IP_VERSION
     $IP_V4
     $IP_V6
@@ -272,7 +270,7 @@ Returns the number of characters sent.
 
 =cut
 sub send {
-    my ( $self, $message ) = @_;
+    my ( $self, $message, $timeout ) = @_;
     $self->_error( $ERROR_MISMATCH_ARGUMENT, '->send' )
         unless defined( _STRING( $message ) )
     ;
@@ -280,16 +278,20 @@ sub send {
     $self->_error( $ERROR_MISMATCH_ARGUMENT, '->send' )
         unless $length <= $MAX_SOCKET_REQUEST_BYTES
     ;
-    my $s = $self->{_io_select};
-    $self->_error( $ERROR_CANNOT_SEND, 'Attempt to work with a closed socket' ) unless $s;
+    my $select = $self->{_io_select};
+    $self->_error( $ERROR_CANNOT_SEND, 'Attempt to work with a closed socket' ) unless $select;
 
+    $timeout = $self->{timeout} // $REQUEST_TIMEOUT unless defined $timeout;
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, '->receive' )
+        unless $timeout > 0
+    ;
     $self->_debug_msg( $message, 'Request to', 'green' )
         if $self->debug_level >= 2
     ;
     my $sent = 0;
 
     my $started = Time::HiRes::time();
-    my $until = $started + ( $self->{timeout} // $REQUEST_TIMEOUT );
+    my $until = $started + $timeout;
 
     my $errno;
     my $retries = 0;
@@ -299,7 +301,7 @@ sub send {
         last if $remaining_time <= 0; # timeout expired
 
         undef $!;
-        my $can_write = $s->can_write( $remaining_time );
+        my $can_write = $select->can_write( $remaining_time );
         $errno = $!;
         if ( $errno ) {
             if ( $errno == EINTR ) {
@@ -328,18 +330,18 @@ sub send {
     unless( !$errno && defined( $sent ) && $sent == $length )
     {
         my $finished = Time::HiRes::time();
-        $self->_error( $ERROR_CANNOT_SEND,
+        $self->_error(
+            $ERROR_CANNOT_SEND,
             format_message( "Kafka::IO->send: ERRNO=%s ERROR='%s' (length=%s, sent=%s, timeout=%s, retries=%s, interrupts=%s, secs=%.6f)",
-                $errno,
-                defined $errno ? $errno.'' : '<none>',
+                ( $errno // 0 ) + 0,
+                ( $errno // '<none>' ) . '',
                 $length,
                 $sent,
-                ( $self->{timeout} // $REQUEST_TIMEOUT ),
+                $timeout,
                 $retries,
                 $interrupts,
                 $finished - $started,
-            ),
-            $errno
+            )
         );
     }
 
@@ -356,18 +358,22 @@ Returns a reference to the received message.
 
 =cut
 sub receive {
-    my ( $self, $length ) = @_;
+    my ( $self, $length, $timeout ) = @_;
     $self->_error( $ERROR_MISMATCH_ARGUMENT, '->receive' )
         unless $length > 0
     ;
-    my $s = $self->{_io_select};
-    $self->_error( $ERROR_CANNOT_RECV, 'Attempt to work with a closed socket' ) unless $s;
+    my $select = $self->{_io_select};
+    $self->_error( $ERROR_CANNOT_RECV, 'Attempt to work with a closed socket' ) unless $select;
 
+    $timeout = $self->{timeout} // $REQUEST_TIMEOUT unless defined $timeout;
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, '->receive' )
+        unless $timeout > 0
+    ;
     my $message = q{};
     my $len_to_read = $length;
 
     my $started = Time::HiRes::time();
-    my $until = $started + ( $self->{timeout} // $REQUEST_TIMEOUT );
+    my $until = $started + $timeout;
 
     my $errno;
     my $retries = 0;
@@ -377,7 +383,7 @@ sub receive {
         last if $remaining_time <= 0; # timeout expired
 
         undef $!;
-        my $can_read = $s->can_read( $remaining_time );
+        my $can_read = $select->can_read( $remaining_time );
         $errno = $!;
         if ( $errno ) {
             if ( $errno == EINTR ) {
@@ -419,6 +425,7 @@ sub receive {
                     $remaining_time = $until - Time::HiRes::time();
                     my $micro_seconds = int( $remaining_time * 1e6 / $remaining_attempts );
                     if ( $micro_seconds > 0 ) {
+                        $micro_seconds = 250_000 if $micro_seconds > 250_000; # prevent long sleeps if total remaining time is big
                         $self->_debug_msg( format_message( 'sleeping (remaining attempts %d, time %.6f): %d microseconds', $remaining_attempts, $remaining_time, $micro_seconds ) )
                             if $self->debug_level;
                         Time::HiRes::usleep( $micro_seconds );
@@ -431,19 +438,18 @@ sub receive {
     unless( !$errno && length( $message ) >= $length )
     {
         my $finished = Time::HiRes::time();
-
-        $self->_error( $ERROR_CANNOT_RECV,
+        $self->_error(
+            $ERROR_CANNOT_RECV,
             format_message( "Kafka::IO->receive: ERRNO=%s ERROR='%s' (length=%s, received=%s, timeout=%s, retries=%s, interrupts=%s, secs=%.6f)",
-                $errno,
-                defined $errno ? $errno . '' : '<none>',
+                ( $errno // 0 ) + 0,
+                ( $errno // '<none>' ) . '',
                 $length,
                 length( $message ),
-                ( $self->{timeout} // $REQUEST_TIMEOUT ),
+                $timeout,
                 $retries,
                 $interrupts,
                 $finished - $started,
             ),
-            $errno,
         );
     }
     $self->_debug_msg( $message, 'Response from', 'yellow' )
@@ -557,7 +563,7 @@ sub _connect {
             }
         } else {
             $ip = $self->_gethostbyname( $name );
-            die( format_message( "not resolve a host name to the IP address: %s\n", $name ) ) unless $ip;
+            die( format_message( "could not resolve host name to IP address: %s\n", $name ) ) unless $ip;
         }
     }
 
@@ -576,7 +582,6 @@ sub _connect {
 
     # Connect returns immediately because of O_NONBLOCK.
     my $sockaddr = $self->{af} eq AF_INET
-#        ? pack_sockaddr_in(  $port, inet_pton( $self->{af}, $ip ) )
         ? pack_sockaddr_in(  $port, inet_aton( $ip ) )
         : pack_sockaddr_in6( $port, inet_pton( $self->{af}, $ip ) )
     ;
@@ -784,10 +789,8 @@ sub _debug_msg {
 
 # Handler for errors
 sub _error {
-    my ( $self, @args ) = @_;
-
-    Kafka::Exception::IO->throw( throw_args( @args ) );
-
+    my $self = shift;
+    Kafka::Exception::IO->throw( throw_args( @_ ) );
     return;
 }
 

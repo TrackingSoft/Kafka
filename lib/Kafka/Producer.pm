@@ -36,7 +36,6 @@ use Scalar::Util qw(
 use Scalar::Util::Numeric qw(
     isint
 );
-use Try::Tiny;
 
 use Kafka qw(
     %ERROR
@@ -163,19 +162,6 @@ C<new()> takes arguments in key-value pairs. The following arguments are current
 C<$connection> is the L<Kafka::Connection|Kafka::Connection> object responsible for communication with
 the Apache Kafka cluster.
 
-=item C<CorrelationId =E<gt> $correlation_id>
-
-Optional, int32 signed integer, default = C<undef> .
-
-C<Correlation> is a user-supplied integer.
-It will be passed back in the response by the server, unmodified.
-The C<$correlation_id> should be an integer number.
-
-If C<CorrelationId> is not passed to constructor, its value will be assigned automatically
-(random negative integer).
-
-An exception is thrown if C<CorrelationId> sent with request does not match C<CorrelationId> received in response.
-
 =item C<ClientId =E<gt> $client_id>
 
 This is a user supplied identifier (string) for the client application.
@@ -220,7 +206,6 @@ sub new {
 
     my $self = bless {
         Connection      => undef,
-        CorrelationId   => undef,
         ClientId        => undef,
         RequiredAcks    => $WAIT_WRITTEN_TO_LOCAL_LOG,
         Timeout         => $REQUEST_TIMEOUT,
@@ -231,13 +216,10 @@ sub new {
         $self->{ $k } = shift @args if exists $self->{ $k };
     }
 
-    $self->{CorrelationId}  //= _get_CorrelationId;
     $self->{ClientId}       //= 'producer';
 
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'Connection' )
         unless _INSTANCE( $self->{Connection}, 'Kafka::Connection' );
-    $self->_error( $ERROR_MISMATCH_ARGUMENT, format_message( 'CorrelationId (%s)', $self->{CorrelationId} ) )
-        unless isint( $self->{CorrelationId} ) && $self->{CorrelationId} <= $MAX_CORRELATIONID;
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'ClientId' )
         unless ( $self->{ClientId} eq q{} || defined( _STRING( $self->{ClientId} ) ) ) && !utf8::is_utf8( $self->{ClientId} );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, format_message( 'Timeout (%s)', $self->{Timeout} ) )
@@ -341,10 +323,10 @@ sub send {
     my $MessageSet = [];
     my $request = {
         ApiKey                              => $APIKEY_PRODUCE,
-        CorrelationId                       => $self->{CorrelationId},
+        CorrelationId                       => _get_CorrelationId(),
         ClientId                            => $self->{ClientId},
         RequiredAcks                        => $self->{RequiredAcks},
-        Timeout                             => $self->{Timeout} * 1000,
+        Timeout                             => int( $self->{Timeout} * 1000 ),
         topics                              => [
             {
                 TopicName                   => $topic,
@@ -366,21 +348,7 @@ sub send {
         };
     }
 
-    my $result = try {
-        $self->{Connection}->receive_response_to_request( $request, $compression_codec );
-    } catch {
-        my $error = $_;
-        if ( blessed( $error ) && $error->isa( 'Kafka::Exception' ) ) {
-            my $message = $error->message;
-            $message .= format_message( " (Kafka::Producer Timeout %s, RequiredAcks %s)",
-                $self->{Timeout},
-                $self->{RequiredAcks},
-            );
-            $error->message( $message );
-        }
-        die $error;
-    };
-
+    my $result = $self->{Connection}->receive_response_to_request( $request, $compression_codec, $self->{Timeout} );
     return $result;
 }
 

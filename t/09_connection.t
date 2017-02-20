@@ -40,7 +40,7 @@ use Kafka qw(
     $DEFAULT_MAX_NUMBER_OF_OFFSETS
     $DEFAULT_MAX_BYTES
     $DEFAULT_MAX_WAIT_TIME
-    $ERROR_MISMATCH_ARGUMENT
+    $ERROR_CANNOT_SEND
     $ERROR_RESPONSEMESSAGE_NOT_RECEIVED
     $IP_V4
     $IP_V6
@@ -97,7 +97,6 @@ sub new_ERROR_MISMATCH_ARGUMENT {
             $connect = Kafka::Connection->new(
                 host                => 'localhost',
                 port                => $port,
-                CorrelationId       => undef,
                 SEND_MAX_ATTEMPTS   => $SEND_MAX_ATTEMPTS,
                 RETRY_BACKOFF       => $RETRY_BACKOFF,
                 $field              => $bad_value,
@@ -190,20 +189,8 @@ sub testing {
 # ip_version
     new_ERROR_MISMATCH_ARGUMENT( 'ip_version', -1, $IP_V6 * 2 );
 
-# CorrelationId
-    new_ERROR_MISMATCH_ARGUMENT( 'CorrelationId', @not_isint );
-
 # SEND_MAX_ATTEMPTS
     new_ERROR_MISMATCH_ARGUMENT( 'SEND_MAX_ATTEMPTS', @not_posint );
-
-    lives_ok {
-        $connect = Kafka::Connection->new(
-            host                => 'localhost',
-            port                => $port,
-            # legacy, will be removed in future releases
-            SEND_MAX_RETRIES    => 5,
-        );
-    } 'SEND_MAX_RETRIES OK';
 
 # RETRY_BACKOFF
     new_ERROR_MISMATCH_ARGUMENT( 'RETRY_BACKOFF', @not_posint );
@@ -417,7 +404,7 @@ sub communication_error {
         code    => sub {
             my ( $self ) = @_;
             if ( $main::_attempt++ ) {
-                $self->_error( $ERROR_MISMATCH_ARGUMENT );
+                $self->_error( $ERROR_CANNOT_SEND );
             } else {
                 return &$method( @_ );
             }

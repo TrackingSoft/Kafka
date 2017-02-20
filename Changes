@@ -3,6 +3,7 @@ Revision history for Kafka package
     CHANGES:
     - Kafka::IO system call processing improved.
     - Kafka::IO error diagnostic extended.
+    - $RECEIVE_MAX_RETRIES, $SEND_MAX_RETRIES removed
     - $Kafka::RECEIVE_MAX_ATTEMPTS not used now.
     - Kafka::Connection->is_server_alive, Kafka::IO->is_alive are private now.
 

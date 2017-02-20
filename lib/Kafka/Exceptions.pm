@@ -35,6 +35,7 @@ use Exception::Class (
     },
     'Kafka::Exception::Connection' => {
         isa     => 'Kafka::Exception',
+        fields  => [ 'request', 'response' ],
     },
     'Kafka::Exception::Consumer' => {
         isa     => 'Kafka::Exception',
@@ -53,6 +54,8 @@ use Exception::Class (
         isa     => 'Kafka::Exception',
     },
 );
+
+Kafka::Exception->Trace(1); # include stack traces
 
 use Kafka qw(
     %ERROR
@@ -207,11 +210,13 @@ An additional error description that contains information about the encountered 
 
 =cut
 sub throw_args {
-    my( $error_code, $description ) = @_;
+    my $error_code = shift;
+    my $description = shift;
 
-    return(
+    return (
         code    => $error_code,
         message => format_message( '%s%s', $ERROR{ $error_code }, $description ? ": $description" : '' ),
+        @_,
     );
 }
 

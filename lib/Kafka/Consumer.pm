@@ -32,7 +32,6 @@ use Params::Util qw(
 use Scalar::Util::Numeric qw(
     isint
 );
-use Try::Tiny;
 
 use Kafka qw(
     $BITS64
@@ -196,19 +195,6 @@ C<new()> takes arguments in key-value pairs. The following arguments are recogni
 C<$connection> is the L<Kafka::Connection|Kafka::Connection> object responsible for communication with
 the Apache Kafka cluster.
 
-=item C<CorrelationId =E<gt> $correlation_id>
-
-Optional, default is C<undef>.
-
-C<Correlation> is a user-supplied integer.
-It will be passed back in the response by the server, unmodified.
-The C<$correlation_id> should be an integer number.
-
-C<CorrelationId> will be auto-assigned (random negative number) if it was not provided on
-creation of L<Kafka::Producer|Kafka::Producer> object.
-
-An exception is thrown if C<CorrelationId> sent with request does not match C<CorrelationId> received in response.
-
 =item C<ClientId =E<gt> $client_id>
 
 This is a user supplied identifier (string) for the client application.
@@ -273,7 +259,6 @@ sub new {
 
     my $self = bless {
         Connection          => undef,
-        CorrelationId       => undef,
         ClientId            => undef,
         MaxWaitTime         => $DEFAULT_MAX_WAIT_TIME,
         MinBytes            => $MIN_BYTES_RESPOND_IMMEDIATELY,
@@ -287,13 +272,10 @@ sub new {
         $self->{ $k } = shift @args if exists $self->{ $k };
     }
 
-    $self->{CorrelationId}  //= _get_CorrelationId;
     $self->{ClientId}       //= 'consumer';
 
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'Connection' )
         unless _INSTANCE( $self->{Connection}, 'Kafka::Connection' );
-    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'CorrelationId' )
-        unless defined( $self->{CorrelationId} ) && isint( $self->{CorrelationId} );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'ClientId' )
         unless ( $self->{ClientId} eq q{} || defined( _STRING( $self->{ClientId} ) ) ) && !utf8::is_utf8( $self->{ClientId} );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, format_message( 'MaxWaitTime (%s)', $self->{MaxWaitTime} ) )
@@ -369,7 +351,7 @@ sub fetch {
 
     my $request = {
         ApiKey                              => $APIKEY_FETCH,
-        CorrelationId                       => $self->{CorrelationId},
+        CorrelationId                       => _get_CorrelationId(),
         ClientId                            => $self->{ClientId},
         MaxWaitTime                         => $self->{MaxWaitTime},
         MinBytes                            => $self->{MinBytes},
@@ -387,7 +369,7 @@ sub fetch {
         ],
     };
 
-    my $response = $self->{Connection}->receive_response_to_request( $request );
+    my $response = $self->{Connection}->receive_response_to_request( $request, undef, $self->{MaxWaitTime} / 1000 );
 
     my $messages = [];
     foreach my $received_topic ( @{ $response->{topics} } ) {
@@ -491,7 +473,7 @@ sub offsets {
 
     my $request = {
         ApiKey                              => $APIKEY_OFFSET,
-        CorrelationId                       => $self->{CorrelationId},
+        CorrelationId                       => _get_CorrelationId(),
         ClientId                            => $self->{ClientId},
         topics                              => [
             {

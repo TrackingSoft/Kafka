@@ -128,11 +128,9 @@ our @EXPORT_OK = qw(
     $RECEIVE_EARLIEST_OFFSETS
     $RECEIVE_LATEST_OFFSET
     $RECEIVE_MAX_ATTEMPTS
-    $RECEIVE_MAX_RETRIES
     $REQUEST_TIMEOUT
     $RETRY_BACKOFF
     $SEND_MAX_ATTEMPTS
-    $SEND_MAX_RETRIES
     $WAIT_WRITTEN_TO_LOCAL_LOG
 );
 
@@ -570,7 +568,6 @@ This property specifies the number of attempts to send of a message.
 Do not use C<$Kafka::SEND_MAX_ATTEMPTS> in C<Kafka::Producer-<gt>send> request to prevent duplicates.
 
 =cut
-const our $SEND_MAX_RETRIES                     => 4;   # legacy, will be removed in future releases
 const our $SEND_MAX_ATTEMPTS                    => 4;
 
 =item C<$RECEIVE_MAX_ATTEMPTS>
@@ -581,7 +578,6 @@ WARN: Only for backward compatibility. C<$RECEIVE_MAX_ATTEMPTS> not used now!
 This property specifies the number of attempts to receive of a response.
 
 =cut
-const our $RECEIVE_MAX_RETRIES                  => 4;   # legacy, will be removed in future releases
 const our $RECEIVE_MAX_ATTEMPTS                 => 4;
 
 =item C<$RETRY_BACKOFF>
@@ -675,7 +671,7 @@ const our $BLOCK_UNTIL_IS_COMMITTED              => -1;
 
 The maximum amount of time (ms) to wait when no sufficient amount of data is available at the time the request is dispatched.
 
-100 - the server will block until the message is committed by all in sync replicas before sending a response.
+100 - allow the server to wait up to 100ms to try to accumulate data before responding.
 
 =cut
 const our $DEFAULT_MAX_WAIT_TIME                => 100;
