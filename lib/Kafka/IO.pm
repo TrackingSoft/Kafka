@@ -246,7 +246,7 @@ sub new {
         $self->_connect();
     } catch {
         my $error = $_;
-        $self->_error( $ERROR_CANNOT_BIND, "->new - $error" );
+        $self->_error( $ERROR_CANNOT_BIND, format_message("Kafka::IO(%s:%s)->new: %s", $self->{host}, $self->{port}, $error ) );
     };
 
     return $self;
@@ -332,7 +332,8 @@ sub send {
         my $finished = Time::HiRes::time();
         $self->_error(
             $ERROR_CANNOT_SEND,
-            format_message( "Kafka::IO->send: ERRNO=%s ERROR='%s' (length=%s, sent=%s, timeout=%s, retries=%s, interrupts=%s, secs=%.6f)",
+            format_message( "Kafka::IO(%s)->send: ERRNO=%s ERROR='%s' (length=%s, sent=%s, timeout=%s, retries=%s, interrupts=%s, secs=%.6f)",
+                $self->{host},
                 ( $errno // 0 ) + 0,
                 ( $errno // '<none>' ) . '',
                 $length,
@@ -440,7 +441,8 @@ sub receive {
         my $finished = Time::HiRes::time();
         $self->_error(
             $ERROR_CANNOT_RECV,
-            format_message( "Kafka::IO->receive: ERRNO=%s ERROR='%s' (length=%s, received=%s, timeout=%s, retries=%s, interrupts=%s, secs=%.6f)",
+            format_message( "Kafka::IO(%s)->receive: ERRNO=%s ERROR='%s' (length=%s, received=%s, timeout=%s, retries=%s, interrupts=%s, secs=%.6f)",
+                $self->{host},
                 ( $errno // 0 ) + 0,
                 ( $errno // '<none>' ) . '',
                 $length,
