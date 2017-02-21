@@ -478,7 +478,8 @@ sub close {
     return $ret;
 }
 
-# The method verifies whether we are connected to Kafka server.
+# The method verifies if we can connect to a Kafka broker.
+# This is evil: opens and immediately closes a NEW connection so do not use unless there is a strong reason for it.
 sub _is_alive {
     my ( $self ) = @_;
 
@@ -791,7 +792,6 @@ sub _debug_msg {
 sub _error {
     my $self = shift;
     Kafka::Exception::IO->throw( throw_args( @_ ) );
-    return;
 }
 
 #-- Closes and cleans up -------------------------------------------------------

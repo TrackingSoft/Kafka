@@ -394,7 +394,6 @@ BEGIN {
         cluster_errors
         debug_level
         get_known_servers
-        is_server_connected
         is_server_known
         new
         nonfatal_errors

@@ -579,7 +579,7 @@ sub is_server_known {
 
 # Returns true, if known C<$server> (host:port or [IPv6_host]:port) is accessible.
 # Checks the accessibility of the server.
-# NOTE: It's open and close new socket.
+# This is evil: opens and closes a NEW connection immediately so do not use unless there is a strong reason for it.
 sub _is_server_alive {
     my ( $self, $server ) = @_;
 
@@ -600,12 +600,8 @@ sub _is_server_alive {
     }
 }
 
-=head3 C<is_server_connected( $server )>
-
-Returns true, if successful connection is established with C<$server> (host:port or [IPv6_host]:port).
-
-=cut
-sub is_server_connected {
+# this is evil, do not use unless there is a very strong reason for it
+sub _is_server_connected {
     my ( $self, $server ) = @_;
 
     $self->_error( $ERROR_MISMATCH_ARGUMENT )
@@ -1256,7 +1252,7 @@ sub _receiveIO {
     my $response_ref;
     my $error_code;
     try {
-        $response_ref = $io->receive( 4, $response_timeout ); # response header must arrive within request-sepcific timeout if provided
+        $response_ref = $io->receive( 4, $response_timeout ); # response header must arrive within request-specific timeout if provided
         my $message_size = $$response_ref;
         if ( length( $message_size ) == 4 ) {
             my $message_body_ref = $io->receive( unpack( 'l>', $message_size ) );

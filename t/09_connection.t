@@ -165,7 +165,7 @@ sub testing {
     ( $server ) = $connect->get_known_servers();
     ok $connect->is_server_known( $server ), 'known server';
     # requests to the server has not yet been
-    ok !$connect->is_server_connected( $server ), 'server is not alive';
+    ok !$connect->_is_server_connected( $server ), 'server is not alive';
 
     $connect->close;
     undef $connect;
@@ -323,13 +323,13 @@ sub testing {
     }
 
     foreach my $server ( $connect->get_known_servers() ) {
-        if ( $connect->is_server_connected( $server ) ) {
-            ok $connect->is_server_connected( $server ), 'server is connected';
+        if ( $connect->_is_server_connected( $server ) ) {
+            ok $connect->_is_server_connected( $server ), 'server is connected';
             ok $connect->close_connection( $server ), 'close connection';
-            ok !$connect->is_server_connected( $server ), 'server is not connected';
+            ok !$connect->_is_server_connected( $server ), 'server is not connected';
         }
     }
-    is_ERROR_MISMATCH_ARGUMENT( 'is_server_connected' );
+    is_ERROR_MISMATCH_ARGUMENT( '_is_server_connected' );
 
 #-- _is_server_alive
     foreach my $server ( $connect->get_known_servers() ) {
@@ -378,13 +378,13 @@ sub testing {
     $connect->receive_response_to_request( $request );
     $tmp = 0;
     foreach my $server ( $connect->get_known_servers() ) {
-        ++$tmp if $connect->is_server_connected( $server );
+        ++$tmp if $connect->_is_server_connected( $server );
     }
     ok( $tmp, 'server is alive' );
     $connect->close;
     $tmp = 0;
     foreach my $server ( $connect->get_known_servers() ) {
-        ++$tmp if $connect->is_server_connected( $server );
+        ++$tmp if $connect->_is_server_connected( $server );
     }
     ok !$tmp, 'server is not connected';
 

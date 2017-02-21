@@ -81,13 +81,13 @@ sub testing {
 #-- stop leader
     my ( $leader_server, $leader_port ) = get_leader( $connect );
     ok $connect->_is_server_alive( $leader_server ), 'leader is alive';
-    ok $connect->is_server_connected( $leader_server ), 'leader is connected';
+    ok $connect->_is_server_connected( $leader_server ), 'leader is connected';
     $cluster->stop( $leader_port );
     ok !$connect->_is_server_alive( $leader_server ), 'leader is not alive';
-    ok !$connect->is_server_connected( $leader_server ), 'leader is connected';
+    ok !$connect->_is_server_connected( $leader_server ), 'leader is connected';
     my ( $next_leader_server ) = get_leader( $connect );
     ok $connect->_is_server_alive( $next_leader_server ), 'new leader is alive';
-    ok $connect->is_server_connected( $next_leader_server ), 'new leader is connected';
+    ok $connect->_is_server_connected( $next_leader_server ), 'new leader is connected';
 
 #-- start previous leader
     $cluster->_remove_log_tree( $leader_port );
@@ -98,7 +98,7 @@ sub testing {
     $connect->close;
     my $tmp = 0;
     foreach my $server ( $connect->get_known_servers() ) {
-        ++$tmp if $connect->is_server_connected( $server );
+        ++$tmp if $connect->_is_server_connected( $server );
     }
     ok !$tmp, 'server is not connected';
 }
