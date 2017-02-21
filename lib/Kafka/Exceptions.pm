@@ -18,6 +18,8 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
+our $DEBUG = 0;
+
 our $VERSION = '1.001012';
 
 use Exporter qw(
@@ -55,14 +57,16 @@ use Exception::Class (
     },
 );
 
-Kafka::Exception->Trace(1); # include stack traces
-
 use Kafka qw(
     %ERROR
 );
 use Kafka::Internals qw(
     format_message
 );
+
+if( Kafka::Internals::debug_level( __PACKAGE__ ) ) {
+    Kafka::Exception->Trace(1); # include stack traces
+}
 
 #-- declarations ---------------------------------------------------------------
 

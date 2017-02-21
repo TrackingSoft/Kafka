@@ -63,6 +63,7 @@ use Kafka::TestInternals qw(
     @not_isint
     @not_nonnegint
     @not_posint
+    @not_posnumber
     @not_right_object
     $topic
 );
@@ -233,7 +234,7 @@ sub testing {
     new_ERROR_MISMATCH_ARGUMENT( 'ClientId', @not_empty_string );
 
 # MaxWaitTime
-    new_ERROR_MISMATCH_ARGUMENT( 'MaxWaitTime', @not_isint );
+    new_ERROR_MISMATCH_ARGUMENT( 'MaxWaitTime', @not_posnumber );
 
 # MinBytes
     new_ERROR_MISMATCH_ARGUMENT( 'MinBytes', @not_nonnegint );

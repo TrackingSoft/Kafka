@@ -37,6 +37,7 @@ use Kafka qw(
     $BLOCK_UNTIL_IS_COMMITTED
     $COMPRESSION_NONE
     $DEFAULT_MAX_BYTES
+    $DEFAULT_MAX_WAIT_TIME
     $KAFKA_SERVER_PORT
     $DEFAULT_MAX_NUMBER_OF_OFFSETS
     $MIN_BYTES_RESPOND_HAS_DATA
@@ -196,7 +197,7 @@ $decoded_request = {
     CorrelationId                       => 4,
     ClientId                            => q{},
     RequiredAcks                        => $NOT_SEND_ANY_RESPONSE,
-    Timeout                             => $REQUEST_TIMEOUT * 1000,
+    Timeout                             => int( $REQUEST_TIMEOUT * 1000 ),
     topics                              => [
         {
             TopicName                   => $TOPIC,
@@ -229,7 +230,7 @@ $decoded_request = {
     ApiKey                              => $APIKEY_FETCH,
     CorrelationId                       => 0,
     ClientId                            => 'console-consumer-25555',
-    MaxWaitTime                         => 100,
+    MaxWaitTime                         => int( $DEFAULT_MAX_WAIT_TIME * 1000 ),
     MinBytes                            => $MIN_BYTES_RESPOND_HAS_DATA,
     topics                              => [
         {

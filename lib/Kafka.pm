@@ -669,12 +669,13 @@ const our $BLOCK_UNTIL_IS_COMMITTED              => -1;
 
 =item C<$DEFAULT_MAX_WAIT_TIME>
 
-The maximum amount of time (ms) to wait when no sufficient amount of data is available at the time the request is dispatched.
+The maximum amount of time (seconds, may be fractional) to wait when no sufficient amount of data is available
+at the time the request is dispatched.
 
-100 - allow the server to wait up to 100ms to try to accumulate data before responding.
+0.1 - allow the server to wait up to 0.1s to try to accumulate data before responding.
 
 =cut
-const our $DEFAULT_MAX_WAIT_TIME                => 100;
+const our $DEFAULT_MAX_WAIT_TIME                => 0.1;
 
 =item C<$MESSAGE_SIZE_OVERHEAD>
 

@@ -218,7 +218,7 @@ sub testing {
             CorrelationId                       => 4,   # for example
             ClientId                            => 'producer',
             RequiredAcks                        => $mode,
-            Timeout                             => $REQUEST_TIMEOUT * 1000, # ms
+            Timeout                             => int( $REQUEST_TIMEOUT * 1000 ), # ms
             topics                              => [
                 {
                     TopicName                   => $topic,
@@ -255,7 +255,7 @@ sub testing {
             ApiKey                              => $APIKEY_FETCH,
             CorrelationId                       => 0,
             ClientId                            => 'consumer',
-            MaxWaitTime                         => $DEFAULT_MAX_WAIT_TIME,
+            MaxWaitTime                         => int( $DEFAULT_MAX_WAIT_TIME * 1000 ),
             MinBytes                            => $mode,
             topics                              => [
                 {
@@ -459,7 +459,7 @@ sub communication_error {
         ApiKey                              => $APIKEY_FETCH,
         CorrelationId                       => 0,
         ClientId                            => 'consumer',
-        MaxWaitTime                         => $DEFAULT_MAX_WAIT_TIME,
+        MaxWaitTime                         => int( $DEFAULT_MAX_WAIT_TIME * 1000 ),
         MinBytes                            => $MIN_BYTES_RESPOND_IMMEDIATELY,
         topics                              => [
             {

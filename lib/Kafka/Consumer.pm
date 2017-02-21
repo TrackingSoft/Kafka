@@ -26,6 +26,7 @@ use Carp;
 use Params::Util qw(
     _INSTANCE
     _NONNEGINT
+    _NUMBER
     _POSINT
     _STRING
 );
@@ -203,7 +204,7 @@ C<ClientId> will be auto-assigned if not passed in when creating L<Kafka::Produc
 
 =item C<MaxWaitTime =E<gt> $max_time>
 
-The maximum amount of time (ms) to wait when no sufficient data is available at the time the
+The maximum amount of time (seconds, may be fractional) to wait when no sufficient data is available at the time the
 request was issued.
 
 Optional, default is C<$DEFAULT_MAX_WAIT_TIME>.
@@ -211,7 +212,7 @@ Optional, default is C<$DEFAULT_MAX_WAIT_TIME>.
 C<$DEFAULT_MAX_WAIT_TIME> is the default time that can be imported from the
 L<Kafka|Kafka> module.
 
-The C<$max_time> must be a positive integer.
+The C<$max_time> must be a positive number.
 
 =item C<MinBytes =E<gt> $min_bytes>
 
@@ -279,7 +280,7 @@ sub new {
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'ClientId' )
         unless ( $self->{ClientId} eq q{} || defined( _STRING( $self->{ClientId} ) ) ) && !utf8::is_utf8( $self->{ClientId} );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, format_message( 'MaxWaitTime (%s)', $self->{MaxWaitTime} ) )
-        unless defined( $self->{MaxWaitTime} ) && isint( $self->{MaxWaitTime} ) && $self->{MaxWaitTime} > 0 && $self->{MaxWaitTime} <= $MAX_INT32;
+        unless defined( $self->{MaxWaitTime} ) && defined _NUMBER( $self->{MaxWaitTime} ) && $self->{MaxWaitTime} > 0 && int( $self->{MaxWaitTime} * 1000 ) <= $MAX_INT32;
     $self->_error( $ERROR_MISMATCH_ARGUMENT, format_message( 'MinBytes (%s)', $self->{MinBytes} ) )
         unless ( _isbig( $self->{MinBytes} ) ? ( $self->{MinBytes} >= 0 ) : defined( _NONNEGINT( $self->{MinBytes} ) ) ) && $self->{MinBytes} <= $MAX_INT32;
     $self->_error( $ERROR_MISMATCH_ARGUMENT, format_message( 'MaxBytes (%s)', $self->{MaxBytes} ) )
@@ -353,7 +354,7 @@ sub fetch {
         ApiKey                              => $APIKEY_FETCH,
         CorrelationId                       => _get_CorrelationId(),
         ClientId                            => $self->{ClientId},
-        MaxWaitTime                         => $self->{MaxWaitTime},
+        MaxWaitTime                         => int( $self->{MaxWaitTime} * 1000 ),
         MinBytes                            => $self->{MinBytes},
         topics                              => [
             {
@@ -369,7 +370,7 @@ sub fetch {
         ],
     };
 
-    my $response = $self->{Connection}->receive_response_to_request( $request, undef, $self->{MaxWaitTime} / 1000 );
+    my $response = $self->{Connection}->receive_response_to_request( $request, undef, $self->{MaxWaitTime} );
 
     my $messages = [];
     foreach my $received_topic ( @{ $response->{topics} } ) {
