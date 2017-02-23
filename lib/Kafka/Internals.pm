@@ -199,31 +199,33 @@ $flags - (string) argument that can be used to pass coma delimited module names 
 Returns C<$DEBUG> level for the module from which C<debug_level> was called.
 
 =cut
+our %_debug_levels; # per-module levels cache to speed-up multiple calls to debug_level()
 sub debug_level {
     no strict 'refs';                                               ## no critic
 
     my $class = ref( $_[0] ) || $_[0];
-    my $flags = $_[1] // $ENV{PERL_KAFKA_DEBUG}
-        // return( ${ "${class}::DEBUG" } );                        ## no critic
 
-    my ( $result, @elements, $module_name, $level );
-    foreach my $spec ( split /\s*,\s*/, $flags ) {
-        @elements = split /\s*:\s*/, $spec;
-        if ( scalar( @elements ) > 1 ) {
-            ( $module_name, $level ) = @elements;
-        } else {
-            $module_name = ( $class =~ /([^:]+)$/ )[0];
-            $level = $spec;
-        }
+    return ${ $_debug_levels{ $class } } if @_ == 1 && exists $_debug_levels{ $class };
 
-        if ( eval( "exists \$Kafka::${module_name}::{DEBUG}" ) ) {  ## no critic
-            $result = ${ "Kafka::${module_name}::DEBUG" } = $level;
-        } else {
-            $result = undef;
+    my $flags = $_[1] // $ENV{PERL_KAFKA_DEBUG};
+    if( defined $flags ) {
+        foreach my $spec ( split /\s*,\s*/, $flags ) {
+            my @elements = split( /\s*:\s*/, $spec, 2 );
+            my( $module_name, $level );
+            if ( scalar( @elements ) > 1 ) {
+                ( $module_name, $level ) = @elements;
+            } else {
+                $module_name = ( $class =~ /([^:]+)$/ )[0];
+                $level = $spec;
+            }
+
+            *{ "Kafka::${module_name}::DEBUG" } = \$level; ## no critic
         }
     }
 
-    return ${ "${class}::DEBUG" };
+    $_debug_levels{ $class } = \${ "${class}::DEBUG" }; ## no critic
+
+    return ${ $_debug_levels{ $class } };
 }
 
 =head2 format_reference

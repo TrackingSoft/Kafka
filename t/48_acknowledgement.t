@@ -291,6 +291,7 @@ while ( $send_with_NO_ACK_errors < $SEND_NO_ACK_REPEATS ) {
     if ( $success_sending ) {
         last if $success_sending == -1;
         $work_timeout /= $TIMEOUT_DIVIDER;
+        $work_timeout = 0.001 if $work_timeout < 0.001; # minimum timeout is 1ms
     } else {
         $max_error_timeout = $work_timeout if $work_timeout > $max_error_timeout;
         $work_timeout = $TIMEOUT;   # return to normal timeout

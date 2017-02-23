@@ -223,7 +223,7 @@ sub new {
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'ClientId' )
         unless ( $self->{ClientId} eq q{} || defined( _STRING( $self->{ClientId} ) ) ) && !utf8::is_utf8( $self->{ClientId} );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, format_message( 'Timeout (%s)', $self->{Timeout} ) )
-        unless defined _NUMBER( $self->{Timeout} ) && $self->{Timeout} > 0 && int( $self->{Timeout} * 1000 ) <= $MAX_INT32;
+        unless defined _NUMBER( $self->{Timeout} ) && int( $self->{Timeout} * 1000 ) >= 1 && int( $self->{Timeout} * 1000 ) <= $MAX_INT32;
 
     my $required_acks = $self->{RequiredAcks};
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'RequiredAcks' )

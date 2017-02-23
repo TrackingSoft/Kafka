@@ -29,6 +29,7 @@ plan 'no_plan';
 
 use Kafka::Connection;
 use Kafka::IO;
+use Kafka::Internals;
 
 #-- setting up facilities ------------------------------------------------------
 
@@ -37,6 +38,7 @@ my $DEBUG_Connection    = $Kafka::Connection::DEBUG;
 my $DEBUG_IO            = $Kafka::IO::DEBUG;
 
 delete $ENV{PERL_KAFKA_DEBUG};
+%Kafka::Internals::_debug_levels = ();
 
 #-- declarations ---------------------------------------------------------------
 
@@ -122,6 +124,7 @@ is( $Kafka::Connection::DEBUG,                                  0, 'debug level 
 #----- control through an environment variable
 
 $ENV{PERL_KAFKA_DEBUG}                                          = 1;
+%Kafka::Internals::_debug_levels = ();
 
 is( Kafka::TestDebugLevel->debug_level(),                       1, 'debug level set' );
 is( $Kafka::TestDebugLevel::DEBUG,                              1, 'debug level set' );
@@ -132,6 +135,7 @@ is( $Kafka::Connection::DEBUG,                                  0, 'debug level 
 $Kafka::TestDebugLevel::DEBUG                                   = 0;
 
 $ENV{PERL_KAFKA_DEBUG}                                          = 'IO:1';
+%Kafka::Internals::_debug_levels = ();
 
 is( Kafka::TestDebugLevel->debug_level(),                       0, 'debug level not set' );
 
@@ -164,6 +168,7 @@ $Kafka::IO::DEBUG                                               = 0;
 #----- control via an object method
 
 delete $ENV{PERL_KAFKA_DEBUG};
+%Kafka::Internals::_debug_levels = ();
 
 my $obj = Kafka::TestDebugLevel->new;
 

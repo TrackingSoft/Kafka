@@ -39,6 +39,7 @@ use Errno qw(
     ECONNRESET
     EINTR
     EWOULDBLOCK
+    ETIMEDOUT
 );
 use Fcntl;
 use IO::Select;
@@ -86,6 +87,7 @@ use Kafka qw(
     $ERROR_CANNOT_SEND
     $ERROR_MISMATCH_ARGUMENT
     $ERROR_INCOMPATIBLE_HOST_IP_VERSION
+    $ERROR_NO_CONNECTION
     $IP_V4
     $IP_V6
     $KAFKA_SERVER_PORT
@@ -223,7 +225,7 @@ sub new {
     my ( $class, @args ) = @_;
 
     my $self = bless {
-        host        => q{},
+        host        => '',
         timeout     => $REQUEST_TIMEOUT,
         port        => $KAFKA_SERVER_PORT,
         ip_version  => undef,
@@ -261,11 +263,13 @@ The following methods are provided by C<Kafka::IO> class:
 
 =cut
 
-=head3 C<send( $message )>
+=head3 C<< send( $message <, $timeout> ) >>
 
 Sends a C<$message> to Kafka.
 
 The argument must be a bytes string.
+
+Use optional C<$timeout> argument to override default timeout for this request only.
 
 Returns the number of characters sent.
 
@@ -279,13 +283,13 @@ sub send {
     $self->_error( $ERROR_MISMATCH_ARGUMENT, '->send' )
         unless $length <= $MAX_SOCKET_REQUEST_BYTES
     ;
-    my $select = $self->{_io_select};
-    $self->_error( $ERROR_CANNOT_SEND, 'Attempt to work with a closed socket' ) unless $select;
-
     $timeout = $self->{timeout} // $REQUEST_TIMEOUT unless defined $timeout;
     $self->_error( $ERROR_MISMATCH_ARGUMENT, '->receive' )
         unless $timeout > 0
     ;
+    my $select = $self->{_io_select};
+    $self->_error( $ERROR_NO_CONNECTION, 'Attempt to work with a closed socket' ) unless $select;
+
     $self->_debug_msg( $message, 'Request to', 'green' )
         if $self->debug_level >= 2
     ;
@@ -294,6 +298,7 @@ sub send {
     my $started = Time::HiRes::time();
     my $until = $started + $timeout;
 
+    my $error_code;
     my $errno;
     my $retries = 0;
     my $interrupts = 0;
@@ -306,16 +311,22 @@ sub send {
         $errno = $!;
         if ( $errno ) {
             if ( $errno == EINTR ) {
+                undef $errno;
                 --$retries; # this attempt does not count
                 ++$interrupts;
                 next ATTEMPT;
             }
+
+            $self->close;
+
             last ATTEMPT;
         }
 
         if ( $can_write ) {
-            if ( $self->_is_close_wait ) {
+            # check for EOF on the first attempt only
+            if ( $retries == 1 && $self->_is_close_wait ) {
                 $self->close;
+                $error_code = $ERROR_NO_CONNECTION;
                 last ATTEMPT;
             }
 
@@ -323,20 +334,39 @@ sub send {
             my $wrote = CORE::send( $self->{socket}, $message, MSG_DONTWAIT );
             $errno = $!;
 
-            last ATTEMPT unless defined $wrote;
-
-            $sent += $wrote;
-            if ( $sent < $length ) {
-                # remove written data from message
-                $message = substr( $message, $wrote );
+            if( defined $wrote && $wrote > 0 ) {
+                $sent += $wrote;
+                if ( $sent < $length ) {
+                    # remove written data from message
+                    $message = substr( $message, $wrote );
+                }
             }
+
+            if( $errno ) {
+                if( $errno == EINTR ) {
+                    undef $errno;
+                    --$retries; # this attempt does not count
+                    ++$interrupts;
+                    next ATTEMPT;
+                } elsif (
+                           $errno != EAGAIN
+                        && $errno != EWOULDBLOCK
+                        ## on freebsd, if we got ECONNRESET, it's a timeout from the other side
+                        && !( $errno == ECONNRESET && $^O eq 'freebsd' )
+                    ) {
+                    $self->close;
+                    last ATTEMPT;
+                }
+            }
+
+            last ATTEMPT unless defined $wrote;
         }
     }
 
     unless( !$errno && defined( $sent ) && $sent == $length )
     {
         $self->_error(
-            $ERROR_CANNOT_SEND,
+            $error_code // $ERROR_CANNOT_SEND,
             format_message( "Kafka::IO(%s)->send: ERRNO=%s ERROR='%s' (length=%s, sent=%s, timeout=%s, retries=%s, interrupts=%s, secs=%.6f)",
                 $self->{host},
                 ( $errno // 0 ) + 0,
@@ -354,11 +384,13 @@ sub send {
     return $sent;
 }
 
-=head3 C<receive( $length )>
+=head3 C<< receive( $length <, $timeout> ) >>
 
 Receives a message up to C<$length> size from Kafka.
 
 C<$length> argument must be a positive number.
+
+Use optional C<$timeout> argument to override default timeout for this call only.
 
 Returns a reference to the received message.
 
@@ -368,19 +400,20 @@ sub receive {
     $self->_error( $ERROR_MISMATCH_ARGUMENT, '->receive' )
         unless $length > 0
     ;
-    my $select = $self->{_io_select};
-    $self->_error( $ERROR_CANNOT_RECV, 'Attempt to work with a closed socket' ) unless $select;
-
     $timeout = $self->{timeout} // $REQUEST_TIMEOUT unless defined $timeout;
     $self->_error( $ERROR_MISMATCH_ARGUMENT, '->receive' )
         unless $timeout > 0
     ;
-    my $message = q{};
+    my $select = $self->{_io_select};
+    $self->_error( $ERROR_NO_CONNECTION, 'Attempt to work with a closed socket' ) unless $select;
+
+    my $message = '';
     my $len_to_read = $length;
 
     my $started = Time::HiRes::time();
     my $until = $started + $timeout;
 
+    my $error_code;
     my $errno;
     my $retries = 0;
     my $interrupts = 0;
@@ -393,15 +426,19 @@ sub receive {
         $errno = $!;
         if ( $errno ) {
             if ( $errno == EINTR ) {
+                undef $errno;
                 --$retries; # this attempt does not count
                 ++$interrupts;
                 next ATTEMPT;
             }
+
+            $self->close;
+
             last ATTEMPT;
         }
 
         if ( $can_read ) {
-            my $buf = q{};
+            my $buf = '';
             undef $!;
             my $from_recv = CORE::recv( $self->{socket}, $buf, $len_to_read, MSG_DONTWAIT );
             $errno = $!;
@@ -412,6 +449,7 @@ sub receive {
             }
             if ( $errno ) {
                 if ( $errno == EINTR ) {
+                    undef $errno;
                     --$retries; # this attempt does not count
                     ++$interrupts;
                     next ATTEMPT;
@@ -432,6 +470,12 @@ sub receive {
                     $self->_debug_msg( 'EOF on receive attempt, closing socket' )
                         if $self->debug_level;
                     $self->close;
+
+                    if( length( $message ) == 0 ) {
+                        # we did not receive anything yet, so we may (in some cases) reconnect and try again
+                        $error_code = $ERROR_NO_CONNECTION;
+                    }
+
                     last ATTEMPT;
                 }
                 # we did not read anything on this attempt: wait a bit before the next one; should not happen, but just in case...
@@ -452,7 +496,7 @@ sub receive {
     unless( !$errno && length( $message ) >= $length )
     {
         $self->_error(
-            $ERROR_CANNOT_RECV,
+            $error_code // $ERROR_CANNOT_RECV,
             format_message( "Kafka::IO(%s)->receive: ERRNO=%s ERROR='%s' (length=%s, received=%s, timeout=%s, retries=%s, interrupts=%s, secs=%.6f)",
                 $self->{host},
                 ( $errno // 0 ) + 0,
@@ -620,17 +664,17 @@ sub _connect {
     fcntl( $connection, F_SETFL, $flags & ~ O_NONBLOCK ) or die "fcntl F_SETFL not O_NONBLOCK: $!\n";  # 0 for error, 0e0 for 0.
 
     # Use select() to poll for completion or error. When connect succeeds we can write.
-    my $vec = q{};
+    my $vec = '';
     vec( $vec, fileno( $connection ), 1 ) = 1;
     select( undef, $vec, undef, $timeout // $REQUEST_TIMEOUT );
     unless ( vec( $vec, fileno( $connection ), 1 ) ) {
         # If no response yet, impose our own timeout.
-        $! = Errno::ETIMEDOUT();
+        $! = ETIMEDOUT;
         die( format_message( "connect ip = %s, port = %s: %s\n", $ip, $port, $! ) );
     }
 
     # This is how we see whether it connected or there was an error. Document Unix, are you kidding?!
-    $! = unpack( q{L}, getsockopt( $connection, SOL_SOCKET, SO_ERROR ) );
+    $! = unpack( 'L', getsockopt( $connection, SOL_SOCKET, SO_ERROR ) );
     die( format_message( "connect ip = %s, port = %s: %s\n", $ip, $port, $! ) ) if $!;
 
     # Set timeout on all reads and writes.
@@ -800,7 +844,7 @@ sub _debug_msg {
 
         say STDERR
             "# $header ", $self->{host}, ':', $self->{port}, "\n",
-            '# Hex Stream: ', unpack( q{H*}, $message ), "\n",
+            '# Hex Stream: ', unpack( 'H*', $message ), "\n",
             $_hdr->dump(
                 [
                     [ 'data', length( $message ), $colour ],

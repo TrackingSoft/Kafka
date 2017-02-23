@@ -61,6 +61,7 @@ our @EXPORT_OK = qw(
     $ERROR_METADATA_ATTRIBUTES
     $ERROR_MISMATCH_ARGUMENT
     $ERROR_MISMATCH_CORRELATIONID
+    $ERROR_NO_CONNECTION
     $ERROR_NO_ERROR
     $ERROR_NO_KNOWN_BROKERS
     $ERROR_NOT_BINARY_STRING
@@ -127,7 +128,6 @@ our @EXPORT_OK = qw(
     $NOT_SEND_ANY_RESPONSE
     $RECEIVE_EARLIEST_OFFSETS
     $RECEIVE_LATEST_OFFSET
-    $RECEIVE_MAX_ATTEMPTS
     $REQUEST_TIMEOUT
     $RETRY_BACKOFF
     $SEND_MAX_ATTEMPTS
@@ -570,16 +570,6 @@ Do not use C<$Kafka::SEND_MAX_ATTEMPTS> in C<Kafka::Producer-<gt>send> request t
 =cut
 const our $SEND_MAX_ATTEMPTS                    => 4;
 
-=item C<$RECEIVE_MAX_ATTEMPTS>
-
-WARN: Only for backward compatibility. C<$RECEIVE_MAX_ATTEMPTS> not used now!
-
-4 - The leader may be unavailable transiently, which can fail the receiving of a response.
-This property specifies the number of attempts to receive of a response.
-
-=cut
-const our $RECEIVE_MAX_ATTEMPTS                 => 4;
-
 =item C<$RETRY_BACKOFF>
 
 200 - (ms)
@@ -777,7 +767,7 @@ const our $COMPRESSION_SNAPPY           => 2;
 
 =head2 Error codes
 
-Possible error codes (complies with a hash of descriptions C<$ERROR>):
+Possible error codes (corresponds to descriptions in C<%ERROR>):
 
 =over
 
@@ -906,6 +896,14 @@ const our $ERROR_RESPONSEMESSAGE_NOT_RECEIVED   => -1016;
 
 =cut
 const our $ERROR_INCOMPATIBLE_HOST_IP_VERSION   => -1017;
+
+
+=item C<$ERROR_NO_CONNECTION>
+
+-1018 - No IO connection
+
+=cut
+const our $ERROR_NO_CONNECTION   => -1018;
 
 =back
 
@@ -1302,6 +1300,7 @@ our %ERROR = (
     $ERROR_COMPRESSION                              => q{Compression error},
     $ERROR_RESPONSEMESSAGE_NOT_RECEIVED             => q{'ResponseMessage' not received},
     $ERROR_INCOMPATIBLE_HOST_IP_VERSION             => q{'Incompatible host name and IP version'},
+    $ERROR_NO_CONNECTION                            => q{'No connection'},
 
     #-- The Protocol Error Messages
     # https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-ErrorCodes

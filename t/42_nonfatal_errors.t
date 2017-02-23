@@ -85,6 +85,7 @@ use Kafka qw(
     $ERROR_CANNOT_RECV
     $ERROR_CANNOT_SEND
     $ERROR_SEND_NO_ACK
+    $ERROR_NO_CONNECTION
     $MIN_BYTES_RESPOND_HAS_DATA
     $RECEIVE_EARLIEST_OFFSETS
     $REQUEST_TIMEOUT
@@ -376,7 +377,7 @@ eval { $connection->receive_response_to_request( $decoded_produce_request ); };
 $error = $@;
 isa_ok( $error, 'Kafka::Exception::Connection' );
 is $error->code, $ERROR_LEADER_NOT_FOUND, 'non-fatal error: '.$ERROR{ $ERROR_LEADER_NOT_FOUND };
-is scalar( @{ $connection->nonfatal_errors } ), 1, 'non-fatal errors are fixed';
+is scalar( @{ $connection->nonfatal_errors } ), $SEND_MAX_ATTEMPTS, 'non-fatal errors are fixed';
 
 is scalar( @{ $connection->clear_nonfatals } ), 0, 'non-fatal errors are not fixed now';
 is scalar( @{ $connection->nonfatal_errors } ), 0, 'non-fatal errors are not fixed';
@@ -392,7 +393,7 @@ Kafka_IO_error(
     1,                  # skip calls
     $ERROR_CANNOT_BIND, # expected error code
     # because connection is not available
-    1,                  # expected non-fatal errors
+    $SEND_MAX_ATTEMPTS,                  # expected non-fatal errors
     $decoded_produce_request,
 );
 
@@ -441,7 +442,6 @@ foreach my $ErrorCode (
         $ERROR_INVALID_FETCH_SIZE,
         $ERROR_LEADER_NOT_AVAILABLE,
         $ERROR_NOT_LEADER_FOR_PARTITION,
-        $ERROR_REQUEST_TIMED_OUT,
         $ERROR_BROKER_NOT_AVAILABLE,
         $ERROR_REPLICA_NOT_AVAILABLE,
         $ERROR_MESSAGE_TOO_LARGE,
@@ -470,6 +470,7 @@ foreach my $ErrorCode (
         $ERROR_UNSUPPORTED_SASL_MECHANISM,
         $ERROR_ILLEGAL_SASL_STATE,
         $ERROR_UNSUPPORTED_VERSION,
+        $ERROR_NO_CONNECTION,
     ) {
 
     $partition_data->{ErrorCode} = $ErrorCode;
@@ -496,7 +497,7 @@ foreach my $ErrorCode (
 
         if ( exists $RETRY_ON_ERRORS{ $ErrorCode } ) {
             is $error->code, $ErrorCode, 'non-fatal error: '.$ERROR{ $ErrorCode };
-            is scalar( @{ $connection->nonfatal_errors } ), 1, 'non-fatal errors are fixed';
+            is scalar( @{ $connection->nonfatal_errors } ), $SEND_MAX_ATTEMPTS, 'non-fatal errors are fixed';
         } else {
             is $error->code, $ErrorCode, 'FATAL error: '.$ERROR{ $ErrorCode };
             is scalar( @{ $connection->nonfatal_errors } ), 0, 'non-fatal errors are not fixed';
