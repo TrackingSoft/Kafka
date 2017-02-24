@@ -73,6 +73,7 @@ requires:
   perl: '5.010'
 version: '1.001013'
 resources:
+  bugtracker: https://github.com/TrackingSoft/Kafka/issues
   homepage: https://github.com/TrackingSoft/Kafka
   repository: git://github.com/TrackingSoft/Kafka.git
 test_requires:

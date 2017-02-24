@@ -467,6 +467,8 @@ L<https://github.com/TrackingSoft/Kafka>
 
 Sergey Gladkov, E<lt>sgladkov@trackingsoft.comE<gt>
 
+Please use GitHub project link above to report problems or contact authors.
+
 =head1 CONTRIBUTORS
 
 Alexander Solovey

@@ -140,6 +140,10 @@
    "release_status" : "stable",
    "version" : "1.001013",
    "resources" : {
+      "bugtracker" : {
+         "web" : "https://github.com/TrackingSoft/Kafka/issues"
+      },
+      "homepage" : "https://github.com/TrackingSoft/Kafka",
       "repository" : {
          "type" : "git",
          "url" : "git://github.com/TrackingSoft/Kafka.git",

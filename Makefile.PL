@@ -130,6 +130,10 @@ my %config = (
         },
         'meta-spec'             => { version => 2 },
         resources               => {
+            bugtracker              => {
+               web                      => 'https://github.com/TrackingSoft/Kafka/issues',
+            },
+            homepage                => 'https://github.com/TrackingSoft/Kafka',
             repository              => {
                 type                    => 'git',
                 url                     => 'git://github.com/TrackingSoft/Kafka.git',
