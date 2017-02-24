@@ -1,11 +1,16 @@
 Revision history for Kafka package
 
+1.001013 Fri Feb  24 2017
     CHANGES:
-    - Kafka::IO system call processing improved.
-    - Kafka::IO error diagnostic extended.
-    - $RECEIVE_MAX_RETRIES, $SEND_MAX_RETRIES removed
-    - $Kafka::RECEIVE_MAX_ATTEMPTS not used now.
-    - Kafka::Connection->is_server_alive, Kafka::IO->is_alive are private now.
+    - Removed support for custom CorrelationID in constructor arguments.
+    - Use seconds for Consumer.MaxWaitTime to make it similar to Producer.Timeout.
+    - Removed deprecated constants $RECEIVE_MAX_ATTEMPTS, $RECEIVE_MAX_RETRIES, $SEND_MAX_RETRIES.
+    - Replaced Kafka::Connection->is_server_alive, Kafka::IO->is_alive with private methods (to be
+      used for internal tests only).
+
+    BUGFIXES:
+    - Fixed incorrect timeout values in requests.
+    - Improved socket handling in Kafka::IO.
 
 1.001012 Thu Nov  17 2016
     BUGFIXES:

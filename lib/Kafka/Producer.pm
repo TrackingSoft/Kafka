@@ -6,7 +6,7 @@ Kafka::Producer - Perl interface for Kafka producer client.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Producer> version 1.001012 .
+This documentation refers to C<Kafka::Producer> version 1.001013 .
 
 =cut
 
@@ -18,7 +18,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '1.001012';
+our $VERSION = '1.001013';
 
 #-- load the modules -----------------------------------------------------------
 

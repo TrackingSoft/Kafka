@@ -48,6 +48,8 @@ use List::Util qw(
     shuffle
 );
 use POSIX ':sys_wait_h';
+use Time::HiRes ();
+use Try::Tiny;
 
 use Kafka qw(
     $BLOCK_UNTIL_IS_COMMITTED
@@ -200,16 +202,20 @@ sub fetching {
     my $start_offset        = int( rand( $next_offset - $msgs_to_receive ) );
     my $bytes_to_receive    = $msgs_to_receive * ( $MSG_LEN + $MESSAGE_SIZE_OVERHEAD );
 
-    eval {
+    Time::HiRes::sleep( 1.5 );
+    my $error;
+    try {
         $consumer->fetch(
             $TOPIC,
             $partition,
             $start_offset,
             $bytes_to_receive,  # Maximum size of MESSAGE(s) to receive
         );
+    } catch {
+        $error = $_;
     };
-    if ( $@ ) {
-        fail "'fetch' FATAL error: $@";
+    if ( $error ) {
+        fail "'fetch' FATAL error: $error";
         return;
     } else {
         return $msgs_to_receive;
