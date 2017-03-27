@@ -1,0 +1,14 @@
+language: perl
+
+perl:
+    - "5.22"
+    - "5.16"
+
+env:
+    - RELEASE_TESTS=1
+    - KAFKA_BASE_DIR=$TRAVIS_BUILD_DIR/kafka
+
+before_install:
+    - wget http://mirrors.ibiblio.org/apache/kafka/0.10.2.0/kafka_2.12-0.10.2.0.tgz -O kafka.tgz
+    - mkdir -p kafka && tar xzf kafka.tgz -C kafka --strip-components 1
+
