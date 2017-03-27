@@ -1389,7 +1389,7 @@ __END__
     try {
 
         #-- Connection
-        $connection = Kafka::IO->new( host => 'localhost' );
+        $connection = Kafka::Connection->new( host => 'localhost' );
 
         #-- Producer
         $producer = Kafka::Producer->new( Connection => $connection );
