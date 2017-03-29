@@ -7,3 +7,5 @@
 /Kafka-*.tar.gz
 /CPANTS_Analyse.t
 /MYMETA.*
+/vendor
+/kafka

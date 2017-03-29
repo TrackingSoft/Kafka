@@ -34,15 +34,6 @@ plan 'no_plan';
 
 #use Data::Dumper;
 
-use IO::Compress::Gzip qw(
-    gzip
-    $GzipError
-);
-use IO::Uncompress::Gunzip qw(
-    gunzip
-    $GunzipError
-);
-
 use Kafka qw(
     $COMPRESSION_GZIP
     $COMPRESSION_NONE
