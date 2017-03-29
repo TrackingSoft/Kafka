@@ -37,9 +37,8 @@ Kafka:
    Data::Validate::IP
    Exception::Class
    Exporter
-   IO::Compress::Gzip
+   Gzip::Faster
    IO::Select
-   IO::Uncompress::Gunzip
    List::Util
    Params::Util
    Scalar::Util

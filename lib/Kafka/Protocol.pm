@@ -51,14 +51,7 @@ our @EXPORT_OK = qw(
 
 use Compress::Snappy;
 use Const::Fast;
-use IO::Compress::Gzip qw(
-    gzip
-    $GzipError
-);
-use IO::Uncompress::Gunzip qw(
-    gunzip
-    $GunzipError
-);
+use Gzip::Faster qw( gzip gunzip );
 use Params::Util qw(
     _ARRAY
     _HASH
@@ -69,6 +62,7 @@ use Scalar::Util qw(
     dualvar
 );
 use String::CRC32;
+use Try::Tiny;
 
 use Kafka qw(
     $BITS64
@@ -1175,8 +1169,11 @@ sub _decode_MessageSet_array {
         if ( my $compression_codec = $Message->{Attributes} & $COMPRESSION_CODEC_MASK ) {
             my $decompressed;
             if ( $compression_codec == $COMPRESSION_GZIP ) {
-                gunzip( \$Message->{Value} => \$decompressed )
-                    or _error( $ERROR_COMPRESSION, format_message( 'gunzip failed: %s', $GunzipError ) );
+                try {
+                    $decompressed = gunzip( $Message->{Value} );
+                } catch {
+                    _error( $ERROR_COMPRESSION, format_message( 'gunzip failed: %s', $_ ) );
+                };
             } elsif ( $compression_codec == $COMPRESSION_SNAPPY ) {
                 my ( $header, $x_version, $x_compatversion, undef ) = unpack( q{a[8]L>L>L>}, $Message->{Value} );   # undef - $x_length
 
@@ -1196,6 +1193,7 @@ sub _decode_MessageSet_array {
             } else {
                 _error( $ERROR_COMPRESSION, "Unknown compression codec $compression_codec" );
             }
+            _error( $ERROR_COMPRESSION, 'Decompression produced empty result' ) unless defined $decompressed;
             my @data;
             my $Value_length = length $decompressed;
             my $resp = {
@@ -1269,9 +1267,8 @@ sub _encode_MessageSet_array {
 
         # Compression
         if ( $compression_codec == $COMPRESSION_GZIP ) {
-            $MessageSet_array_ref->[0]->{Value} = q{};
-            gzip( \$message_set => \$MessageSet_array_ref->[0]->{Value} )
-                or _error( $ERROR_COMPRESSION, "gzip failed: $GzipError" );
+            $MessageSet_array_ref->[0]->{Value} = gzip( $message_set )
+                // _error( $ERROR_COMPRESSION, 'Unable to compress gzip data' );
         } elsif ( $compression_codec == $COMPRESSION_SNAPPY ) {
             $MessageSet_array_ref->[0]->{Value} = Compress::Snappy::compress( $message_set )
                 // _error( $ERROR_COMPRESSION, 'Unable to compress snappy data' );
