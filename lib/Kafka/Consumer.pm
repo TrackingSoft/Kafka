@@ -338,7 +338,7 @@ can be imported from L<Kafka|Kafka> module.
 
 =cut
 sub fetch {
-    my ( $self, $topic, $partition, $start_offset, $max_size, $_return_all ) = @_;
+    my ( $self, $topic, $partition, $start_offset, $max_size, $_return_all, $api_version ) = @_;
     # Special argument: $_return_all - return redundant messages sent out of a compressed package posts
 
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'topic' )
@@ -352,6 +352,7 @@ sub fetch {
 
     my $request = {
         ApiKey                              => $APIKEY_FETCH,
+        ApiVersion                          => $api_version,
         CorrelationId                       => _get_CorrelationId(),
         ClientId                            => $self->{ClientId},
         MaxWaitTime                         => int( $self->{MaxWaitTime} * 1000 ),

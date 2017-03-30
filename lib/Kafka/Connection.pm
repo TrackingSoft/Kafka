@@ -87,6 +87,7 @@ use Kafka qw(
     $ERROR_NOT_ENOUGH_REPLICAS
     $ERROR_NOT_ENOUGH_REPLICAS_AFTER_APPEND
     $ERROR_REBALANCE_IN_PROGRESS
+    $ERROR_UNSUPPORTED_VERSION
 
     $ERROR_CANNOT_BIND
     $ERROR_CANNOT_GET_METADATA
@@ -110,12 +111,14 @@ use Kafka qw(
     $RETRY_BACKOFF
     $SEND_MAX_ATTEMPTS
 );
+
 use Kafka::Exceptions;
 use Kafka::Internals qw(
     $APIKEY_FETCH
     $APIKEY_METADATA
     $APIKEY_OFFSET
     $APIKEY_PRODUCE
+    $APIKEY_APIVERSIONS
     $MAX_CORRELATIONID
     $MAX_INT32
     debug_level
@@ -125,14 +128,17 @@ use Kafka::Internals qw(
 use Kafka::IO;
 use Kafka::Protocol qw(
     $BAD_OFFSET
+    $IMPLEMENTED_APIVERSIONS
     decode_fetch_response
     decode_metadata_response
     decode_offset_response
     decode_produce_response
+    decode_api_versions_response
     encode_fetch_request
     encode_metadata_request
     encode_offset_request
     encode_produce_request
+    encode_api_versions_request
 );
 
 #-- declarations ---------------------------------------------------------------
@@ -208,6 +214,10 @@ my %protocol = (
     "$APIKEY_METADATA"  => {
         decode                  => \&decode_metadata_response,
         encode                  => \&encode_metadata_request,
+    },
+    "$APIKEY_APIVERSIONS"  => {
+        decode                  => \&decode_api_versions_response,
+        encode                  => \&encode_api_versions_request,
     },
 );
 
@@ -385,6 +395,13 @@ Optional, default value is 100.
 Defines maximum number of last non-fatal errors that we keep in log. Use method L</nonfatal_errors> to
 access those errors.
 
+=item C<dont_load_supported_api_versions =E<gt> $boolean>
+
+Optional, default value is 0 (false).
+
+If set to false, upon instantiation, C<load_supported_api_versions()> will be
+called. If set to true, C<load_supported_api_versions()> will not be called.
+
 =back
 
 =cut
@@ -401,6 +418,8 @@ sub new {
         RETRY_BACKOFF           => $RETRY_BACKOFF,
         AutoCreateTopicsEnable  => 0,
         MaxLoggedErrors         => 100,
+        dont_load_supported_api_versions => 0,
+        _api_versions           => {},
     }, $class;
 
     while ( @args ) {
@@ -474,6 +493,9 @@ sub new {
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'server is not specified' )
         unless keys( %$IO_cache );
 
+    $self->{dont_load_supported_api_versions}
+      or $self->load_supported_api_versions();
+
     return $self;
 }
 
@@ -496,6 +518,100 @@ sub get_known_servers {
     my ( $self ) = @_;
 
     return keys %{ $self->{_IO_cache} };
+}
+
+=head3 C<load_supported_api_versions>
+
+Query the Kafka servers to find out what are the supported API versions per
+endpoints, and finds out the best version numbers to use for each of them. This
+is automatically called when calling C<new()>, unless the attribute
+C<dont_load_supported_api_versions> is set to true
+
+=cut
+
+sub load_supported_api_versions {
+    my ( $self ) = @_;
+    try {
+        my $api_versions = $self->_get_supported_api_versions();
+        foreach my $element (@$api_versions) {
+            # we want to choose which api version to use for each API call. We
+            # try to use the max version that the server supports, with
+            # fallback to the max version the protocol implements. If it's
+            # lower than the min version the kafka server supports, we set it
+            # to -1. If thie API endpoint is called, it'll die.
+            my $kafka_min_version = $element->{MinVersion};
+            my $kafka_max_version = $element->{MaxVersion};
+            my $api_key = $element->{ApiKey};
+            my $implemented_max_version = $IMPLEMENTED_APIVERSIONS->{$api_key} // -1;
+            my $version = $kafka_max_version;
+            $version > $implemented_max_version
+              and $version = $implemented_max_version;
+            $version < $kafka_min_version
+              and $version = -1;
+            $self->{_api_versions}{$api_key} = $version;
+        }
+
+    };
+    return;
+}
+
+
+# Returns the list of supported API versions. This is not really. *Warning*,
+# this call works only against Kafka 1.10.0.0
+
+sub _get_supported_api_versions {
+    my ( $self ) = @_;
+
+    my $CorrelationId = _get_CorrelationId();
+    my $decoded_request = {
+        CorrelationId   => $CorrelationId,
+        ClientId        => q{},
+        ApiVersion => 0,
+    };
+    say STDERR format_message( '[%s] apiversions request: %s',
+            scalar( localtime ),
+            $decoded_request,
+        ) if $self->debug_level;
+    my $encoded_request = $protocol{ $APIKEY_APIVERSIONS }->{encode}->( $decoded_request );
+
+    my $encoded_response_ref;
+    my @brokers = $self->_get_interviewed_servers;
+
+    # receive metadata
+    say "brokers : " . Dumper(\@brokers); use Data::Dumper;
+    foreach my $broker ( @brokers ) {
+        $self->_connectIO( $broker )
+          or next;
+        my $sent = $self->_sendIO( $broker, $encoded_request )
+          or next;
+        say HexDump($encoded_request); use Data::HexDump;
+        $encoded_response_ref = $self->_receiveIO( $broker )
+          or next;
+        last;
+    }
+
+    unless ( $encoded_response_ref ) {
+        # NOTE: it is possible to repeat the operation here
+        $self->_error( $ERROR_CANNOT_RECV );
+    }
+
+    my $decoded_response = $protocol{ $APIKEY_APIVERSIONS }->{decode}->( $encoded_response_ref );
+    say STDERR format_message( '[%s] metadata response: %s',
+            scalar( localtime ),
+            $decoded_response,
+        ) if $self->debug_level;
+    ( defined( $decoded_response->{CorrelationId} ) && $decoded_response->{CorrelationId} == $CorrelationId )
+        # FATAL error
+        or $self->_error( $ERROR_MISMATCH_CORRELATIONID );
+    my $ErrorCode = $decoded_response->{ErrorCode};
+
+    # we asked a Kafka < 0.10 ( in this case the call is not
+    # implemented and it dies
+    $ErrorCode == $ERROR_NO_ERROR
+      or $self->_error($ErrorCode);
+
+    my $api_versions = $decoded_response->{ApiVersions};
+    return $api_versions;
 }
 
 =head3 C<get_metadata( $topic )>
@@ -657,6 +773,7 @@ sub receive_response_to_request {
     my $topic_data  = $request->{topics}->[0];
     my $topic_name  = $topic_data->{TopicName};
     my $partition   = $topic_data->{partitions}->[0]->{Partition};
+    my $api_version = $request->{ApiVersion};
 
     if (
            !%{ $self->{_metadata} }         # the first request
@@ -757,7 +874,7 @@ sub receive_response_to_request {
                 }
             }
             if ( length( $$encoded_response_ref ) > 4 ) {   # MessageSize => int32
-                $response = $protocol{ $api_key }->{decode}->( $encoded_response_ref );
+                $response = $protocol{ $api_key }->{decode}->( $encoded_response_ref, $api_version );
                 say STDERR format_message( '[%s] response: %s',
                         scalar( localtime ),
                         $response,
