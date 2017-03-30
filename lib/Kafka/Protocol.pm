@@ -32,6 +32,8 @@ our @EXPORT_OK = qw(
     encode_metadata_request
     encode_offset_request
     encode_produce_request
+    encode_api_versions_request
+    decode_api_versions_response
     _decode_MessageSet_template
     _decode_MessageSet_array
     _encode_MessageSet_array
@@ -39,7 +41,8 @@ our @EXPORT_OK = qw(
     _pack64
     _unpack64
     _verify_string
-    $APIVERSION
+    $DEFAULT_APIVERSION
+    $IMPLEMENTED_APIVERSIONS
     $BAD_OFFSET
     $COMPRESSION_CODEC_MASK
     $CONSUMERS_REPLICAID
@@ -93,6 +96,7 @@ use Kafka::Internals qw(
     $APIKEY_METADATA
     $APIKEY_OFFSET
     $APIKEY_PRODUCE
+    $APIKEY_APIVERSIONS
     $PRODUCER_ANY_OFFSET
     format_message
 );
@@ -346,13 +350,21 @@ The following constants are available for export
 
 =cut
 
-=head3 C<$APIVERSION>
+=head3 C<$DEFAULT_APIVERSION>
 
-According to Apache Kafka documentation: 'This is a numeric version number for this api.
-Currently the supported version for all APIs is 0 .'
+The default API version that will be used as fallback, if it's not possible to
+detect what the Kafka server supports. Only Kafka servers > 0.10.0.0 can be
+queried to get which API version they implements. On Kafka servers 0.8.x and
+0.9.x, the protocol will default to use $DEFAULT_APIVERSION. Currently its
+value is '0'
 
 =cut
-const our $APIVERSION                   => 0;
+
+const our $DEFAULT_APIVERSION                   => 0;
+
+# HashRef, keys are APIKEYs, values are the api version that this protocol
+# implements. If not populated, the connection will use the $DEFAULT_APIVERSION
+our $IMPLEMENTED_APIVERSIONS = {};
 
 # Attributes
 
@@ -462,6 +474,83 @@ The following functions are available for C<Kafka::MockProtocol> module.
 
 =cut
 
+=head3 C<encode_api_versions_request( $ApiVersions_Request )>
+
+Encodes the argument and returns a reference to the encoded binary string
+representing a Request buffer.
+
+This function take arguments. The following argument is currently recognized:
+
+=over 3
+
+=item C<$ApiVersions_Request>
+
+C<$ApiVersions_Request> is a reference to the hash representing the structure
+of the APIVERSIONS Request. it contains CorrelationId, ClientId (can be empty
+string), and ApiVersion (must be 0)
+
+=back
+
+=cut
+
+$IMPLEMENTED_APIVERSIONS->{$APIKEY_APIVERSIONS} = 0;
+sub encode_api_versions_request {
+    my ( $ApiVersions_Request ) = @_;
+
+    my @data;
+    my $request = {
+                                                # template    => '...',
+                                                # len         => ...,
+        data        => \@data,
+    };
+
+    _encode_request_header( $request, $APIKEY_APIVERSIONS, $ApiVersions_Request );
+                                                                            # Size
+                                                                            # ApiKey
+                                                                            # ApiVersion
+                                                                            # CorrelationId
+                                                                            # ClientId
+
+    return pack( $request->{template}, $request->{len}, @data );
+}
+
+my $_decode_api_version_response_template = q{x[l]l>s>l>X[l]l>/(s>s>s>)};
+                                           # x[l]    # Size (skip)
+                                           # l>      # CorrelationId
+                                           # s>      # ErrorCode
+                                           # l>      # ApiVersions array size
+                                           # X[l]
+                                           # l>/(    # ApiVersions array
+                                           #     s>     # ApiKey
+                                           #     s>     # MinVersion
+                                           #     s>     # MaxVersion
+                                           # )
+
+sub decode_api_versions_response {
+    my ( $bin_stream_ref ) = @_;
+
+    my @data = unpack( $_decode_api_version_response_template, $$bin_stream_ref );
+
+    my $i = 0;
+    my $ApiVersions_Response = {};
+
+    $ApiVersions_Response->{CorrelationId}                        =  $data[ $i++ ];   # CorrelationId
+    $ApiVersions_Response->{ErrorCode}                            =  $data[ $i++ ];   # ErrorCode
+
+    my $ApiVersions_array = $ApiVersions_Response->{ApiVersions}  =  [];
+    my $ApiVersions_array_size                                    =  $data[ $i++ ];   # ApiVersions array size
+    while ( $ApiVersions_array_size-- ) {
+        push( @$ApiVersions_array, {
+            ApiKey                                                => $data[ $i++ ],   # ApiKey
+            MinVersion                                            => $data[ $i++ ],   # MinVersion
+            MaxVersion                                            => $data[ $i++ ],   # MaxVersion
+            }
+        );
+    }
+
+    return $ApiVersions_Response;
+}
+
 # PRODUCE Request --------------------------------------------------------------
 
 =head3 C<encode_produce_request( $Produce_Request, $compression_codec )>
@@ -469,7 +558,7 @@ The following functions are available for C<Kafka::MockProtocol> module.
 Encodes the argument and returns a reference to the encoded binary string
 representing a Request buffer.
 
-This function take argument. The following argument is currently recognized:
+This function take arguments. The following arguments are currently recognized:
 
 =over 3
 
@@ -493,6 +582,8 @@ L<$COMPRESSION_SNAPPY|Kafka/$COMPRESSION_SNAPPY>.
 =back
 
 =cut
+
+$IMPLEMENTED_APIVERSIONS->{$APIKEY_PRODUCE} = 0;
 sub encode_produce_request {
     my ( $Produce_Request, $compression_codec ) = @_;
 
@@ -631,6 +722,8 @@ the structure of the FETCH Request (examples see C<t/*_decode_encode.t>).
 =back
 
 =cut
+
+$IMPLEMENTED_APIVERSIONS->{$APIKEY_FETCH} = 0;
 sub encode_fetch_request {
     my ( $Fetch_Request ) = @_;
 
@@ -701,7 +794,7 @@ must be a non-empty binary string.
 
 =cut
 sub decode_fetch_response {
-    my ( $bin_stream_ref ) = @_;
+    my ( $bin_stream_ref, $api_version ) = @_;
 
 # According to Apache Kafka documentation:
 # As an optimization the server is allowed to return a partial message at the end of the message set.
@@ -716,7 +809,7 @@ sub decode_fetch_response {
         bin_stream  => $bin_stream_ref,
     };
 
-    _decode_fetch_response_template( $response );
+    _decode_fetch_response_template( $response, $api_version );
     @data = unpack( $response->{template}, $$bin_stream_ref );
 
     my $i = 0;
@@ -774,6 +867,7 @@ the structure of the OFFSET Request (examples see C<t/*_decode_encode.t>).
 =back
 
 =cut
+$IMPLEMENTED_APIVERSIONS->{$APIKEY_OFFSET} = 0;
 sub encode_offset_request {
     my ( $Offset_Request ) = @_;
 
@@ -924,6 +1018,7 @@ the structure of the METADATA Request (examples see C<t/*_decode_encode.t>).
 =back
 
 =cut
+$IMPLEMENTED_APIVERSIONS->{$APIKEY_METADATA} = 0;
 sub encode_metadata_request {
     my ( $Metadata_Request ) = @_;
 
@@ -1078,10 +1173,17 @@ sub decode_metadata_response {
 sub _encode_request_header {
     my ( $request, $api_key, $request_ref ) = @_;
 
+    # we need to find out which API version to use for ther equest (and the
+    # response). $request_ref->{ApiVersion} can be specified by the end user,
+    # or providede by by Kafka::Connection ( see
+    # Kafka::Connection::load_supported_api_versions() ). If not provided, we
+    # default to $DEFAULT_APIVERSION
+    my $api_version = $request_ref->{ApiVersion} // $DEFAULT_APIVERSION;
+
     @{ $request->{data} } = (
                                                                             # Size
         $api_key,                                                           # ApiKey
-        $APIVERSION,                                                        # ApiVersion
+        $api_version,                                                       # ApiVersion
         $request_ref->{CorrelationId},                                      # CorrelationId
     );
     $request->{template}    = $_Request_header_template;
@@ -1093,7 +1195,7 @@ sub _encode_request_header {
 
 # Generates a template to decrypt the fetch response body
 sub _decode_fetch_response_template {
-    my ( $response ) = @_;
+    my ( $response, $api_version ) = @_;
 
     $response->{template}       = $_FetchResponse_header_template;
     $response->{stream_offset}  = $_FetchResponse_header_length;    # bytes before topics array size
