@@ -5,12 +5,13 @@ perl:
     - "5.16"
 
 env:
-    - RELEASE_TESTS=1
-    - KAFKA_BASE_DIR=$TRAVIS_BUILD_DIR/kafka
+    global:
+        - RELEASE_TESTS=1
+        - KAFKA_BASE_DIR="${TRAVIS_BUILD_DIR}/kafka"
 
 cache:
     directories:
-    - vendor
+        - vendor
 
 before_install:
     - ./install_kafka.sh
