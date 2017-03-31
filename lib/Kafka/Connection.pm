@@ -578,13 +578,11 @@ sub _get_supported_api_versions {
     my @brokers = $self->_get_interviewed_servers;
 
     # receive metadata
-    say "brokers : " . Dumper(\@brokers); use Data::Dumper;
     foreach my $broker ( @brokers ) {
         $self->_connectIO( $broker )
           or next;
         my $sent = $self->_sendIO( $broker, $encoded_request )
           or next;
-        say HexDump($encoded_request); use Data::HexDump;
         $encoded_response_ref = $self->_receiveIO( $broker )
           or next;
         last;
