@@ -280,7 +280,7 @@ BEGIN {
 
 BEGIN {
     $constants_Kafka_Protocol = [ qw(
-        $APIVERSION
+        $DEFAULT_APIVERSION
         $BAD_OFFSET
         $COMPRESSION_CODEC_MASK
         $CONSUMERS_REPLICAID
