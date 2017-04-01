@@ -4,6 +4,14 @@ perl:
     - "5.22"
     - "5.16"
 
+jdk:
+    - oraclejdk8
+
+addons:
+    apt:
+        packages:
+            - oracle-java8-installer
+
 env:
     global:
         - RELEASE_TESTS=1
