@@ -26,6 +26,7 @@ our $VERSION = '1.001013';
 
 our @_standard_fields = qw(
     Attributes
+    Timestamp
     error
     HighwaterMarkOffset
     key

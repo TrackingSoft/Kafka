@@ -771,7 +771,11 @@ sub receive_response_to_request {
     my $topic_data  = $request->{topics}->[0];
     my $topic_name  = $topic_data->{TopicName};
     my $partition   = $topic_data->{partitions}->[0]->{Partition};
-    my $api_version = $request->{ApiVersion};
+    # If the api version was not specified in the request, try to use the one
+    # we detected from the Kafka server and that our protocol implements.
+    # $self->{_api_versions}{$api_key} might be undef if detection against the
+    # Kafka server was not done
+    $request->{ApiVersion} //= $self->{_api_versions}{$api_key};
 
     if (
            !%{ $self->{_metadata} }         # the first request
@@ -872,7 +876,9 @@ sub receive_response_to_request {
                 }
             }
             if ( length( $$encoded_response_ref ) > 4 ) {   # MessageSize => int32
-                $response = $protocol{ $api_key }->{decode}->( $encoded_response_ref, $api_version );
+                # we also pass the api version that was used for the request,
+                # so that we know how to decode the response
+                $response = $protocol{ $api_key }->{decode}->( $encoded_response_ref, $request->{ApiVersion} );
                 say STDERR format_message( '[%s] response: %s',
                         scalar( localtime ),
                         $response,
