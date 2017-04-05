@@ -394,14 +394,28 @@ sub fetch {
                 # skip previous messages of a compressed package posts
                 next if $offset < $start_offset && !$_return_all;
 
+                my $message_error = q{};
                 # According to Apache Kafka documentation:
-                # This byte holds metadata attributes about the message.
-                # The lowest 2 bits contain the compression codec used for the message.
-                # The other bits should be set to 0.
-                my $message_error = $Message->{Attributes} >> 2 ? $ERROR{ $ERROR_METADATA_ATTRIBUTES } : q{};
+                # This byte holds metadata attributes about the message. The
+                # lowest 3 bits contain the compression codec used for the
+                # message. The fourth lowest bit represents the timestamp type.
+                # 0 stands for CreateTime and 1 stands for LogAppendTime. The
+                # producer should always set this bit to 0. (since 0.10.0).
+                # All other bits should be set to 0.
+                my $attributes = $Message->{Attributes};
+                # check that attributes is valid
+                $attributes & 0b11110000
+                  and $message_error = $ERROR{ $ERROR_METADATA_ATTRIBUTES };
+
+                if (my $compression_codec = $attributes & 0b00000111) {
+                     $compression_codec == 1 # GZIP
+                  || $compression_codec == 2 # Snappy
+                       or $message_error = $ERROR{ $ERROR_METADATA_ATTRIBUTES };
+                }
 
                 push( @$messages, Kafka::Message->new( {
                         Attributes          => $Message->{Attributes},
+                        Timestamp           => $Message->{Timestamp},
                         MagicByte           => $Message->{MagicByte},
                         key                 => $Message->{Key},
                         payload             => $Message->{Value},

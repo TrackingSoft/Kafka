@@ -422,6 +422,15 @@ my ( $_FetchRequest_header_template,        $_FetchRequest_header_length ) = (
                             # 4 topics array size
     16
 );
+my ( $_FetchRequest_header_template_v3,     $_FetchRequest_header_length_v3 ) = (
+    q{l>l>l>l>l>},
+                            # 4 ReplicaId
+                            # 4 MaxWaitTime
+                            # 4 MinBytes
+                            # 4 MaxBytes
+                            # 4 topics array size
+    20
+);
 my ( $_FetchRequest_body_template,          $_FetchRequest_body_length ) = (
     q{l>a[8]l>},            # 4 Partition
                             # 8 FetchOffset
@@ -445,6 +454,13 @@ my ( $_FetchResponse_header_template,       $_FetchResponse_header_length ) = (
                             # 4 topics array size
     8
 );
+my ( $_FetchResponse_header_template_v1,       $_FetchResponse_header_length_v1 ) = (
+    q{x[l]l>l>l>},          # Size (skip)
+                            # 4 CorrelationId
+                            # 4 throttle_time_ms
+                            # 4 topics array size
+    12
+);
 my ( $_Message_template,                    $_Message_length ) = (
     qq(${_int64_template}l>l>ccl>),
                             # 8 Offset
@@ -455,6 +471,18 @@ my ( $_Message_template,                    $_Message_length ) = (
                             # Key length
     8                       # Only Offset length
 );
+my ( $_Message_template_v1,                    $_Message_length_v1 ) = (
+    qq(${_int64_template}l>l>cc${_int64_template}l>),
+                            # 8 Offset
+                            # MessageSize
+                            # Crc
+                            # MagicByte
+                            # Attributes
+                            # Timestamp
+                            # Key length
+    8                       # Only Offset length
+);
+
 my ( $_FetchResponse_topic_body_template,   $_FetchResponse_topic_body_length )= (
     qq(s>/al>l>s>${_int64_template}),
                             # TopicName
@@ -583,7 +611,7 @@ L<$COMPRESSION_SNAPPY|Kafka/$COMPRESSION_SNAPPY>.
 
 =cut
 
-$IMPLEMENTED_APIVERSIONS->{$APIKEY_PRODUCE} = 0;
+$IMPLEMENTED_APIVERSIONS->{$APIKEY_PRODUCE} = 2;
 sub encode_produce_request {
     my ( $Produce_Request, $compression_codec ) = @_;
 
@@ -651,6 +679,45 @@ my $_decode_produce_response_template = qq{x[l]l>l>X[l]l>/(s>/al>X[l]l>/(l>s>${_
                                         #     )
                                         # )
 
+my $_decode_produce_response_template_v1 = qq{x[l]l>l>X[l]l>/(s>/al>X[l]l>/(l>s>${_int64_template}))l>};
+                                        # x[l]                    # Size (skip)
+                                        # l>                      # CorrelationId
+
+                                        # l>                      # topics array size
+                                        # X[l]
+                                        # l>/(                    # topics array
+                                        #     s>/a                    # TopicName
+
+                                        #     l>                      # partitions array size
+                                        #     X[l]
+                                        #     l>/(                    # partitions array
+                                        #         l>                      # Partition
+                                        #         s>                      # ErrorCode
+                                        #         $_int64_template        # Offset
+                                        #     )
+                                        # )
+                                        # l>                      # Throttle_Time_Ms
+
+my $_decode_produce_response_template_v2 = qq{x[l]l>l>X[l]l>/(s>/al>X[l]l>/(l>s>${_int64_template}${_int64_template}))l>};
+                                        # x[l]                    # Size (skip)
+                                        # l>                      # CorrelationId
+
+                                        # l>                      # topics array size
+                                        # X[l]
+                                        # l>/(                    # topics array
+                                        #     s>/a                    # TopicName
+
+                                        #     l>                      # partitions array size
+                                        #     X[l]
+                                        #     l>/(                    # partitions array
+                                        #         l>                      # Partition
+                                        #         s>                      # ErrorCode
+                                        #         $_int64_template        # Offset
+                                        #         $_int64_template        # Log_Append_Time
+                                        #     )
+                                        # )
+                                        # l>                      # Throttle_Time_Ms
+
 =head3 C<decode_produce_response( $bin_stream_ref )>
 
 Decodes the argument and returns a reference to the hash representing
@@ -669,9 +736,15 @@ must be a non-empty binary string.
 
 =cut
 sub decode_produce_response {
-    my ( $bin_stream_ref ) = @_;
+    my ( $bin_stream_ref, $api_version ) = @_;
 
-    my @data = unpack( $_decode_produce_response_template, $$bin_stream_ref );
+    $api_version //= $DEFAULT_APIVERSION;
+    my $is_v1 = $api_version == 1;
+    my $is_v2 = $api_version == 2;
+
+    my @data = unpack(   $is_v1 ? $_decode_produce_response_template_v1
+                       : $is_v2 ? $_decode_produce_response_template_v2
+                       :          $_decode_produce_response_template, $$bin_stream_ref );
 
     my $i = 0;
     my $Produce_Response = {};
@@ -689,9 +762,10 @@ sub decode_produce_response {
         my $partitions_array_size                   =  $data[ $i++ ];   # partitions array size
         while ( $partitions_array_size-- ) {
             my $partition = {
-                Partition                           => $data[ $i++ ],   # Partition
-                ErrorCode                           => $data[ $i++ ],   # ErrorCode
-                Offset                   => _unpack64( $data[ $i++ ] ), # Offset
+                Partition                           => $data[ $i++ ],          # Partition
+                ErrorCode                           => $data[ $i++ ],          # ErrorCode
+                Offset                   => _unpack64( $data[ $i++ ] ),        # Offset
+     ( $is_v2 ? (Log_Append_Time         => _unpack64( $data[ $i++ ] )) : () ), # Log_Append_Time
             };
 
             push( @$partitions_array, $partition );
@@ -699,6 +773,7 @@ sub decode_produce_response {
 
         push( @$topics_array, $topic );
     }
+    $Produce_Response->{Throttle_Time_Ms} = $data[ $i++ ];
 
     return $Produce_Response;
 }
@@ -723,7 +798,8 @@ the structure of the FETCH Request (examples see C<t/*_decode_encode.t>).
 
 =cut
 
-$IMPLEMENTED_APIVERSIONS->{$APIKEY_FETCH} = 0;
+# version 0, 1, 2 have the same request protocol.
+$IMPLEMENTED_APIVERSIONS->{$APIKEY_FETCH} = 3;
 sub encode_fetch_request {
     my ( $Fetch_Request ) = @_;
 
@@ -733,7 +809,8 @@ sub encode_fetch_request {
                                                 # len         => ...,
         data        => \@data,
     };
-
+    my $api_version = $Fetch_Request->{ApiVersion} // $DEFAULT_APIVERSION;
+    my $is_v3 = $api_version == 3;
     _encode_request_header( $request, $APIKEY_FETCH, $Fetch_Request );
                                                                             # Size
                                                                             # ApiKey
@@ -746,10 +823,16 @@ sub encode_fetch_request {
     push( @data,
         $Fetch_Request->{MaxWaitTime},                                      # MaxWaitTime
         $Fetch_Request->{MinBytes},                                         # MinBytes
+        ( $is_v3 ? $Fetch_Request->{MinBytes} : () ),                       # MinBytes (version 3 only)
         scalar( @$topics_array ),                                           # topics array size
     );
-    $request->{template}    .= $_FetchRequest_header_template;
-    $request->{len}         += $_FetchRequest_header_length;
+    if ($is_v3) {
+        $request->{template}    .= $_FetchRequest_header_template_v3;
+        $request->{len}         += $_FetchRequest_header_length_v3;
+    } else {
+        $request->{template}    .= $_FetchRequest_header_template;
+        $request->{len}         += $_FetchRequest_header_length;
+    }
 
     foreach my $topic ( @$topics_array ) {
         $request->{template}    .= q{s>};                                   # string length
@@ -796,6 +879,11 @@ must be a non-empty binary string.
 sub decode_fetch_response {
     my ( $bin_stream_ref, $api_version ) = @_;
 
+    $api_version //= $DEFAULT_APIVERSION;
+    my $is_v1 = $api_version == 1;
+    my $is_v2 = $api_version == 2;
+    my $is_v3 = $api_version == 3;
+
 # According to Apache Kafka documentation:
 # As an optimization the server is allowed to return a partial message at the end of the message set.
 # Clients should handle this case.
@@ -816,6 +904,9 @@ sub decode_fetch_response {
     my $Fetch_Response = {};
 
     $Fetch_Response->{CorrelationId}                        =  $data[ $i++ ];   # CorrelationId
+    if ($is_v1 || $is_v2 || $is_v3) {
+        $Fetch_Response->{ThrottleTimeMs}                   =  $data[ $i++ ];   # ( ThrottleTimeMs ) only v1 and above
+    }
 
     my $topics_array = $Fetch_Response->{topics}            =  [];
     my $topics_array_size                                   =  $data[ $i++ ];   # topics array size
@@ -837,7 +928,7 @@ sub decode_fetch_response {
             $MessageSetSize                                 =  $data[ $i++ ];   # MessageSetSize
             $MessageSet_array = $partition->{MessageSet}    =  [];
 
-            _decode_MessageSet_array( $response, $MessageSetSize, \$i, $MessageSet_array );
+            _decode_MessageSet_array( $response, $MessageSetSize, \$i, $MessageSet_array, $api_version );
 
             push( @$partitions_array, $partition );
         }
@@ -1173,13 +1264,12 @@ sub decode_metadata_response {
 sub _encode_request_header {
     my ( $request, $api_key, $request_ref ) = @_;
 
-    # we need to find out which API version to use for ther equest (and the
+    # we need to find out which API version to use for the request (and the
     # response). $request_ref->{ApiVersion} can be specified by the end user,
     # or providede by by Kafka::Connection ( see
     # Kafka::Connection::load_supported_api_versions() ). If not provided, we
     # default to $DEFAULT_APIVERSION
     my $api_version = $request_ref->{ApiVersion} // $DEFAULT_APIVERSION;
-
     @{ $request->{data} } = (
                                                                             # Size
         $api_key,                                                           # ApiKey
@@ -1197,13 +1287,25 @@ sub _encode_request_header {
 sub _decode_fetch_response_template {
     my ( $response, $api_version ) = @_;
 
-    $response->{template}       = $_FetchResponse_header_template;
-    $response->{stream_offset}  = $_FetchResponse_header_length;    # bytes before topics array size
+    my $is_v1 = $api_version == 1;
+    my $is_v2 = $api_version == 2;
+    my $is_v3 = $api_version == 3;
+
+    if ($is_v1 || $is_v2 || $is_v3) {
+        $response->{template}       = $_FetchResponse_header_template_v1;
+        $response->{stream_offset}  = $_FetchResponse_header_length_v1;    # bytes before topics array size
                                                                                 # [l] Size
                                                                                 # [l] CorrelationId
+                                                                                # [l] throttle_time_ms
+    } else {
+        $response->{template}       = $_FetchResponse_header_template;
+        $response->{stream_offset}  = $_FetchResponse_header_length;    # bytes before topics array size
+                                                                                # [l] Size
+                                                                                # [l] CorrelationId
+    }
     my $topics_array_size = unpack(
-         q{x[}.$response->{stream_offset}
-        .q{]l>},                            # topics array size
+         q{x[}.$response->{stream_offset} . q{]}
+        .q{l>},                            # topics array size
         ${ $response->{bin_stream} }
     );
     $response->{stream_offset} += 4;        # bytes before TopicName length
@@ -1237,7 +1339,7 @@ sub _decode_fetch_response_template {
                                                                                 # [s] ErrorCode
                                                                                 # [q] HighwaterMarkOffset
 
-        _decode_MessageSet_template( $response );
+        _decode_MessageSet_template( $response, $is_v1 || $is_v2 || $is_v3 );
     }
 
     return;
@@ -1245,7 +1347,12 @@ sub _decode_fetch_response_template {
 
 # Decrypts MessageSet
 sub _decode_MessageSet_array {
-    my ( $response, $MessageSetSize, $i_ref, $MessageSet_array_ref ) = @_;
+    my ( $response, $MessageSetSize, $i_ref, $MessageSet_array_ref, $api_version ) = @_;
+
+    $api_version //= $DEFAULT_APIVERSION;
+    my $is_v1 = $api_version == 1;
+    my $is_v2 = $api_version == 2;
+    my $is_v3 = $api_version == 3;
 
     my $data = $response->{data};
     my $data_array_size = scalar @{ $data };
@@ -1268,6 +1375,9 @@ sub _decode_MessageSet_array {
 # and we allow messages to recursively contain compressed message sets to allow batch compression.
         $Message->{MagicByte}                                        =  $data->[ $$i_ref++ ];   # MagicByte
         $Message->{Attributes}                                       =  $data->[ $$i_ref++ ];   # Attributes
+        if ($is_v1 || $is_v2 || $is_v3) {
+            $Message->{Timestamp}                                    =  $data->[ $$i_ref++ ];   # Timestamp
+        }
 
         $Key_length                                                  =  $data->[ $$i_ref++ ];   # Key length
         $Message->{Key}   = $Key_length   == $NULL_BYTES_LENGTH ? q{} : $data->[ $$i_ref++ ];   # Key
@@ -1305,7 +1415,7 @@ sub _decode_MessageSet_array {
                 bin_stream      => \$decompressed,
                 stream_offset   => 0,
             };
-            _decode_MessageSet_sized_template( $Value_length, $resp );
+            _decode_MessageSet_sized_template( $Value_length, $resp, $is_v1 || $is_v2 || $is_v3 );
             @data = unpack( $resp->{template}, ${ $resp->{bin_stream} } );
             my $i = 0;  # i_ref
             my $size = length( $decompressed );
@@ -1451,7 +1561,7 @@ sub _encode_MessageSet_array {
 
 # Generates a template to decrypt MessageSet
 sub _decode_MessageSet_template {
-    my ( $response ) = @_;
+    my ( $response, $is_v1 ) = @_;
 
     my $MessageSetSize = unpack(
          q{x[}.$response->{stream_offset}
@@ -1461,11 +1571,11 @@ sub _decode_MessageSet_template {
     $response->{template} .= q{l>};         # MessageSetSize
     $response->{stream_offset} += 4;        # bytes before Offset
 
-    return _decode_MessageSet_sized_template($MessageSetSize, $response);
+    return _decode_MessageSet_sized_template($MessageSetSize, $response, $is_v1);
 }
 
 sub _decode_MessageSet_sized_template {
-    my ( $MessageSetSize, $response ) = @_;
+    my ( $MessageSetSize, $response, $is_v1 ) = @_;
 
     my $bin_stream_length = length ${ $response->{bin_stream} };
 
@@ -1473,25 +1583,27 @@ sub _decode_MessageSet_sized_template {
     CREATE_TEMPLATE:
     while ( $MessageSetSize ) {
 # Not the full MessageSet
-        last CREATE_TEMPLATE if $MessageSetSize < 22;
+        last CREATE_TEMPLATE if $MessageSetSize < ($is_v1 ? 30 : 22);
                 # [q] Offset
                 # [l] MessageSize
                 # [l] Crc
                 # [c] MagicByte
                 # [c] Attributes
+                # ( [q] Timestamp ) v1 only
                 # [l] Key length
                 # [l] Value length
 
         $local_template = q{};
         MESSAGE_SET:
         {
-            $local_template .= $_Message_template;
-            $response->{stream_offset} += $_Message_length; # (Only Offset length)
+            $local_template .= ( $is_v1 ? $_Message_template_v1 : $_Message_template );
+            $response->{stream_offset} += ( $is_v1 ? $_Message_length_v1 : $_Message_length ); # (Only Offset length)
                 # [q] Offset
                 # [l] MessageSize
                 # [l] Crc
                 # [c] MagicByte
                 # [c] Attributes
+                # ( [q] Timestamp ) v1 only
                 # [l] Key length
                                                 # bytes before MessageSize
                                                                                 # [q] Offset
@@ -1501,12 +1613,14 @@ sub _decode_MessageSet_sized_template {
                 ${ $response->{bin_stream} }
             );
 
-            $response->{stream_offset} += 10;   # bytes before Crc
+            $response->{stream_offset} += ($is_v1 ? 18: 10);
+                                                # bytes before Crc
                                                                                 # [l] MessageSize
                                                 # bytes before Key length
                                                                                 # [l] Crc
                                                                                 # [c] MagicByte
                                                                                 # [c] Attributes
+                                                                                # ( [q] Timestamp ) v1 only
             $Key_length = unpack(
                  q{x[}.$response->{stream_offset}
                 .q{]l>},                        # Key length
