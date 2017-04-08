@@ -23,5 +23,6 @@ cache:
         - vendor
 
 before_install:
+    - source /etc/profile.d/jdk.sh
     - ./install_kafka.sh
 
