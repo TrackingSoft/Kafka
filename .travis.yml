@@ -21,8 +21,13 @@ env:
 cache:
     directories:
         - vendor
+        - perl_modules
 
 before_install:
     - source /etc/profile.d/jdk.sh
     - ./install_kafka.sh
-
+    - cpanm local::lib
+    - eval "$(perl -Mlocal::lib=${PWD}/perl_modules)"
+    - cpanm --notest Test::Distribution
+    - cpanm --notest Test::Kwalitee
+    - cpanm --notest Test::Kwalitee::Extra
