@@ -317,6 +317,7 @@ sub create_client {
         $connection = Kafka::Connection->new(
             host                    => $HOST,
             port                    => $port,
+            timeout                 => 20,
             AutoCreateTopicsEnable  => 1,
             RETRY_BACKOFF           => $RETRY_BACKOFF * 2,
         );
@@ -326,10 +327,12 @@ sub create_client {
                 Connection  => $connection,
                 # Require verification the number of messages sent and recorded
                 RequiredAcks    => $BLOCK_UNTIL_IS_COMMITTED,
+                Timeout         => 20,
             );
         } elsif ( $client_type eq 'consumer' ) {
             $consumer = Kafka::Consumer->new(
                 Connection  => $connection,
+                MaxWaitTime => 20,
             );
         } else {
             # nothing to do now
