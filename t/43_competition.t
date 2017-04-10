@@ -30,6 +30,10 @@ BEGIN {
 
 plan 'no_plan';
 
+BEGIN {
+    $ENV{PERL_KAFKA_DEBUG} = 1;
+}
+
 #-- load the modules -----------------------------------------------------------
 
 use Config::IniFiles;
