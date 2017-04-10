@@ -245,13 +245,16 @@ sub new {
 
     $self->{socket}     = undef;
     $self->{_io_select} = undef;
+    my $error;
     try {
         $self->_connect();
     } catch {
-        my $error = $_;
-        $self->_error( $ERROR_CANNOT_BIND, format_message("Kafka::IO(%s:%s)->new: %s", $self->{host}, $self->{port}, $error ) );
+        $error = $_;
     };
 
+    $self->_error( $ERROR_CANNOT_BIND, format_message("Kafka::IO(%s:%s)->new: %s", $self->{host}, $self->{port}, $error ) )
+        if defined $error
+    ;
     return $self;
 }
 
@@ -862,7 +865,10 @@ sub _debug_msg {
 # Handler for errors
 sub _error {
     my $self = shift;
-    Kafka::Exception::IO->throw( throw_args( @_ ) );
+    my %args = throw_args( @_ );
+    $self->_debug_msg( format_message( 'throwing IO error %s: %s', $args{code}, $args{message} ) )
+        if $self->debug_level;
+    Kafka::Exception::IO->throw( %args );
 }
 
 #-- Closes and cleans up -------------------------------------------------------
@@ -873,7 +879,7 @@ __END__
 
 =head1 DIAGNOSTICS
 
-When error is detected, an exception, represented by object of C<Kafka::Exception::Producer> class,
+When error is detected, an exception, represented by object of C<Kafka::Exception::IO> class,
 is thrown (see L<Kafka::Exceptions|Kafka::Exceptions>).
 
 L<code|Kafka::Exceptions/code> and a more descriptive L<message|Kafka::Exceptions/message> provide

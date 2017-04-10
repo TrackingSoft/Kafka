@@ -801,7 +801,7 @@ const our $ERROR_CANNOT_RECV                    => -1003;
 
 =item C<ERROR_CANNOT_BIND>
 
--1004 - Cannot bind
+-1004 - Cannot connect to broker
 
 =cut
 const our $ERROR_CANNOT_BIND                    => -1004;
@@ -1286,7 +1286,7 @@ our %ERROR = (
     $ERROR_CANNOT_SEND                              => q{Cannot send},
     $ERROR_SEND_NO_ACK                              => q{No acknowledgement for sent request},
     $ERROR_CANNOT_RECV                              => q{Cannot receive},
-    $ERROR_CANNOT_BIND                              => q{Cannot bind},
+    $ERROR_CANNOT_BIND                              => q{Cannot connect to broker},
     $ERROR_METADATA_ATTRIBUTES                      => q{Unknown metadata attributes},
     $ERROR_UNKNOWN_APIKEY                           => q{Unknown ApiKey},
     $ERROR_CANNOT_GET_METADATA                      => q{Cannot get metadata},

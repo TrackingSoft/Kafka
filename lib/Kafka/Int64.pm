@@ -194,7 +194,7 @@ __END__
 
 =head1 DIAGNOSTICS
 
-When error is detected, an exception, represented by object of C<Kafka::Exception::Producer> class,
+When error is detected, an exception, represented by object of C<Kafka::Exception::Int64> class,
 is thrown (see L<Kafka::Exceptions|Kafka::Exceptions>).
 
 Any error L<functions|/FUNCTIONS> is FATAL.

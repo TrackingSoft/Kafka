@@ -678,11 +678,13 @@ sub receive_response_to_request {
         $request,
     ) if $self->debug_level;
 
-    my( $ErrorCode, $partition_data );
+    my( $ErrorCode, $partition_data, $io_error );
 
     my $attempt = 0;
     ATTEMPT: while ( ++$attempt <= ( $self->{SEND_MAX_ATTEMPTS} // 1 ) ) {
         $ErrorCode = $ERROR_NO_ERROR;
+        undef $io_error;
+
         # hash metadata could be updated
         my $leader = $self->{_metadata}->{ $topic_name }->{ $partition }->{Leader};
         next ATTEMPT unless defined $leader;
@@ -697,13 +699,14 @@ sub receive_response_to_request {
         # Send a request to the leader
         if ( $self->_connectIO( $server ) ) {
             unless ( $self->_sendIO( $server, $encoded_request ) ) {
-                $ErrorCode = $self->_io_error_code( $server );
-                $ErrorCode = $ERROR_CANNOT_SEND if $ErrorCode == $ERROR_NO_ERROR;
+                $io_error = $self->_io_error( $server );
+                $ErrorCode = $io_error ? $io_error->code : $ERROR_CANNOT_SEND;
                 $self->_closeIO( $server, 1 );
             }
         }
         else {
-            $ErrorCode = $ERROR_CANNOT_BIND;
+            $io_error = $self->_io_error( $server );
+            $ErrorCode = $io_error ? $io_error->code : $ERROR_CANNOT_BIND;
         }
 
         if ( $ErrorCode != $ERROR_NO_ERROR ) {
@@ -745,7 +748,7 @@ sub receive_response_to_request {
 
                     # Should not be allowed to re-send data on the next attempt
                     # FATAL error
-                    $self->_error( $ErrorCode, $self->_io_error( $server ), request => $request );
+                    $self->_error( $ErrorCode, "no ack for request", io_error => $self->_io_error( $server ), request => $request );
                     last ATTEMPT;
                 } else {
                     $ErrorCode = $ERROR_CANNOT_RECV;
@@ -760,7 +763,7 @@ sub receive_response_to_request {
                         $response,
                     ) if $self->debug_level;
             } else {
-                $self->_error( $ERROR_RESPONSEMESSAGE_NOT_RECEIVED, format_message("response length=%s", length( $$encoded_response_ref ) ), request => $request );
+                $self->_error( $ERROR_RESPONSEMESSAGE_NOT_RECEIVED, format_message("response length=%s", length( $$encoded_response_ref ) ), io_error => $self->_io_error( $server ), request => $request );
             }
         }
 
@@ -809,9 +812,9 @@ sub receive_response_to_request {
 
     # FATAL error
     if ( $ErrorCode ) {
-        $self->_error( $ErrorCode, format_message( "topic='%s'%s", $topic_data->{TopicName}, $partition_data ? ", partition = ".$partition_data->{Partition} : '' ), request => $request );
+        $self->_error( $ErrorCode, format_message( "topic='%s'%s", $topic_data->{TopicName}, $partition_data ? ", partition = ".$partition_data->{Partition} : '' ), request => $request, io_error => $io_error );
     } else {
-        $self->_error( $ERROR_UNKNOWN_TOPIC_OR_PARTITION, format_message( "topic='%s', partition=%s", $topic_name, $partition ), request => $request );
+        $self->_error( $ERROR_UNKNOWN_TOPIC_OR_PARTITION, format_message( "topic='%s', partition=%s", $topic_name, $partition ), request => $request, io_error => $io_error );
     }
 
     return;
@@ -1195,14 +1198,11 @@ sub _on_io_error {
 
 sub _io_error {
     my( $self, $server ) = @_;
-    my $server_data = $self->{_IO_cache}->{ $server } or return;
-    return $server_data->{error};
-}
-
-sub _io_error_code {
-    my( $self, $server ) = @_;
-    my $error = $self->_io_error( $server );
-    return $error ? $error->code : $ERROR_NO_ERROR;
+    my $error;
+    if( my $server_data = $self->{_IO_cache}->{ $server } ) {
+        $error = $server_data->{error};
+    }
+    return $error;
 }
 
 # connects to a server (host:port or [IPv6_host]:port)
