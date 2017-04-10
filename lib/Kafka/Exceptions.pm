@@ -37,7 +37,7 @@ use Exception::Class (
     },
     'Kafka::Exception::Connection' => {
         isa     => 'Kafka::Exception',
-        fields  => [ 'request', 'response' ],
+        fields  => [ 'request', 'response', 'io_error' ],
     },
     'Kafka::Exception::Consumer' => {
         isa     => 'Kafka::Exception',

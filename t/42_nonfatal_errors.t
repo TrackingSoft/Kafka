@@ -305,6 +305,7 @@ sub Kafka_IO_error {
     my $expected_error_code = shift;
     my $expected_nonfatals  = shift;
     my $decoded_request     = shift;
+    my $throw_error         = shift // $ERROR_CANNOT_SEND;
 
     my $replaced_method_name = 'Kafka::IO::'.$method_name;
     $replaced_method = \&$replaced_method_name;
@@ -317,7 +318,7 @@ sub Kafka_IO_error {
                     return $main::replaced_method->( @_ );
                 } else {
                     my ( $self ) = @_;
-                    $self->_error( $ERROR_CANNOT_SEND );  # any exception
+                    $self->_error( $throw_error );
                 }
             },
             into    => 'Kafka::IO',
@@ -395,6 +396,7 @@ Kafka_IO_error(
     # because connection is not available
     $SEND_MAX_ATTEMPTS,                  # expected non-fatal errors
     $decoded_produce_request,
+    $ERROR_CANNOT_BIND, # error to throw from IO
 );
 
 #-- send IO

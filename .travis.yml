@@ -17,6 +17,7 @@ env:
     global:
         - RELEASE_TESTS=1
         - KAFKA_BASE_DIR="${TRAVIS_BUILD_DIR}/kafka"
+        - PERL_KAFKA_DEBUG=1
 
 cache:
     directories:
