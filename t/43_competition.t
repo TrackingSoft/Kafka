@@ -30,10 +30,6 @@ BEGIN {
 
 plan 'no_plan';
 
-BEGIN {
-    $ENV{PERL_KAFKA_DEBUG} = 1;
-}
-
 #-- load the modules -----------------------------------------------------------
 
 use Config::IniFiles;
@@ -164,7 +160,7 @@ sub sending {
         );
     };
     if ( $@ ) {
-#        fail "'send' FATAL error: $@";
+        diag "'send' FATAL error: $@";
         return 0;
     } else {
         return $msgs_to_send;
@@ -321,7 +317,7 @@ sub create_client {
         $connection = Kafka::Connection->new(
             host                    => $HOST,
             port                    => $port,
-            timeout                 => 20,
+            timeout                 => 30,
             AutoCreateTopicsEnable  => 1,
             RETRY_BACKOFF           => $RETRY_BACKOFF * 2,
         );
@@ -331,12 +327,12 @@ sub create_client {
                 Connection  => $connection,
                 # Require verification the number of messages sent and recorded
                 RequiredAcks    => $BLOCK_UNTIL_IS_COMMITTED,
-                Timeout         => 20,
+                Timeout         => 30,
             );
         } elsif ( $client_type eq 'consumer' ) {
             $consumer = Kafka::Consumer->new(
                 Connection  => $connection,
-                MaxWaitTime => 20,
+                MaxWaitTime => 30,
             );
         } else {
             # nothing to do now
