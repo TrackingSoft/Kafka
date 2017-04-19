@@ -404,7 +404,9 @@ my ( $_ProduceRequest_header_template,      $_ProduceRequest_header_length ) = (
     10
 );
 my ( $_MessageSet_template,                 $_MessageSet_length ) = (
-    q{a[8]l>},              #    a8                  # 8 Offset
+    # qq{${_int64_template}l>},
+    q{a[8]l>},
+                            # 8 Offset
                             # 4 MessageSize
     12
 );
@@ -426,7 +428,9 @@ my ( $_FetchRequest_header_template_v3,     $_FetchRequest_header_length_v3 ) = 
     20
 );
 my ( $_FetchRequest_body_template,          $_FetchRequest_body_length ) = (
-    q{l>a[8]l>},            # 4 Partition
+#    qq{l>${_int64_template}l>},
+    q{l>a[8]l>},
+                            # 4 Partition
                             # 8 FetchOffset
                             # 4 MaxBytes
     16
@@ -437,10 +441,19 @@ my ( $_OffsetRequest_header_template,       $_OffsetRequest_header_length ) = (
     8
 );
 my ( $_OffsetRequest_body_template,         $_OffsetRequest_body_length ) = (
-    q{l>a[8]l>},            # 4 Partition
+#    qq{l>${_int64_template}l>},
+    q{l>a[8]l>},
+                            # 4 Partition
                             # 8 Time
                             # 4 MaxNumberOfOffsets
     16
+);
+my ( $_OffsetRequest_body_template_v1,      $_OffsetRequest_body_length_v1 ) = (
+#    qq{l>${_int64_template}},
+    q{l>a[8]},
+                          # 4 Partition
+                          # 8 Time
+    12
 );
 my ( $_FetchResponse_header_template,       $_FetchResponse_header_length ) = (
     q{x[l]l>l>},            # Size (skip)
@@ -803,14 +816,13 @@ sub encode_fetch_request {
                                                 # len         => ...,
         data        => \@data,
     };
-    my $api_version = $Fetch_Request->{ApiVersion} // $DEFAULT_APIVERSION;
-    my $is_v3 = $api_version == 3;
-    _encode_request_header( $request, $APIKEY_FETCH, $Fetch_Request );
+    my $api_version = _encode_request_header( $request, $APIKEY_FETCH, $Fetch_Request );
                                                                             # Size
                                                                             # ApiKey
                                                                             # ApiVersion
                                                                             # CorrelationId
                                                                             # ClientId
+    my $is_v3 = $api_version == 3;
 
     push( @data, $CONSUMERS_REPLICAID );                                    # ReplicaId
     my $topics_array = $Fetch_Request->{topics};
@@ -952,7 +964,7 @@ the structure of the OFFSET Request (examples see C<t/*_decode_encode.t>).
 =back
 
 =cut
-$IMPLEMENTED_APIVERSIONS->{$APIKEY_OFFSET} = 0;
+$IMPLEMENTED_APIVERSIONS->{$APIKEY_OFFSET} = 1;
 sub encode_offset_request {
     my ( $Offset_Request ) = @_;
 
@@ -962,13 +974,14 @@ sub encode_offset_request {
                                                 # len         => ...,
         data        => \@data,
     };
-
-    _encode_request_header( $request, $APIKEY_OFFSET, $Offset_Request );
+    my $api_version = _encode_request_header( $request, $APIKEY_OFFSET, $Offset_Request );
                                                                             # Size
                                                                             # ApiKey
                                                                             # ApiVersion
                                                                             # CorrelationId
                                                                             # ClientId
+
+    my $is_v1 = $api_version == 1;
 
     my $topics_array = $Offset_Request->{topics};
     push( @data,
@@ -978,6 +991,8 @@ sub encode_offset_request {
     $request->{template}    .= $_OffsetRequest_header_template;
     $request->{len}         += $_OffsetRequest_header_length;
 
+    my $body_template = $is_v1 ? $_OffsetRequest_body_template_v1 : $_OffsetRequest_body_template;
+    my $body_length   = $is_v1 ? $_OffsetRequest_body_length_v1   : $_OffsetRequest_body_length;
     foreach my $topic ( @$topics_array ) {
         $request->{template}    .= q{s>};                                   # string length
         $request->{len}          += 2;
@@ -991,13 +1006,15 @@ sub encode_offset_request {
             push( @data,
                 $partition->{Partition},                                    # Partition
                 _pack64( $partition->{Time} ),                              # Time
-                $partition->{MaxNumberOfOffsets},                           # MaxNumberOfOffsets
+                $is_v1 ? () : $partition->{MaxNumberOfOffsets},             # MaxNumberOfOffsets
             );
-            $request->{template}    .= $_OffsetRequest_body_template;
-            $request->{len}         += $_OffsetRequest_body_length;
+            $request->{template}    .= $body_template;
+            $request->{len}         += $body_length;
         }
     }
 
+    # say STDERR $request->{template};
+    # say STDERR HexDump($_) foreach @data; use Data::HexDump;
     return pack( $request->{template}, $request->{len}, @data );
 }
 
@@ -1026,6 +1043,25 @@ my $_decode_offset_response_template = qq{x[l]l>l>X[l]l>/(s>/al>X[l]l>/(l>s>l>X[
                                         #     )
                                         # )
 
+my $_decode_offset_response_template_v1 = qq{x[l]l>l>X[l]l>/(s>/al>X[l]l>/(l>s>${_int64_template}${_int64_template}))};
+                                        # x[l]                    # Size (skip)
+                                        # l>                      # CorrelationId
+
+                                        # l>                      # topics array size
+                                        # X[l]
+                                        # l>/(                    # topics array
+                                        #     s>/a                    # TopicName
+
+                                        #     l>                      # PartitionOffsets array size
+                                        #     X[l]
+                                        #     l>/(                    # PartitionOffsets array
+                                        #         l>                      # Partition
+                                        #         s>                      # ErrorCode
+                                        #         $_int64_template        # Timestamp
+                                        #         $_int64_template        # Offset
+                                        #     )
+                                        # )
+
 =head3 C<decode_offset_response( $bin_stream_ref )>
 
 Decodes the argument and returns a reference to the hash representing
@@ -1044,12 +1080,16 @@ must be a non-empty binary string.
 
 =cut
 sub decode_offset_response {
-    my ( $bin_stream_ref ) = @_;
+    my ( $bin_stream_ref, $api_version ) = @_;
 
-    my @data = unpack( $_decode_offset_response_template, $$bin_stream_ref );
+    $api_version //= $DEFAULT_APIVERSION;
+    my $is_v1 = $api_version == 1;
+    my $template = $is_v1 ? $_decode_offset_response_template_v1 : $_decode_offset_response_template;
+
+    my @data = unpack( $template, $$bin_stream_ref );
 
     my $i = 0;
-    my $Offset_Response = {};
+    my $Offset_Response = { is_v1 => $is_v1 };
 
     $Offset_Response->{CorrelationId}                           =  $data[ $i++ ];   # CorrelationId
 
@@ -1068,11 +1108,16 @@ sub decode_offset_response {
                 Partition                                       => $data[ $i++ ],   # Partition
                 ErrorCode                                       => $data[ $i++ ],   # ErrorCode
             };
+            if ($is_v1) {
+                $PartitionOffset->{Timestamp}           = _unpack64($data[ $i++ ]); # Timestamp (v1 only)
+                $PartitionOffset->{Offset}              = _unpack64($data[ $i++ ]); # Offset (v1 only)
 
-            $Offset_array = $PartitionOffset->{Offset}          =  [];
-            $Offset_array_size                                  =  $data[ $i++ ];   # Offset array size
-            while ( $Offset_array_size-- ) {
-                push( @$Offset_array,                   _unpack64( $data[ $i++ ] ) );   # Offset
+            } else {
+                $Offset_array = $PartitionOffset->{Offset}      =  [];
+                $Offset_array_size                              =  $data[ $i++ ];   # Offset array size
+                while ( $Offset_array_size-- ) {
+                    push( @$Offset_array,                   _unpack64( $data[ $i++ ] ) );   # Offset
+                }
             }
 
             push( @$PartitionOffsets_array, $PartitionOffset );
@@ -1274,7 +1319,7 @@ sub _encode_request_header {
     $request->{len}         = $_Request_header_length;
     _encode_string( $request, $request_ref->{ClientId} );                   # ClientId
 
-    return;
+    return $api_version;
 }
 
 # Generates a template to decrypt the fetch response body
