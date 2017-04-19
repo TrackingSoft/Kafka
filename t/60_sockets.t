@@ -113,6 +113,7 @@ sub get_new_connection {
         port                    => $PORT,
         AutoCreateTopicsEnable  => 1,
         RETRY_BACKOFF           => $RETRY_BACKOFF * 2,
+        dont_load_supported_api_versions => 1,
     );
 }
 

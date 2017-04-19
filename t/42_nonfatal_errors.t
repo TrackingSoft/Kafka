@@ -330,6 +330,7 @@ sub Kafka_IO_error {
         host                => $host,
         port                => $port,
         RETRY_BACKOFF       => $RETRY_BACKOFF * 2,
+        dont_load_supported_api_versions => 1,
     );
 
     is scalar( @{ $connection->nonfatal_errors } ), 0, 'non-fatal errors are not fixed';
@@ -363,6 +364,7 @@ $connection = Kafka::Connection->new(
     host                => $host,
     port                => $port,
     RETRY_BACKOFF       => $RETRY_BACKOFF * 2,
+    dont_load_supported_api_versions => 1,
 );
 
 #-- $ERROR_LEADER_NOT_FOUND
@@ -486,6 +488,7 @@ foreach my $ErrorCode (
         host                => $host,
         port                => $port,
         RETRY_BACKOFF       => $RETRY_BACKOFF * 2,
+        dont_load_supported_api_versions => 1,
     );
 
     is scalar( @{ $connection->nonfatal_errors } ), 0, 'non-fatal errors are not fixed';

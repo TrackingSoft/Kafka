@@ -112,6 +112,7 @@ Kafka::MockIO::override();
 unless ( $connect = Kafka::Connection->new(
     host    => 'localhost',
     port    => $port,
+    dont_load_supported_api_versions => 1,
     ) ) {
     BAIL_OUT 'connection is not created';
 }

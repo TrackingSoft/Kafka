@@ -548,6 +548,24 @@ my $_decode_api_version_response_template = q{x[l]l>s>l>X[l]l>/(s>s>s>)};
                                            #     s>     # MaxVersion
                                            # )
 
+=head3 C<decode_api_versions_response( $bin_stream_ref )>
+
+Decodes the argument and returns a reference to the hash representing
+the structure of the APIVERSIONS Response.
+
+This function take argument. The following argument is currently recognized:
+
+=over 3
+
+=item C<$bin_stream_ref>
+
+C<$bin_stream_ref> is a reference to the encoded Response buffer. The buffer
+must be a non-empty binary string.
+
+=back
+
+=cut
+
 sub decode_api_versions_response {
     my ( $bin_stream_ref ) = @_;
 
@@ -767,7 +785,8 @@ sub decode_produce_response {
 
         push( @$topics_array, $topic );
     }
-    $Produce_Response->{Throttle_Time_Ms} = $data[ $i++ ];
+    defined $data[ $i ]
+      and $Produce_Response->{Throttle_Time_Ms} = $data[ $i++ ];
 
     return $Produce_Response;
 }

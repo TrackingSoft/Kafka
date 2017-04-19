@@ -253,6 +253,7 @@ sub get_new_objects {
             host                    => 'localhost',
             port                    => $port,
             timeout                 => $TIMEOUT,
+            dont_load_supported_api_versions => 1,
         );
     } 'Expecting to live new CONNECTION';
     lives_ok {

@@ -616,7 +616,7 @@ sub receive {
     _POSINT( $length )
         or Kafka::IO::_error( $self, $ERROR_MISMATCH_ARGUMENT, 'Kafka::IO->receive' );
 
-    my $message = substr( $encoded_response, 0, $length, q{} );
+    my $message = substr( $encoded_response // '', 0, $length, q{} );
 
     Kafka::IO::_debug_msg( $self, $message, 'Response from', 'yellow' )
         if Kafka::IO->debug_level == 1;

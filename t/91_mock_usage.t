@@ -75,11 +75,13 @@ dies_ok { $connect = Kafka::Connection->new(
     host        => 'localhost',
     port        => $port,
     timeout     => 'nothing',
+    dont_load_supported_api_versions => 1,
 ) } 'expecting to die';
 
 $connect = Kafka::Connection->new(
     host    => 'localhost',
     port    => $port,
+    dont_load_supported_api_versions => 1,
 );
 isa_ok( $connect, 'Kafka::Connection');
 
@@ -138,6 +140,7 @@ undef $connect;
 unless ( $connect = Kafka::Connection->new(
     host    => 'localhost',
     port    => $port,
+    dont_load_supported_api_versions => 1,
     ) ) {
     BAIL_OUT 'connection is not created';
 }

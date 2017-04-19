@@ -158,6 +158,12 @@ A simple message received from the Apache Kafka server.
 The key is an optional message key that was used for partition assignment.
 The key can be an empty string.
 
+=head3 Timestamp
+
+Integer of BigInt on 32 bits platforms: the message timestamp ( might be -1 if
+the message has no timestamp). Requires Kafka version > 0.10.0 and timestamp
+enabled in the topic messages format.
+
 =head3 C<valid>
 
 Boolean value: indicates whether received message is valid or not.

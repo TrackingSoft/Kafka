@@ -141,6 +141,7 @@ sub communication_error {
         host            => 'localhost',
         port            => $port,
         RETRY_BACKOFF   => $RETRY_BACKOFF * 2,
+        dont_load_supported_api_versions => 1,
     );
 
     Sub::Install::reinstall_sub( {
@@ -213,6 +214,7 @@ sub testing {
         host            => 'localhost',
         port            => $port,
         RETRY_BACKOFF   => $RETRY_BACKOFF * 2,
+        dont_load_supported_api_versions => 1,
     );
 
 #-- simple start

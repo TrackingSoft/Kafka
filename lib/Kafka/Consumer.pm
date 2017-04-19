@@ -408,9 +408,11 @@ sub fetch {
                   and $message_error = $ERROR{ $ERROR_METADATA_ATTRIBUTES };
 
                 if (my $compression_codec = $attributes & 0b00000111) {
-                     $compression_codec == 1 # GZIP
-                  || $compression_codec == 2 # Snappy
-                       or $message_error = $ERROR{ $ERROR_METADATA_ATTRIBUTES };
+                    unless (   $compression_codec == 1 # GZIP
+                            || $compression_codec == 2 # Snappy
+                           ) {
+                        $message_error = $ERROR{ $ERROR_METADATA_ATTRIBUTES };
+                    }
                 }
 
                 push( @$messages, Kafka::Message->new( {

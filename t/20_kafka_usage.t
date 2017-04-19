@@ -95,12 +95,14 @@ dies_ok { $connect = Kafka::Connection->new(
     host        => $host_name,
     port        => $port,
     timeout     => 'nothing',
+    dont_load_supported_api_versions => 1,
 ) } 'expecting to die';
 
 $connect = Kafka::Connection->new(
     host            => $host_name,
     port            => $port,
     RETRY_BACKOFF   => $RETRY_BACKOFF * 2,
+    dont_load_supported_api_versions => 1,
 );
 isa_ok( $connect, 'Kafka::Connection');
 
@@ -154,6 +156,7 @@ unless ( $connect = Kafka::Connection->new(
     host            => $host_name,
     port            => $port,
     RETRY_BACKOFF   => $RETRY_BACKOFF * 2,
+    dont_load_supported_api_versions => 1,
     ) ) {
     fail 'connection is not created';
 }
