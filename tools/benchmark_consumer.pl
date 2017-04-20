@@ -28,8 +28,8 @@ use Try::Tiny;
 
 use Kafka qw(
     $MESSAGE_SIZE_OVERHEAD
-    $RECEIVE_EARLIEST_OFFSETS
-    $RECEIVE_LATEST_OFFSET
+    $RECEIVE_EARLIEST_OFFSET
+    $RECEIVE_LATEST_OFFSETS
 );
 use Kafka::Connection;
 use Kafka::Consumer;

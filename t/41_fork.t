@@ -44,7 +44,7 @@ use Const::Fast;
 
 use Kafka qw(
     $BLOCK_UNTIL_IS_COMMITTED
-    $RECEIVE_LATEST_OFFSET
+    $RECEIVE_LATEST_OFFSETS
     $RETRY_BACKOFF
 );
 use Kafka::Cluster qw(
@@ -111,7 +111,7 @@ sub next_offset {
         $offsets = $consumer->offsets(
             $topic,
             $partition,
-            $RECEIVE_LATEST_OFFSET,             # time
+            $RECEIVE_LATEST_OFFSETS,             # time
         );
     };
     fail "offsets are not received: $@" if $@;

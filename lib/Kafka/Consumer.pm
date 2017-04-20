@@ -47,8 +47,8 @@ use Kafka qw(
     $ERROR_TOPIC_DOES_NOT_MATCH
     $MESSAGE_SIZE_OVERHEAD
     $MIN_BYTES_RESPOND_IMMEDIATELY
-    $RECEIVE_LATEST_OFFSET
-    $RECEIVE_EARLIEST_OFFSETS
+    $RECEIVE_LATEST_OFFSETS
+    $RECEIVE_EARLIEST_OFFSET
 );
 use Kafka::Exceptions;
 use Kafka::Internals qw(
@@ -80,7 +80,7 @@ if ( !$BITS64 ) { eval 'use Kafka::Int64; 1;' or die "Cannot load Kafka::Int64 :
     use Kafka qw(
         $DEFAULT_MAX_BYTES
         $DEFAULT_MAX_NUMBER_OF_OFFSETS
-        $RECEIVE_EARLIEST_OFFSETS
+        $RECEIVE_EARLIEST_OFFSET
     );
     use Kafka::Connection;
     use Kafka::Consumer;
@@ -98,7 +98,7 @@ if ( !$BITS64 ) { eval 'use Kafka::Int64; 1;' or die "Cannot load Kafka::Int64 :
         my $offsets = $consumer->offsets(
             'mytopic',                      # topic
             0,                              # partition
-            $RECEIVE_EARLIEST_OFFSETS,      # time
+            $RECEIVE_EARLIEST_OFFSET,       # time
             $DEFAULT_MAX_NUMBER_OF_OFFSETS  # max_number
         );
 
@@ -358,6 +358,7 @@ sub fetch {
         ClientId                            => $self->{ClientId},
         MaxWaitTime                         => int( $self->{MaxWaitTime} * 1000 ),
         MinBytes                            => $self->{MinBytes},
+        MaxBytes                            => $max_size // $self->{MaxBytes},
         topics                              => [
             {
                 TopicName                   => $topic,
@@ -441,7 +442,7 @@ sub fetch {
 Returns an offset, given a topic, partition and time.
 
 The returned offset is the earliest offset whose timestamp is greater than or
-equals to the given timestamp. The return value is a HashRef, containing
+equal to the given timestamp. The return value is a HashRef, containing
 C<timestamp> and C<offset> keys.
 
 B<WARNING>: this method requires Kafka 0.10.0, and messages with timestamps.
@@ -482,7 +483,7 @@ sub offset_at_time {
         unless defined( $time ) && ( _isbig( $time ) || isint( $time ) ) && $time >= 0;
 
     # no max_number, api version = 1
-    return $self->_query_offsets($topic, $partition, $time, undef, 1)
+    return $self->_query_offsets($topic, $partition, $time, undef, 1)->[0];
 }
 
 =head3 C<offset_before_time( $topic, $partition, $time )>
@@ -518,8 +519,8 @@ system.
 
 =cut
 
-sub offsets_before_time {
-    my ( $self, $topic, $partition, $time, $max_number ) = @_;
+sub offset_before_time {
+    my ( $self, $topic, $partition, $time ) = @_;
 
     # we don't accept special values for $time, we want a real timestamp
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'time' )
@@ -527,68 +528,102 @@ sub offsets_before_time {
     # $self->_error( $ERROR_MISMATCH_ARGUMENT, format_message( 'max_number (%s)', $max_number ) )
     #     unless !defined( $max_number ) || ( _POSINT( $max_number ) && $max_number <= $MAX_INT32 );
 
-    # max_number = 1api version = 0
-    return $self->_query_offsets($topic, $partition, $time, 1, 0)
+    # max_number = 1, api version = 0
+    return $self->_query_offsets($topic, $partition, $time, 1, 0)->[0];
 }
 
+=head3 C<offset_earliest( $topic, $partition )>
 
-=for html
+Returns the earliest offset for a given topic and partition
 
-To get the list of offsets of a single partition 0 from a topic called C<the_topic>, use:
+C<offset_earliest()> takes the following arguments:
 
-  use Kafka qw($RECEIVE_EARLIEST_OFFSETS);
-  my $offsets = $self->search_offsets( { the_topic => { 0 => $RECEIVE_EARLIEST_OFFSETS } );
+=over 3
 
-$topic, $partition, $time
+=item C<$topic>
 
-Returns a data structure like:
+The C<$topics> must be a normal non-false strings of non-zero length.
 
-(L<Math::BigInt|Math::BigInt> integers on 32 bit system).
+=item C<$partition>
 
- if your query contains C<$time> values that are real timestamps
-and not special values (C<$RECEIVE_LATEST_OFFSET>,
-C<$RECEIVE_EARLIEST_OFFSETS>), then it requires Kafka 0.10.0.
-
-The special values C<$RECEIVE_LATEST_OFFSET> (-1), C<$RECEIVE_EARLIEST_OFFSETS> (-2) are allowed.
-
-C<$RECEIVE_LATEST_OFFSET>, C<$RECEIVE_EARLIEST_OFFSETS>
-are the defaults that can be imported from the L<Kafka|Kafka> module.
+The C<$partitions> must be a non-negative integers.
 
 =cut
 
+sub offset_earliest {
+    my ( $self, $topic, $partition ) = @_;
+
+    # max_number = 1, api version = 0
+    return $self->_query_offsets($topic, $partition, $RECEIVE_EARLIEST_OFFSET, 1, 0)->[0];
+}
+
+=head3 C<offset_earliest( $topic, $partition )>
+
+Returns the latest offset for a given topic and partition
+
+C<offset_latest()> takes the following arguments:
+
+=over 3
+
+=item C<$topic>
+
+The C<$topics> must be a normal non-false strings of non-zero length.
+
+=item C<$partition>
+
+The C<$partitions> must be a non-negative integers.
+
+=cut
+
+sub offset_latest {
+    my ( $self, $topic, $partition ) = @_;
+
+    # max_number = 1, api version = 0
+    return $self->_query_offsets($topic, $partition, $RECEIVE_LATEST_OFFSETS, 1, 0)->[0];
+}
 
 =head3 C<offsets( $topic, $partition, $time, $max_number )>
 
-B<WARNING>: This method is DEPRECATED, please use one of C<offset_at_time()>, C<offset_before_time()>, C<offset_earliest()>, C<offset_latest()>
+B<WARNING>: This method is DEPRECATED, please use one of C<offset_at_time()>, C<offset_before_time()>, C<offset_earliest()>, C<offset_latest()>. It is kept for backward compatibility.
 
-This method is kept for backward compatibility, Depending of the value of C<$time>:
+Returns an ArrayRef of offsets
 
-If $time is $RECEIVE_LATEST_OFFSET ( -1 ), then it redirects to:
+C<offsets()> takes the following arguments:
 
-  $self->offsets_latest($topic, $partition)
+=over 3
 
-If $time is $RECEIVE_EARLIEST_OFFSETS ( -2 ), then it redirects to:
+=item C<$topic>
 
-  $self->offsets_earliest($topic, $partition)
+The C<$topics> must be a normal non-false strings of non-zero length.
 
-Otherwise, it redirects to:
+=item C<$partition>
 
-  $self->offsets_before_time($topic, $partition, $time, $max_number)
+The C<$partitions> must be a non-negative integers.
+
+=item C<$time>
+
+Get offsets before the given time (in milliseconds since UNIX Epoch). It must
+be a positive number. It may be a L<Math::BigInt|Math::BigInt> integer on 32
+bit system.
+
+The special values C<$RECEIVE_LATEST_OFFSETS> (-1), C<$RECEIVE_EARLIEST_OFFSET>
+(-2) are allowed. They can be imported from the L<Kafka|Kafka> module.
+
+=item C<$max_number>
+
+Maximum number of offsets to be returned
 
 =cut
 
 sub offsets {
     my ( $self, $topic, $partition, $time, $max_number ) = @_;
+
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'time' )
-        unless defined( $time ) && ( _isbig( $time ) || isint( $time ) ) && $time >= $RECEIVE_EARLIEST_OFFSETS;
+        unless defined( $time ) && ( _isbig( $time ) || isint( $time ) ) && $time >= $RECEIVE_EARLIEST_OFFSET;
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, format_message( 'max_number (%s)', $max_number ) )
+        unless !defined( $max_number ) || ( _POSINT( $max_number ) && $max_number <= $MAX_INT32 );
 
-    $time == $RECEIVE_LATEST_OFFSET
-      and return $self->offset_latest($topic, $partition);
-
-    $time == $RECEIVE_EARLIEST_OFFSETS
-      and return $self->offset_earliest($topic, $partition);
-
-    return $self->offset_before_time($topic, $partition, $time, $max_number);
+    return $self->_query_offsets($topic, $partition, $time, $max_number, 0);
 }
 
 sub _query_offsets {

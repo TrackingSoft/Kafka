@@ -87,7 +87,7 @@ use Kafka qw(
     $ERROR_SEND_NO_ACK
     $ERROR_NO_CONNECTION
     $MIN_BYTES_RESPOND_HAS_DATA
-    $RECEIVE_EARLIEST_OFFSETS
+    $RECEIVE_EARLIEST_OFFSET
     $REQUEST_TIMEOUT
     $RETRY_BACKOFF
     $SEND_MAX_ATTEMPTS
@@ -166,7 +166,7 @@ my $decoded_offset_request = {
             partitions                  => [
                 {
                     Partition           => $partition,
-                    Time                => $RECEIVE_EARLIEST_OFFSETS,
+                    Time                => $RECEIVE_EARLIEST_OFFSET,
                     MaxNumberOfOffsets  => 1,
                 },
             ],

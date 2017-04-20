@@ -51,7 +51,7 @@ use Kafka qw(
     %ERROR
     $ERROR_SEND_NO_ACK
     $MESSAGE_SIZE_OVERHEAD
-    $RECEIVE_LATEST_OFFSET
+    $RECEIVE_LATEST_OFFSETS
     $RETRY_BACKOFF
 );
 use Kafka::Connection;
@@ -96,7 +96,7 @@ sub next_offset {
         $offsets = $consumer->offsets(
             $TOPIC,
             $PARTITION,
-            $RECEIVE_LATEST_OFFSET,             # time
+            $RECEIVE_LATEST_OFFSETS,             # time
         );
     };
     if ( $@ ) {
@@ -146,7 +146,7 @@ sub next_offset {
         my $offsets = $consumer->offsets(
             $TOPIC,
             $PARTITION,
-            $RECEIVE_LATEST_OFFSET,             # time
+            $RECEIVE_LATEST_OFFSETS,             # time
             $DEFAULT_MAX_NUMBER_OF_OFFSETS,     # max_number
         );
         if ( $offsets ) {

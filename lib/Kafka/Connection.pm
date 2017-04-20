@@ -531,27 +531,32 @@ C<dont_load_supported_api_versions> is set to true
 
 sub load_supported_api_versions {
     my ( $self ) = @_;
+    my $api_versions = [];
     try {
-        my $api_versions = $self->_get_supported_api_versions();
-        foreach my $element (@$api_versions) {
-            # we want to choose which api version to use for each API call. We
-            # try to use the max version that the server supports, with
-            # fallback to the max version the protocol implements. If it's
-            # lower than the min version the kafka server supports, we set it
-            # to -1. If thie API endpoint is called, it'll die.
-            my $kafka_min_version = $element->{MinVersion};
-            my $kafka_max_version = $element->{MaxVersion};
-            my $api_key = $element->{ApiKey};
-            my $implemented_max_version = $IMPLEMENTED_APIVERSIONS->{$api_key} // -1;
-            my $version = $kafka_max_version;
-            $version > $implemented_max_version
-              and $version = $implemented_max_version;
-            $version < $kafka_min_version
-              and $version = -1;
-            $self->{_api_versions}{$api_key} = $version;
-        }
+        # The ApiVersions API endpoint is only supported on Kafka versions >
+        # 0.10.0.0 so this call may fail. We simply ignore this failure and
+        # carry on.
+        $api_versions = $self->_get_supported_api_versions();
+    }; 
 
-    };
+    foreach my $element (@$api_versions) {
+        # we want to choose which api version to use for each API call. We
+        # try to use the max version that the server supports, with
+        # fallback to the max version the protocol implements. If it's
+        # lower than the min version the kafka server supports, we set it
+        # to -1. If thie API endpoint is called, it'll die.
+        my $kafka_min_version = $element->{MinVersion};
+        my $kafka_max_version = $element->{MaxVersion};
+        my $api_key = $element->{ApiKey};
+        my $implemented_max_version = $IMPLEMENTED_APIVERSIONS->{$api_key} // -1;
+        my $version = $kafka_max_version;
+        $version > $implemented_max_version
+          and $version = $implemented_max_version;
+        $version < $kafka_min_version
+          and $version = -1;
+        $self->{_api_versions}{$api_key} = $version;
+    }
+
     return;
 }
 

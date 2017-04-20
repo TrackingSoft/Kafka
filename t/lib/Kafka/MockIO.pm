@@ -46,8 +46,7 @@ use Kafka qw(
     $ERROR_NO_ERROR
     $ERROR_NOT_BINARY_STRING
     $KAFKA_SERVER_PORT
-    $RECEIVE_LATEST_OFFSET
-    $RECEIVE_EARLIEST_OFFSETS
+    $RECEIVE_LATEST_OFFSETS    $RECEIVE_EARLIEST_OFFSET
     $REQUEST_TIMEOUT
 );
 use Kafka::Internals qw(
@@ -567,13 +566,13 @@ sub send {
         my $Time = $partition_data->{Time};
 
         my $offsets = $decoded_offset_response->{topics}->[0]->{PartitionOffsets}->[0]->{Offset} = [];
-        if ( $Time == $RECEIVE_LATEST_OFFSET ) {
+        if ( $Time == $RECEIVE_LATEST_OFFSETS) {
             push( @{ $offsets }, ( exists( $_received_data{ $topic }->{ $partition } )
                 ? scalar( @{ $_received_data{ $topic }->{ $partition } } )
                 : () ),
                 0 );
         }
-        elsif ( $Time == $RECEIVE_EARLIEST_OFFSETS ) {
+        elsif ( $Time == $RECEIVE_EARLIEST_OFFSET ) {
             push @{ $offsets }, 0;
         } else {
             if ( exists( $_received_data{ $topic }->{ $partition } ) ) {

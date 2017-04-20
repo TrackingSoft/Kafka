@@ -56,7 +56,7 @@ use Params::Util qw(
 use Kafka qw(
     $BLOCK_UNTIL_IS_COMMITTED
     $DEFAULT_MAX_BYTES
-    $RECEIVE_LATEST_OFFSET
+    $RECEIVE_LATEST_OFFSETS
     $RETRY_BACKOFF
 );
 use Kafka::Cluster qw(
@@ -127,7 +127,7 @@ sub getting_offsets {
     return $consumer->offsets(
         ++$topic,
         $partition,
-        $RECEIVE_LATEST_OFFSET,         # time
+        $RECEIVE_LATEST_OFFSETS,         # time
     );
 }
 

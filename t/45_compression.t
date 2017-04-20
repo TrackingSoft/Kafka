@@ -39,7 +39,7 @@ use Kafka qw(
     $COMPRESSION_SNAPPY
     $DEFAULT_MAX_BYTES
     $DEFAULT_MAX_NUMBER_OF_OFFSETS
-    $RECEIVE_LATEST_OFFSET
+    $RECEIVE_LATEST_OFFSETS
     $RETRY_BACKOFF
 );
 use Kafka::Cluster;
@@ -119,7 +119,7 @@ foreach my $codec ( @compession_codecs )
 $offsets = $consumer->offsets(
     $topic,
     $partition,
-    $RECEIVE_LATEST_OFFSET,         # time
+    $RECEIVE_LATEST_OFFSETS,         # time
     $DEFAULT_MAX_NUMBER_OF_OFFSETS, # max_number
 );
 if ( $offsets ) {

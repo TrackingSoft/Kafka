@@ -54,7 +54,7 @@ use Try::Tiny;
 use Kafka qw(
     $BLOCK_UNTIL_IS_COMMITTED
     $MESSAGE_SIZE_OVERHEAD
-    $RECEIVE_LATEST_OFFSET
+    $RECEIVE_LATEST_OFFSETS
     $RETRY_BACKOFF
 );
 use Kafka::Cluster;
@@ -175,7 +175,7 @@ sub next_offset {
         $offsets = $consumer->offsets(
             $TOPIC,
             $partition,
-            $RECEIVE_LATEST_OFFSET,             # time
+            $RECEIVE_LATEST_OFFSETS,             # time
         );
     };
     if ( $@ ) {

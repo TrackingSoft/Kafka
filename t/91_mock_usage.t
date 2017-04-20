@@ -39,8 +39,8 @@ use Kafka qw(
     $DEFAULT_MAX_BYTES
     $DEFAULT_MAX_NUMBER_OF_OFFSETS
     $KAFKA_SERVER_PORT
-    $RECEIVE_LATEST_OFFSET
-    $RECEIVE_EARLIEST_OFFSETS
+    $RECEIVE_LATEST_OFFSETS
+    $RECEIVE_EARLIEST_OFFSET
     $REQUEST_TIMEOUT
 );
 use Kafka::Connection;
@@ -164,7 +164,7 @@ isa_ok( $consumer, 'Kafka::Consumer');
 $offsets = $consumer->offsets(
     $topic,                         # topic
     $partition,                     # partition
-    $RECEIVE_LATEST_OFFSET,         # time
+    $RECEIVE_LATEST_OFFSETS,         # time
     $DEFAULT_MAX_NUMBER_OF_OFFSETS, # max_number
     );
 if ( $offsets ) {

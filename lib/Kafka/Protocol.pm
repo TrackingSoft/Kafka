@@ -80,8 +80,6 @@ use Kafka qw(
     $ERROR_NOT_BINARY_STRING
     $ERROR_REQUEST_OR_RESPONSE
     $NOT_SEND_ANY_RESPONSE
-    $RECEIVE_EARLIEST_OFFSETS
-    $RECEIVE_LATEST_OFFSET
     $WAIT_WRITTEN_TO_LOCAL_LOG
 );
 use Kafka::Exceptions;
@@ -478,7 +476,7 @@ my ( $_Message_template,                    $_Message_length ) = (
                             # Key length
     8                       # Only Offset length
 );
-my ( $_Message_template_v1,                    $_Message_length_v1 ) = (
+my ( $_Message_template_with_timestamp,     $_Message_length_with_timestamp ) = (
     qq(${_int64_template}l>l>cc${_int64_template}l>),
                             # 8 Offset
                             # MessageSize
@@ -848,7 +846,7 @@ sub encode_fetch_request {
     push( @data,
         $Fetch_Request->{MaxWaitTime},                                      # MaxWaitTime
         $Fetch_Request->{MinBytes},                                         # MinBytes
-        ( $is_v3 ? $Fetch_Request->{MinBytes} : () ),                       # MinBytes (version 3 only)
+        ( $is_v3 ? $Fetch_Request->{MaxBytes} : () ),                       # MaxBytes (version 3 only)
         scalar( @$topics_array ),                                           # topics array size
     );
     if ($is_v3) {
@@ -909,6 +907,7 @@ sub decode_fetch_response {
     my $is_v2 = $api_version == 2;
     my $is_v3 = $api_version == 3;
 
+
 # According to Apache Kafka documentation:
 # As an optimization the server is allowed to return a partial message at the end of the message set.
 # Clients should handle this case.
@@ -953,7 +952,7 @@ sub decode_fetch_response {
             $MessageSetSize                                 =  $data[ $i++ ];   # MessageSetSize
             $MessageSet_array = $partition->{MessageSet}    =  [];
 
-            _decode_MessageSet_array( $response, $MessageSetSize, \$i, $MessageSet_array, $api_version );
+            _decode_MessageSet_array( $response, $MessageSetSize, \$i, $MessageSet_array );
 
             push( @$partitions_array, $partition );
         }
@@ -1108,7 +1107,7 @@ sub decode_offset_response {
     my @data = unpack( $template, $$bin_stream_ref );
 
     my $i = 0;
-    my $Offset_Response = { is_v1 => $is_v1 };
+    my $Offset_Response = { };
 
     $Offset_Response->{CorrelationId}                           =  $data[ $i++ ];   # CorrelationId
 
@@ -1397,7 +1396,7 @@ sub _decode_fetch_response_template {
                                                                                 # [s] ErrorCode
                                                                                 # [q] HighwaterMarkOffset
 
-        _decode_MessageSet_template( $response, $is_v1 || $is_v2 || $is_v3 );
+        _decode_MessageSet_template( $response );
     }
 
     return;
@@ -1405,12 +1404,7 @@ sub _decode_fetch_response_template {
 
 # Decrypts MessageSet
 sub _decode_MessageSet_array {
-    my ( $response, $MessageSetSize, $i_ref, $MessageSet_array_ref, $api_version ) = @_;
-
-    $api_version //= $DEFAULT_APIVERSION;
-    my $is_v1 = $api_version == 1;
-    my $is_v2 = $api_version == 2;
-    my $is_v3 = $api_version == 3;
+    my ( $response, $MessageSetSize, $i_ref, $MessageSet_array_ref) = @_;
 
     my $data = $response->{data};
     my $data_array_size = scalar @{ $data };
@@ -1432,8 +1426,9 @@ sub _decode_MessageSet_array {
 # A message set is also the unit of compression in Kafka,
 # and we allow messages to recursively contain compressed message sets to allow batch compression.
         $Message->{MagicByte}                                        =  $data->[ $$i_ref++ ];   # MagicByte
+        my $is_v1_msg_format = $Message->{MagicByte} == 1;
         $Message->{Attributes}                                       =  $data->[ $$i_ref++ ];   # Attributes
-        if ($is_v1 || $is_v2 || $is_v3) {
+        if ($is_v1_msg_format) {
             $Message->{Timestamp}                                    =  $data->[ $$i_ref++ ];   # Timestamp
         }
 
@@ -1477,7 +1472,7 @@ sub _decode_MessageSet_array {
                 bin_stream      => \$decompressed,
                 stream_offset   => 0,
             };
-            _decode_MessageSet_sized_template( $Value_length, $resp, $is_v1 || $is_v2 || $is_v3 );
+            _decode_MessageSet_sized_template( $Value_length, $resp );
             @data = unpack( $resp->{template}, ${ $resp->{bin_stream} } );
             my $i = 0;  # i_ref
             my $size = length( $decompressed );
@@ -1622,7 +1617,7 @@ sub _encode_MessageSet_array {
 
 # Generates a template to decrypt MessageSet
 sub _decode_MessageSet_template {
-    my ( $response, $is_v1 ) = @_;
+    my ( $response ) = @_;
 
     my $MessageSetSize = unpack(
          q{x[}.$response->{stream_offset}
@@ -1632,56 +1627,46 @@ sub _decode_MessageSet_template {
     $response->{template} .= q{l>};         # MessageSetSize
     $response->{stream_offset} += 4;        # bytes before Offset
 
-    return _decode_MessageSet_sized_template($MessageSetSize, $response, $is_v1);
+    return _decode_MessageSet_sized_template($MessageSetSize, $response);
 }
 
 sub _decode_MessageSet_sized_template {
-    my ( $MessageSetSize, $response, $is_v1 ) = @_;
+    my ( $MessageSetSize, $response ) = @_;
 
     my $bin_stream_length = length ${ $response->{bin_stream} };
 
-    my ( $local_template, $MessageSize, $Key_length, $Value_length );
+    my ( $local_template, $MessageSize, $MagicByte, $Key_length, $Value_length );
     CREATE_TEMPLATE:
     while ( $MessageSetSize ) {
 # Not the full MessageSet
-        last CREATE_TEMPLATE if $MessageSetSize < ($is_v1 ? 30 : 22);
+        last CREATE_TEMPLATE if $MessageSetSize < 22; # 22 is the minimal size of a v0 message format
                 # [q] Offset
                 # [l] MessageSize
                 # [l] Crc
                 # [c] MagicByte
                 # [c] Attributes
-                # ( [q] Timestamp ) v1 only
+                # ( [q] Timestamp ) message format v1 only
                 # [l] Key length
                 # [l] Value length
 
         $local_template = q{};
         MESSAGE_SET:
         {
-            $local_template .= ( $is_v1 ? $_Message_template_v1 : $_Message_template );
-            $response->{stream_offset} += ( $is_v1 ? $_Message_length_v1 : $_Message_length ); # (Only Offset length)
-                # [q] Offset
-                # [l] MessageSize
-                # [l] Crc
-                # [c] MagicByte
-                # [c] Attributes
-                # ( [q] Timestamp ) v1 only
-                # [l] Key length
-                                                # bytes before MessageSize
-                                                                                # [q] Offset
-            $MessageSize = unpack(
-                 q{x[}.$response->{stream_offset}
-                .q{]l>},                        # MessageSize
+            $response->{stream_offset} += 8; # the size of the offset data value
+            ($MessageSize, $MagicByte) = unpack(
+                 q{x[}.$response->{stream_offset}.q{]}
+                .q{l>}                        # MessageSize
+                .q{x[l]}                      # Crc
+                .q{c},                        # MagicByte
+
                 ${ $response->{bin_stream} }
             );
 
-            $response->{stream_offset} += ($is_v1 ? 18: 10);
-                                                # bytes before Crc
-                                                                                # [l] MessageSize
-                                                # bytes before Key length
-                                                                                # [l] Crc
-                                                                                # [c] MagicByte
-                                                                                # [c] Attributes
-                                                                                # ( [q] Timestamp ) v1 only
+            my $is_v1_msg_format = $MagicByte == 1;
+            $local_template .= ( $is_v1_msg_format ? $_Message_template_with_timestamp : $_Message_template );
+
+            $response->{stream_offset} += ($is_v1_msg_format ? 18: 10);
+
             $Key_length = unpack(
                  q{x[}.$response->{stream_offset}
                 .q{]l>},                        # Key length

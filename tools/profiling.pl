@@ -35,8 +35,8 @@ use Try::Tiny;
 
 use Kafka qw (
     $MESSAGE_SIZE_OVERHEAD
-    $RECEIVE_EARLIEST_OFFSETS
-    $RECEIVE_LATEST_OFFSET
+    $RECEIVE_EARLIEST_OFFSET
+    $RECEIVE_LATEST_OFFSETS
 );
 use Kafka::Cluster;
 use Kafka::Connection;
@@ -50,7 +50,7 @@ use Kafka::TestInternals;
 #-- declarations ---------------------------------------------------------------
 
 const my @T_DIRS                => ( 't', catdir( '..', 't' ) );
-const my @TEST_OFFSETS          => ( $RECEIVE_LATEST_OFFSET, $RECEIVE_EARLIEST_OFFSETS );
+const my @TEST_OFFSETS          => ( $RECEIVE_LATEST_OFFSETS, $RECEIVE_EARLIEST_OFFSET );
 
 my ( $ret, $help, $base_dir, $topic, $partition, $msg_len, $number_of_messages );
 
@@ -158,7 +158,7 @@ try {
 # INSTRUCTIONS -----------------------------------------------------------------
 
 try {
-    $offsets = $consumer->offsets( $topic, $partition, $RECEIVE_LATEST_OFFSET );
+    $offsets = $consumer->offsets( $topic, $partition, $RECEIVE_LATEST_OFFSETS );
 } catch {
     exit_on_error( $_ );
 };
