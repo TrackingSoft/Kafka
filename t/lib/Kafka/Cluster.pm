@@ -812,9 +812,8 @@ sub data_cleanup {
 #-- private functions ----------------------------------------------------------
 
 sub _clear_tainted {
-    my ( $str ) = @_;
 
-    $str =~ /(.+)/;
+    $_[0] =~ /(.+)/;
 
     return $1;
 }

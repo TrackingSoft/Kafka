@@ -75,6 +75,7 @@ sub testing {
         host            => 'localhost',
         port            => $port,
         RETRY_BACKOFF   => $RETRY_BACKOFF * 2,
+        dont_load_supported_api_versions => 1,
     );
     isa_ok( $connect, 'Kafka::Connection' );
 

@@ -126,8 +126,10 @@ our @EXPORT_OK = qw(
     $MIN_BYTES_RESPOND_HAS_DATA
     $MIN_BYTES_RESPOND_IMMEDIATELY
     $NOT_SEND_ANY_RESPONSE
+    $RECEIVE_EARLIEST_OFFSET
     $RECEIVE_EARLIEST_OFFSETS
     $RECEIVE_LATEST_OFFSET
+    $RECEIVE_LATEST_OFFSETS
     $REQUEST_TIMEOUT
     $RETRY_BACKOFF
     $SEND_MAX_ATTEMPTS
@@ -427,14 +429,14 @@ L<Kafka::Message|Kafka::Message> objects.
     use Kafka qw(
         $DEFAULT_MAX_BYTES
         $DEFAULT_MAX_NUMBER_OF_OFFSETS
-        $RECEIVE_EARLIEST_OFFSETS
+        $RECEIVE_EARLIEST_OFFSET
     );
 
     # Get a list of valid offsets up to max_number before the given time
     my $offsets = $consumer->offsets(
         'mytopic',                      # topic
         0,                              # partition
-        $RECEIVE_EARLIEST_OFFSETS,      # time
+        $RECEIVE_EARLIEST_OFFSET,      # time
         $DEFAULT_MAX_NUMBER_OF_OFFSETS  # max_number
     );
     say "Received offset: $_" foreach @$offsets;
@@ -591,12 +593,34 @@ const our $RETRY_BACKOFF                        => 200;
 
 =item C<$RECEIVE_LATEST_OFFSET>
 
+B<DEPRECATED>: please use C<$RECEIVE_LATEST_OFFSETS>, as when using this
+constant to retrieve offsets, you can get more than one. It's kept for backward
+compatibility.
+
 -1 : special value that denotes latest available offset.
 
 =cut
-const our $RECEIVE_LATEST_OFFSET                => -1;  # to receive the latest offset (this will only ever return one offset).
+const our $RECEIVE_LATEST_OFFSET                => -1;  # deprecated, this may return multiple offsets, so the naming is wrong).
+
+=item C<$RECEIVE_LATEST_OFFSETS>
+
+-1 : special value that denotes latest available offsets.
+
+=cut
+const our $RECEIVE_LATEST_OFFSETS                => -1;  # to receive the latest offsets.
+
+=item C<$RECEIVE_EARLIEST_OFFSET>
+
+-2 : special value that denotes earliest available offset.
+
+=cut
+const our $RECEIVE_EARLIEST_OFFSET             => -2;
 
 =item C<$RECEIVE_EARLIEST_OFFSETS>
+
+B<DEPRECATED>: please use C<$RECEIVE_EARLIEST_OFFSET>, as when using this
+constant to retrieve offset, you can get only one. It's kept for backward
+compatibility.
 
 -2 : special value that denotes earliest available offset.
 
@@ -1377,7 +1401,7 @@ __END__
     use Kafka qw(
         $KAFKA_SERVER_PORT
         $REQUEST_TIMEOUT
-        $RECEIVE_EARLIEST_OFFSETS
+        $RECEIVE_EARLIEST_OFFSET
         $DEFAULT_MAX_NUMBER_OF_OFFSETS
         $DEFAULT_MAX_BYTES
     );
@@ -1419,7 +1443,7 @@ __END__
         my $offsets = $consumer->offsets(
             'mytopic',                      # topic
             0,                              # partition
-            $RECEIVE_EARLIEST_OFFSETS,      # time
+            $RECEIVE_EARLIEST_OFFSET,      # time
             $DEFAULT_MAX_NUMBER_OF_OFFSETS  # max_number
         );
 

@@ -54,7 +54,7 @@ use Try::Tiny;
 use Kafka qw(
     $BLOCK_UNTIL_IS_COMMITTED
     $MESSAGE_SIZE_OVERHEAD
-    $RECEIVE_LATEST_OFFSET
+    $RECEIVE_LATEST_OFFSETS
     $RETRY_BACKOFF
 );
 use Kafka::Cluster;
@@ -175,7 +175,7 @@ sub next_offset {
         $offsets = $consumer->offsets(
             $TOPIC,
             $partition,
-            $RECEIVE_LATEST_OFFSET,             # time
+            $RECEIVE_LATEST_OFFSETS,             # time
         );
     };
     if ( $@ ) {
@@ -320,6 +320,7 @@ sub create_client {
             timeout                 => 30,
             AutoCreateTopicsEnable  => 1,
             RETRY_BACKOFF           => $RETRY_BACKOFF * 2,
+            dont_load_supported_api_versions => 1,
         );
 
         if ( $client_type eq 'producer' ) {
@@ -414,6 +415,7 @@ $connection = Kafka::Connection->new(
     port                    => $port,
     AutoCreateTopicsEnable  => 1,
     RETRY_BACKOFF           => $RETRY_BACKOFF * 2,
+    dont_load_supported_api_versions => 1,
 );
 $producer = Kafka::Producer->new(
     Connection      => $connection,

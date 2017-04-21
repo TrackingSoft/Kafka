@@ -52,7 +52,7 @@ use Time::HiRes qw(
 use Try::Tiny;
 
 use Kafka qw(
-    $RECEIVE_LATEST_OFFSET
+    $RECEIVE_LATEST_OFFSETS
     $DEFAULT_MAX_BYTES
     $DEFAULT_MAX_NUMBER_OF_OFFSETS
     $ERROR_CANNOT_BIND
@@ -127,6 +127,7 @@ unless ( $connect = Kafka::Connection->new(
     port    => $port,
     SEND_MAX_ATTEMPTS       => $attempts,
     RETRY_BACKOFF           => $RETRY_BACKOFF * 2,
+    dont_load_supported_api_versions => 1,
     ) ) {
     BAIL_OUT 'connection is not created';
 }
@@ -157,7 +158,7 @@ sub next_offset {
     my $offsets = $consumer->offsets(
         $topic,
         $partition,
-        $RECEIVE_LATEST_OFFSET,             # time
+        $RECEIVE_LATEST_OFFSETS,             # time
         $DEFAULT_MAX_NUMBER_OF_OFFSETS,     # max_number
     );
     if ( $offsets ) {

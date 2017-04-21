@@ -48,8 +48,8 @@ use Kafka qw(
     $MIN_BYTES_RESPOND_IMMEDIATELY
     $MIN_BYTES_RESPOND_HAS_DATA
     $NOT_SEND_ANY_RESPONSE
-    $RECEIVE_EARLIEST_OFFSETS
-    $RECEIVE_LATEST_OFFSET
+    $RECEIVE_EARLIEST_OFFSET
+    $RECEIVE_LATEST_OFFSETS
     $REQUEST_TIMEOUT
     $RETRY_BACKOFF
     $SEND_MAX_ATTEMPTS
@@ -100,6 +100,7 @@ sub new_ERROR_MISMATCH_ARGUMENT {
                 SEND_MAX_ATTEMPTS   => $SEND_MAX_ATTEMPTS,
                 RETRY_BACKOFF       => $RETRY_BACKOFF,
                 $field              => $bad_value,
+                dont_load_supported_api_versions => 1,
             );
         } 'Kafka::Exception::Connection', 'error thrown';
         ok !defined( $connect ), 'connection object is not created';
@@ -113,6 +114,7 @@ sub is_ERROR_MISMATCH_ARGUMENT {
         $connect = Kafka::Connection->new(
             host        => 'localhost',
             port        => $port,
+            dont_load_supported_api_versions => 1,
         );
 
         throws_ok { $connect->$function( $bad_value->[0] ) } 'Kafka::Exception::Connection', 'error thrown';
@@ -148,6 +150,7 @@ sub testing {
     $connect = Kafka::Connection->new(
         host    => 'localhost',
         port    => $port,
+        dont_load_supported_api_versions => 1,
     );
     isa_ok( $connect, 'Kafka::Connection' );
     ok !defined( $connect->{ip_version} ), 'ip_version OK';
@@ -156,6 +159,7 @@ sub testing {
         host        => 'localhost',
         port        => $port,
         ip_version  => $IP_V4,
+        dont_load_supported_api_versions => 1,
     );
     isa_ok( $connect, 'Kafka::Connection' );
     is $connect->{ip_version}, $IP_V4, 'ip_version OK';
@@ -203,6 +207,7 @@ sub testing {
         host        => 'localhost',
         port        => $port,
         ip_version  => $IP_V4,
+        dont_load_supported_api_versions => 1,
     );
 
 # Here and below, the query explicitly indicate ApiKey - producer and consumer must act also
@@ -280,8 +285,8 @@ sub testing {
 #-- OffsetRequest
 
     for my $mode (
-        $RECEIVE_EARLIEST_OFFSETS,
-        $RECEIVE_LATEST_OFFSET,
+        $RECEIVE_EARLIEST_OFFSET,
+        $RECEIVE_LATEST_OFFSETS,
         ) {
 
         $request = {
@@ -416,6 +421,7 @@ sub communication_error {
     $connect = Kafka::Connection->new(
         host        => 'localhost',
         port        => $port,
+        dont_load_supported_api_versions => 1,
     );
 
     my $errors = $connect->cluster_errors;
