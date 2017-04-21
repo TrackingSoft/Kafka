@@ -473,6 +473,8 @@ The argument must be a positive number.
 The argument may be a L<Math::BigInt|Math::BigInt> integer on 32 bit
 system.
 
+=back
+
 =cut
 
 sub offset_at_time {
@@ -517,6 +519,8 @@ The argument must be a positive number.
 The argument may be a L<Math::BigInt|Math::BigInt> integer on 32 bit
 system.
 
+=back
+
 =cut
 
 sub offset_before_time {
@@ -548,6 +552,8 @@ The C<$topics> must be a normal non-false strings of non-zero length.
 
 The C<$partitions> must be a non-negative integers.
 
+=back
+
 =cut
 
 sub offset_earliest {
@@ -557,7 +563,7 @@ sub offset_earliest {
     return $self->_query_offsets($topic, $partition, $RECEIVE_EARLIEST_OFFSET, 1, 0)->[0];
 }
 
-=head3 C<offset_earliest( $topic, $partition )>
+=head3 C<offset_latest( $topic, $partition )>
 
 Returns the latest offset for a given topic and partition
 
@@ -572,6 +578,8 @@ The C<$topics> must be a normal non-false strings of non-zero length.
 =item C<$partition>
 
 The C<$partitions> must be a non-negative integers.
+
+=back
 
 =cut
 
@@ -612,6 +620,8 @@ The special values C<$RECEIVE_LATEST_OFFSETS> (-1), C<$RECEIVE_EARLIEST_OFFSET>
 =item C<$max_number>
 
 Maximum number of offsets to be returned
+
+=back
 
 =cut
 

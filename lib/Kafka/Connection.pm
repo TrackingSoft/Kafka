@@ -537,7 +537,7 @@ sub load_supported_api_versions {
         # 0.10.0.0 so this call may fail. We simply ignore this failure and
         # carry on.
         $api_versions = $self->_get_supported_api_versions();
-    }; 
+    };
 
     foreach my $element (@$api_versions) {
         # we want to choose which api version to use for each API call. We
