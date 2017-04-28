@@ -449,6 +449,7 @@ sub receive {
             if ( defined( $from_recv ) && length( $buf ) ) {
                 $message .= $buf;
                 $len_to_read = $length - length( $message );
+                --$retries; # this attempt was successful, don't count as a retry
             }
             if ( $errno ) {
                 if ( $errno == EINTR ) {
