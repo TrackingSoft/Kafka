@@ -94,12 +94,11 @@ if ( !$BITS64 ) { eval 'use Kafka::Int64; 1;' or die "Cannot load Kafka::Int64 :
         #-- Consumer
         $consumer = Kafka::Consumer->new( Connection  => $connection );
 
-        # Get a list of valid offsets up max_number before the given time
-        my $offsets = $consumer->offsets(
+        # Get a valid offset before the given time
+        my $offsets = $consumer->offset_before_time(
             'mytopic',                      # topic
             0,                              # partition
-            $RECEIVE_EARLIEST_OFFSET,       # time
-            $DEFAULT_MAX_NUMBER_OF_OFFSETS  # max_number
+            (time()-3600) * 1000,           # time
         );
 
         if ( @$offsets ) {
