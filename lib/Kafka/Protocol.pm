@@ -1324,7 +1324,7 @@ sub _encode_request_header {
     # we need to find out which API version to use for the request (and the
     # response). $request_ref->{ApiVersion} can be specified by the end user,
     # or providede by by Kafka::Connection ( see
-    # Kafka::Connection::load_supported_api_versions() ). If not provided, we
+    # Kafka::Connection::_get_api_versions() ). If not provided, we
     # default to $DEFAULT_APIVERSION
     my $api_version = $request_ref->{ApiVersion} // $DEFAULT_APIVERSION;
     @{ $request->{data} } = (

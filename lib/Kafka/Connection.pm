@@ -399,8 +399,18 @@ access those errors.
 
 Optional, default value is 0 (false).
 
-If set to false, upon instantiation, C<load_supported_api_versions()> will be
-called. If set to true, C<load_supported_api_versions()> will not be called.
+If set to false, when communicating with a broker, the client will
+automatically try to find out the best version numbers to use for each of the
+API endpoints.
+
+If set to true, the client will alays use
+C<$Kafka::Protocol::DEFAULT_APIVERSION> as API version.
+
+=item C<api_versions_refresh_delay_sec =E<gt> $positive_integer>
+
+Optional, default value is 60 (1 minute).
+
+The delay after which the client will refresh the supported API versions.
 
 =back
 
@@ -419,6 +429,7 @@ sub new {
         AutoCreateTopicsEnable  => 0,
         MaxLoggedErrors         => 100,
         dont_load_supported_api_versions => 0,
+        api_versions_refresh_delay_sec => 60,
         _api_versions           => {},
     }, $class;
 
@@ -493,9 +504,6 @@ sub new {
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'server is not specified' )
         unless keys( %$IO_cache );
 
-    $self->{dont_load_supported_api_versions}
-      or $self->load_supported_api_versions();
-
     return $self;
 }
 
@@ -520,23 +528,32 @@ sub get_known_servers {
     return keys %{ $self->{_IO_cache} };
 }
 
-=head3 C<load_supported_api_versions>
+sub _get_api_versions {
+    my ( $self, $server ) = @_;
 
-Query the Kafka servers to find out what are the supported API versions per
-endpoints, and finds out the best version numbers to use for each of them. This
-is automatically called when calling C<new()>, unless the attribute
-C<dont_load_supported_api_versions> is set to true
+    # if the cached data we have is too old, delete it
+    defined $self->{_api_versions}{$server}
+      && $self->{_api_versions}{$server}{__timestamp_sec__} + $self->{api_versions_refresh_delay_sec} < time
+      and delete $self->{_api_versions}{$server};
 
-=cut
+    # if we have cached data, just use it
+    defined $self->{_api_versions}{$server}
+      and return $self->{_api_versions}{$server};
 
-sub load_supported_api_versions {
-    my ( $self ) = @_;
+    # no cached data. Initialize empty one
+    $self->{_api_versions}{$server} = { __timestamp_sec__ => time() };
+
+    # use empty data if client doesn't want to detect API versions
+    $self->{dont_load_supported_api_versions}
+      and return $self->{_api_versions}{$server};
+
+    # call the server and try to get the supported API versions
     my $api_versions = [];
     try {
         # The ApiVersions API endpoint is only supported on Kafka versions >
         # 0.10.0.0 so this call may fail. We simply ignore this failure and
         # carry on.
-        $api_versions = $self->_get_supported_api_versions();
+        $api_versions = $self->_get_supported_api_versions($server);
     };
 
     foreach my $element (@$api_versions) {
@@ -554,10 +571,10 @@ sub load_supported_api_versions {
           and $version = $implemented_max_version;
         $version < $kafka_min_version
           and $version = -1;
-        $self->{_api_versions}{$api_key} = $version;
+        $self->{_api_versions}{$server}{$api_key} = $version;
     }
 
-    return;
+    return $self->{_api_versions}{$server};
 }
 
 
@@ -565,7 +582,7 @@ sub load_supported_api_versions {
 # this call works only against Kafka 1.10.0.0
 
 sub _get_supported_api_versions {
-    my ( $self ) = @_;
+    my ( $self, $broker ) = @_;
 
     my $CorrelationId = _get_CorrelationId();
     my $decoded_request = {
@@ -580,17 +597,15 @@ sub _get_supported_api_versions {
     my $encoded_request = $protocol{ $APIKEY_APIVERSIONS }->{encode}->( $decoded_request );
 
     my $encoded_response_ref;
-    my @brokers = $self->_get_interviewed_servers;
 
-    # receive metadata
-    foreach my $broker ( @brokers ) {
+    # receive apiversions. We use a code block because it's actually a loop where
+    # you can do last.
+    {
         $self->_connectIO( $broker )
-          or next;
+          or last;
         my $sent = $self->_sendIO( $broker, $encoded_request )
-          or next;
-        $encoded_response_ref = $self->_receiveIO( $broker )
-          or next;
-        last;
+          or last;
+        $encoded_response_ref = $self->_receiveIO( $broker );
     }
 
     unless ( $encoded_response_ref ) {
@@ -599,7 +614,7 @@ sub _get_supported_api_versions {
     }
 
     my $decoded_response = $protocol{ $APIKEY_APIVERSIONS }->{decode}->( $encoded_response_ref );
-    say STDERR format_message( '[%s] metadata response: %s',
+    say STDERR format_message( '[%s] apiversions response: %s',
             scalar( localtime ),
             $decoded_response,
         ) if $self->debug_level;
@@ -776,11 +791,6 @@ sub receive_response_to_request {
     my $topic_data  = $request->{topics}->[0];
     my $topic_name  = $topic_data->{TopicName};
     my $partition   = $topic_data->{partitions}->[0]->{Partition};
-    # If the api version was not specified in the request, try to use the one
-    # we detected from the Kafka server and that our protocol implements.
-    # $self->{_api_versions}{$api_key} might be undef if detection against the
-    # Kafka server was not done
-    $request->{ApiVersion} //= $self->{_api_versions}{$api_key};
 
     if (
            !%{ $self->{_metadata} }         # the first request
@@ -793,8 +803,6 @@ sub receive_response_to_request {
     }
 
     $request->{CorrelationId} = _get_CorrelationId() unless exists $request->{CorrelationId};
-
-    my $encoded_request = $protocol{ $api_key }->{encode}->( $request, $compression_codec );
 
     say STDERR format_message( '[%s] compression_codec=%s, request=%s',
         scalar( localtime ),
@@ -822,6 +830,16 @@ sub receive_response_to_request {
 
         # Send a request to the leader
         if ( $self->_connectIO( $server ) ) {
+
+            # we can connect to this leader, so let's detect the api versions
+            # it and use whatever it supports, except if the request forces us
+            # to use an api version. Warning, the version might be undef if
+            # detection against the Kafka server failed, or if
+            # dont_load_supported_api_versions is true
+
+            $request->{ApiVersion} //= $self->_get_api_versions($server)->{$api_key};
+            my $encoded_request = $protocol{ $api_key }->{encode}->( $request, $compression_codec );
+
             unless ( $self->_sendIO( $server, $encoded_request ) ) {
                 $io_error = $self->_io_error( $server );
                 $ErrorCode = $io_error ? $io_error->code : $ERROR_CANNOT_SEND;
