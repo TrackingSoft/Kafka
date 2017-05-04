@@ -30,6 +30,8 @@ our @EXPORT_OK = qw(
     $APIKEY_OFFSET
     $APIKEY_METADATA
     $APIKEY_APIVERSIONS
+    $APIKEY_OFFSETCOMMIT
+    $APIKEY_OFFSETFETCH
     $DEFAULT_RAISE_ERROR
     $MAX_CORRELATIONID
     $MAX_INT16
@@ -119,10 +121,20 @@ const our $APIKEY_METADATA                      => 3;
 const our $APIKEY_LEADERANDISR                  => 4;   # Not used now
 # The numeric code that the ApiKey in the request take for the C<StopReplicaRequest> request type.
 const our $APIKEY_STOPREPLICA                   => 5;   # Not used now
-# The numeric code that the ApiKey in the request take for the C<OffsetCommitRequest> request type.
-const our $APIKEY_OFFSETCOMMIT                  => 8;   # Not used now
-# The numeric code that the ApiKey in the request take for the C<OffsetFetchRequest> request type.
-const our $APIKEY_OFFSETFETCH                   => 9;   # Not used now
+
+=head3 C<$APIKEY_OFFSETCOMMIT>
+
+The numeric code that the ApiKey in the request take for the C<OffsetCommitRequest> request type.
+
+=cut
+const our $APIKEY_OFFSETCOMMIT                  => 8;
+
+=head3 C<$APIKEY_OFFSETFETCH>
+
+The numeric code that the ApiKey in the request take for the C<OffsetFetchRequest> request type.
+
+=cut
+const our $APIKEY_OFFSETFETCH                   => 9;
 
 =head3 C<$APIKEY_APIVERSIONS>
 
