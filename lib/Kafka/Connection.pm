@@ -224,6 +224,7 @@ my %protocol = (
     "$APIKEY_APIVERSIONS"  => {
         decode                  => \&decode_api_versions_response,
         encode                  => \&encode_api_versions_request,
+    },
     "$APIKEY_OFFSETCOMMIT"  => {
         decode                  => \&decode_offsetcommit_response,
         encode                  => \&encode_offsetcommit_request,
