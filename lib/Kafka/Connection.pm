@@ -430,7 +430,6 @@ sub new {
         MaxLoggedErrors         => 100,
         dont_load_supported_api_versions => 0,
         api_versions_refresh_delay_sec => 60,
-        _api_versions           => {},
     }, $class;
 
     while ( @args ) {
@@ -531,21 +530,20 @@ sub get_known_servers {
 sub _get_api_versions {
     my ( $self, $server ) = @_;
 
-    # if the cached data we have is too old, delete it
-    defined $self->{_api_versions}{$server}
-      && $self->{_api_versions}{$server}{__timestamp_sec__} + $self->{api_versions_refresh_delay_sec} < time
-      and delete $self->{_api_versions}{$server};
+    my $server_metadata = $self->{_IO_cache}->{$server};
+    defined $server_metadata
+      or die "Fatal error: server '$server' is unknown in IO cache, which should not happen";
 
     # if we have cached data, just use it
-    defined $self->{_api_versions}{$server}
-      and return $self->{_api_versions}{$server};
+    defined $server_metadata->{_api_versions}
+      and return $server_metadata->{_api_versions};
 
     # no cached data. Initialize empty one
-    $self->{_api_versions}{$server} = { __timestamp_sec__ => time() };
+    my $server_api_versions = $server_metadata->{_api_versions} = {};
 
     # use empty data if client doesn't want to detect API versions
     $self->{dont_load_supported_api_versions}
-      and return $self->{_api_versions}{$server};
+      and return $server_api_versions;
 
     # call the server and try to get the supported API versions
     my $api_versions = [];
@@ -571,10 +569,10 @@ sub _get_api_versions {
           and $version = $implemented_max_version;
         $version < $kafka_min_version
           and $version = -1;
-        $self->{_api_versions}{$server}{$api_key} = $version;
+        $server_api_versions->{$api_key} = $version;
     }
 
-    return $self->{_api_versions}{$server};
+    return $server_api_versions;
 }
 
 
