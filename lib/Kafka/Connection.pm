@@ -813,6 +813,10 @@ sub receive_response_to_request {
     my( $ErrorCode, $partition_data, $io_error );
 
     my $attempt = 0;
+    # we save the original api version of the request, because in the attempt
+    # loop we might be trying different brokers which may support different api
+    # versions.
+    my $original_request_api_version = $request->{ApiVersion};
     ATTEMPT: while ( ++$attempt <= ( $self->{SEND_MAX_ATTEMPTS} // 1 ) ) {
         $ErrorCode = $ERROR_NO_ERROR;
         undef $io_error;
@@ -833,11 +837,11 @@ sub receive_response_to_request {
 
             # we can connect to this leader, so let's detect the api versions
             # it and use whatever it supports, except if the request forces us
-            # to use an api version. Warning, the version might be undef if
-            # detection against the Kafka server failed, or if
-            # dont_load_supported_api_versions is true
-
-            $request->{ApiVersion} //= $self->_get_api_versions($server)->{$api_key};
+            # to use an api version. Warning, the version might end up being
+            # undef if detection against the Kafka server failed, or if
+            # dont_load_supported_api_versions is true. However the Encoder
+            # code knows how to handle it.
+            $request->{ApiVersion} = $original_request_api_version // $self->_get_api_versions($server)->{$api_key};
             my $encoded_request = $protocol{ $api_key }->{encode}->( $request, $compression_codec );
 
             unless ( $self->_sendIO( $server, $encoded_request ) ) {
