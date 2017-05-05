@@ -1340,6 +1340,7 @@ the structure of the OffsetCommit Request (examples see C<t/*_decode_encode.t>).
 =back
 
 =cut
+$IMPLEMENTED_APIVERSIONS->{$APIKEY_OFFSETCOMMIT} = 0;
 sub encode_offsetcommit_request {
     my ( $OffsetCommit_Request ) = @_;
 
@@ -1476,6 +1477,7 @@ the structure of the OffsetFetch Request (examples see C<t/*_decode_encode.t>).
 =back
 
 =cut
+$IMPLEMENTED_APIVERSIONS->{$APIKEY_OFFSETFETCH} = 1;
 sub encode_offsetfetch_request {
     my ( $OffsetFetch_Request ) = @_;
 
