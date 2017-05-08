@@ -34,7 +34,7 @@ use Kafka qw(
     $DEFAULT_MAX_WAIT_TIME
     $MIN_BYTES_RESPOND_IMMEDIATELY
     $NOT_SEND_ANY_RESPONSE
-    $RECEIVE_LATEST_OFFSET
+    $RECEIVE_LATEST_OFFSETS
     $REQUEST_TIMEOUT
 );
 use Kafka::Internals qw(
@@ -94,7 +94,7 @@ $request->{topics}->[0]->{partitions}->[0]->{FetchOffset} = 0;
 $request->{topics}->[0]->{partitions}->[0]->{MaxBytes} = $DEFAULT_MAX_BYTES;
 
 # Time
-$request->{topics}->[0]->{partitions}->[0]->{Time} = $RECEIVE_LATEST_OFFSET;
+$request->{topics}->[0]->{partitions}->[0]->{Time} = $RECEIVE_LATEST_OFFSETS;
 
 # MaxNumberOfOffsets
 $request->{topics}->[0]->{partitions}->[0]->{MaxNumberOfOffsets} = $DEFAULT_MAX_NUMBER_OF_OFFSETS;

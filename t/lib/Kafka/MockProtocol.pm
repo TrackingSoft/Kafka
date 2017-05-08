@@ -66,7 +66,7 @@ use Kafka::Internals qw(
     $APIKEY_PRODUCE
 );
 use Kafka::Protocol qw(
-    $APIVERSION
+    $DEFAULT_APIVERSION
     $CONSUMERS_REPLICAID
     $NULL_BYTES_LENGTH
     $_int64_template
@@ -213,7 +213,7 @@ sub decode_produce_request {
 
     $APIKEY_PRODUCE                                          == $data[ $i++ ]       # ApiKey
         or return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'ApiKey' );
-    $APIVERSION                                              == $data[ $i++ ]       # ApiVersion
+    $DEFAULT_APIVERSION                                      == $data[ $i++ ]       # ApiVersion
         or return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'ApiVersion' );
     $Produce_Request = {
         CorrelationId                                        => $data[ $i++ ],      # CorrelationId
@@ -379,7 +379,7 @@ sub decode_fetch_request {
 
     $APIKEY_FETCH                                            == $data[ $i++ ]       # ApiKey
         or return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'ApiKey' );
-    $APIVERSION                                              == $data[ $i++ ]       # ApiVersion
+    $DEFAULT_APIVERSION                                      == $data[ $i++ ]       # ApiVersion
         or return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'ApiVersion' );
     $Fetch_Request->{CorrelationId}                          =  $data[ $i++ ];      # CorrelationId
     $Fetch_Request->{ClientId}                               =  $data[ $i++ ];      # ClientId
@@ -543,7 +543,7 @@ sub decode_offset_request {
 
     $APIKEY_OFFSET                                           == $data[ $i++ ]       # ApiKey
         or return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'ApiKey' );
-    $APIVERSION                                              == $data[ $i++ ]       # ApiVersion
+    $DEFAULT_APIVERSION                                      == $data[ $i++ ]       # ApiVersion
         or return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'ApiVersion' );
     $Offset_Request->{CorrelationId}                         =  $data[ $i++ ];      # CorrelationId
     $Offset_Request->{ClientId}                              =  $data[ $i++ ];      # ClientId
@@ -702,7 +702,7 @@ sub decode_metadata_request {
 
     $APIKEY_METADATA                                     == $data[ $i++ ]   # ApiKey
         or return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'ApiKey' );
-    $APIVERSION                                          == $data[ $i++ ]   # ApiVersion
+    $DEFAULT_APIVERSION                                  == $data[ $i++ ]       # ApiVersion
         or return _protocol_error( $ERROR_REQUEST_OR_RESPONSE, 'ApiVersion' );
     $Metadata_Request->{CorrelationId}                   =  $data[ $i++ ];  # CorrelationId
     $Metadata_Request->{ClientId}                        =  $data[ $i++ ];  # ClientId

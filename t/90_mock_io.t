@@ -42,8 +42,8 @@ use Kafka qw(
     $DEFAULT_MAX_NUMBER_OF_OFFSETS
     $MIN_BYTES_RESPOND_HAS_DATA
     $NOT_SEND_ANY_RESPONSE
-    $RECEIVE_EARLIEST_OFFSETS
-    $RECEIVE_LATEST_OFFSET
+    $RECEIVE_EARLIEST_OFFSET
+    $RECEIVE_LATEST_OFFSETS
     $REQUEST_TIMEOUT
     $WAIT_WRITTEN_TO_LOCAL_LOG
 );
@@ -263,8 +263,8 @@ $decoded_request = {
             partitions                  => [
                 {
                     Partition           => $PARTITION,
-#                    Time                => $RECEIVE_EARLIEST_OFFSETS,
-                    Time                => $RECEIVE_LATEST_OFFSET,
+#                    Time                => $RECEIVE_EARLIEST_OFFSET,
+                    Time                => $RECEIVE_LATEST_OFFSETS,
                     MaxNumberOfOffsets  => $DEFAULT_MAX_NUMBER_OF_OFFSETS,
                 },
             ],

@@ -49,8 +49,8 @@ use Kafka qw(
     $ERROR_CANNOT_RECV
     $MESSAGE_SIZE_OVERHEAD
     $MIN_BYTES_RESPOND_IMMEDIATELY
-    $RECEIVE_EARLIEST_OFFSETS
-    $RECEIVE_LATEST_OFFSET
+    $RECEIVE_EARLIEST_OFFSET
+    $RECEIVE_LATEST_OFFSETS
     $RETRY_BACKOFF
 );
 use Kafka::Cluster;
@@ -141,6 +141,7 @@ sub communication_error {
         host            => 'localhost',
         port            => $port,
         RETRY_BACKOFF   => $RETRY_BACKOFF * 2,
+        dont_load_supported_api_versions => 1,
     );
 
     Sub::Install::reinstall_sub( {
@@ -176,7 +177,7 @@ sub communication_error {
         $offsets = $consumer->offsets(
             $topic,
             $partition,
-            $RECEIVE_LATEST_OFFSET,
+            $RECEIVE_LATEST_OFFSETS,
         );
     } 'Kafka::Exception::Connection', 'error thrown';
 
@@ -213,6 +214,7 @@ sub testing {
         host            => 'localhost',
         port            => $port,
         RETRY_BACKOFF   => $RETRY_BACKOFF * 2,
+        dont_load_supported_api_versions => 1,
     );
 
 #-- simple start
@@ -266,11 +268,11 @@ sub testing {
 #-- offsets
 
 # topic
-    offsets_ERROR_MISMATCH_ARGUMENT( $_, $partition, $RECEIVE_EARLIEST_OFFSETS, $DEFAULT_MAX_NUMBER_OF_OFFSETS )
+    offsets_ERROR_MISMATCH_ARGUMENT( $_, $partition, $RECEIVE_EARLIEST_OFFSET, $DEFAULT_MAX_NUMBER_OF_OFFSETS )
         foreach @not_empty_string;
 
 # partition
-    offsets_ERROR_MISMATCH_ARGUMENT( $topic, $_, $RECEIVE_EARLIEST_OFFSETS, $DEFAULT_MAX_NUMBER_OF_OFFSETS )
+    offsets_ERROR_MISMATCH_ARGUMENT( $topic, $_, $RECEIVE_EARLIEST_OFFSET, $DEFAULT_MAX_NUMBER_OF_OFFSETS )
         foreach @not_isint;
 
 # time
@@ -278,7 +280,7 @@ sub testing {
         foreach @not_isint, -3;
 
 # max_number
-    offsets_ERROR_MISMATCH_ARGUMENT( $topic, $partition, $RECEIVE_EARLIEST_OFFSETS, $_ )
+    offsets_ERROR_MISMATCH_ARGUMENT( $topic, $partition, $RECEIVE_EARLIEST_OFFSET, $_ )
         foreach grep( { defined $_ } @not_posint );
 
 #-- Preparing data
@@ -330,10 +332,10 @@ sub testing {
         $partition,
 # According to Apache Kafka documentation:
 # There are two special values.
-# Specify -1 ($RECEIVE_LATEST_OFFSET) to receive the latest offset (this will only ever return one offset).
-# Specify -2 ($RECEIVE_EARLIEST_OFFSETS) to receive the earliest available offsets.
-#        $RECEIVE_EARLIEST_OFFSETS,      # time
-        $RECEIVE_LATEST_OFFSET,         # time
+# Specify -1 ($RECEIVE_LATEST_OFFSETS) to receive the latest offset (this will only ever return one offset).
+# Specify -2 ($RECEIVE_EARLIEST_OFFSET) to receive the earliest available offsets.
+#        $RECEIVE_EARLIEST_OFFSET,      # time
+        $RECEIVE_LATEST_OFFSETS,         # time
         $DEFAULT_MAX_NUMBER_OF_OFFSETS, # max_number
     );
     ok _ARRAY( $offsets ), 'offsets are received';

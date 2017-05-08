@@ -39,8 +39,8 @@ use Kafka qw(
     $DEFAULT_MAX_BYTES
     $DEFAULT_MAX_NUMBER_OF_OFFSETS
     $KAFKA_SERVER_PORT
-    $RECEIVE_LATEST_OFFSET
-    $RECEIVE_EARLIEST_OFFSETS
+    $RECEIVE_LATEST_OFFSETS
+    $RECEIVE_EARLIEST_OFFSET
     $REQUEST_TIMEOUT
 );
 use Kafka::Connection;
@@ -75,11 +75,13 @@ dies_ok { $connect = Kafka::Connection->new(
     host        => 'localhost',
     port        => $port,
     timeout     => 'nothing',
+    dont_load_supported_api_versions => 1,
 ) } 'expecting to die';
 
 $connect = Kafka::Connection->new(
     host    => 'localhost',
     port    => $port,
+    dont_load_supported_api_versions => 1,
 );
 isa_ok( $connect, 'Kafka::Connection');
 
@@ -138,6 +140,7 @@ undef $connect;
 unless ( $connect = Kafka::Connection->new(
     host    => 'localhost',
     port    => $port,
+    dont_load_supported_api_versions => 1,
     ) ) {
     BAIL_OUT 'connection is not created';
 }
@@ -161,7 +164,7 @@ isa_ok( $consumer, 'Kafka::Consumer');
 $offsets = $consumer->offsets(
     $topic,                         # topic
     $partition,                     # partition
-    $RECEIVE_LATEST_OFFSET,         # time
+    $RECEIVE_LATEST_OFFSETS,         # time
     $DEFAULT_MAX_NUMBER_OF_OFFSETS, # max_number
     );
 if ( $offsets ) {

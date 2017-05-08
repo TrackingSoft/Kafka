@@ -51,7 +51,7 @@ use Socket;
 use Kafka qw(
     $DEFAULT_MAX_BYTES
     $DEFAULT_MAX_NUMBER_OF_OFFSETS
-    $RECEIVE_LATEST_OFFSET
+    $RECEIVE_LATEST_OFFSETS
     $RETRY_BACKOFF
 );
 use Kafka::Cluster;
@@ -89,6 +89,7 @@ $connect = Kafka::Connection->new(
     host            => '::1',
     port            => $PORT,
     RETRY_BACKOFF   => $RETRY_BACKOFF * 2,
+    dont_load_supported_api_versions => 1,
 );
 isa_ok( $connect, 'Kafka::Connection');
 
@@ -125,7 +126,7 @@ isa_ok( $consumer, 'Kafka::Consumer');
 $offsets = $consumer->offsets(
     $topic,                         # topic
     $partition,                     # partition
-    $RECEIVE_LATEST_OFFSET,         # time
+    $RECEIVE_LATEST_OFFSETS,         # time
     $DEFAULT_MAX_NUMBER_OF_OFFSETS, # max_number
 );
 if ( $offsets ) {

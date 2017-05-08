@@ -46,7 +46,7 @@ use Kafka qw(
     $BLOCK_UNTIL_IS_COMMITTED
     %ERROR
     $ERROR_SEND_NO_ACK
-    $RECEIVE_LATEST_OFFSET
+    $RECEIVE_LATEST_OFFSETS
     $REQUEST_TIMEOUT
     $RETRY_BACKOFF
     $SEND_MAX_ATTEMPTS
@@ -204,7 +204,7 @@ sub next_offset {
             $offsets = $CONSUMER->offsets(
                 $TOPIC,
                 $PARTITION,
-                $RECEIVE_LATEST_OFFSET,
+                $RECEIVE_LATEST_OFFSETS,
             );
         } catch {
             $error = $_;
@@ -253,6 +253,7 @@ sub get_new_objects {
             host                    => 'localhost',
             port                    => $port,
             timeout                 => $TIMEOUT,
+            dont_load_supported_api_versions => 1,
         );
     } 'Expecting to live new CONNECTION';
     lives_ok {
