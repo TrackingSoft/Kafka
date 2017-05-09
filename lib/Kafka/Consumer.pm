@@ -742,7 +742,7 @@ sub commit_offsets {
 
     my $request = {
         ApiKey                    => $APIKEY_OFFSETCOMMIT,
-        CorrelationId             => $self->{CorrelationId},
+        CorrelationId             => _get_CorrelationId(),
         ClientId                  => $self->{ClientId},
         GroupId                   => $group,
         topics  => [
@@ -803,7 +803,7 @@ sub fetch_offsets {
 
     my $request = {
         ApiKey                    => $APIKEY_OFFSETFETCH,
-        CorrelationId             => $self->{CorrelationId},
+        CorrelationId             => _get_CorrelationId(),
         ClientId                  => $self->{ClientId},
         GroupId                   => $group,
         topics  => [
