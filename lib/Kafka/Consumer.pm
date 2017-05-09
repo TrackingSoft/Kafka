@@ -258,7 +258,7 @@ is the default that can be imported from the L<Kafka|Kafka> module.
 
 =cut
 sub new {
-    my ( $class, @args ) = @_;
+    my ( $class, %p ) = @_;
 
     my $self = bless {
         Connection          => undef,
@@ -269,11 +269,7 @@ sub new {
         MaxNumberOfOffsets  => $DEFAULT_MAX_NUMBER_OF_OFFSETS,
     }, $class;
 
-    while ( @args )
-    {
-        my $k = shift @args;
-        $self->{ $k } = shift @args if exists $self->{ $k };
-    }
+    exists $p{$_} and $self->{$_} = $p{$_} foreach keys %$self;
 
     $self->{ClientId}       //= 'consumer';
 

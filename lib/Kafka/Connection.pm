@@ -430,7 +430,7 @@ The delay after which the client will refresh the supported API versions.
 
 =cut
 sub new {
-    my ( $class, @args ) = @_;
+    my ( $class, %p ) = @_;
 
     my $self = bless {
         host                    => q{},
@@ -446,10 +446,7 @@ sub new {
         api_versions_refresh_delay_sec => 60,
     }, $class;
 
-    while ( @args ) {
-        my $k = shift @args;
-        $self->{ $k } = shift @args if exists $self->{ $k };
-    }
+    exists $p{$_} and $self->{$_} = $p{$_} foreach keys %$self;
 
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'host' )
         unless defined( $self->{host} ) && ( $self->{host} eq q{} || defined( _STRING( $self->{host} ) ) ) && !utf8::is_utf8( $self->{host} );

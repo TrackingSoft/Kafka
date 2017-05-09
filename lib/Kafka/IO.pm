@@ -222,7 +222,7 @@ in C<Kafka> L<EXPORT|Kafka/EXPORT>.
 
 =cut
 sub new {
-    my ( $class, @args ) = @_;
+    my ( $class, %p ) = @_;
 
     my $self = bless {
         host        => '',
@@ -234,10 +234,7 @@ sub new {
         ip          => '',  # Human-readable textual representation of the ip address
     }, $class;
 
-    while ( @args ) {
-        my $k = shift @args;
-        $self->{ $k } = shift @args if exists $self->{ $k };
-    }
+    exists $p{$_} and $self->{$_} = $p{$_} foreach keys %$self;
 
     # we trust it: make it untainted
     ( $self->{host} ) = $self->{host} =~ /\A(.+)\z/;
