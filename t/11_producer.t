@@ -222,7 +222,7 @@ sub testing {
 
 # key
     send_ERROR_MISMATCH_ARGUMENT( $topic, $partition, 'Some value', $_ )
-        foreach @not_empty_string;
+        foreach grep { !( _ARRAY0( $_ ) && @$_ == 1 ) } @not_empty_string;
 
 # compression_codec
     send_ERROR_MISMATCH_ARGUMENT( $topic, $partition, 'Some value', 'Some key', $_ )

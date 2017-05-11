@@ -1,5 +1,20 @@
 Revision history for Kafka package
 
+1.001021 Fri May  12 2017
+
+    Special thanks to Damien Krotkine for API versioning implementation.
+
+    CHANGES:
+    - Added API versioning support with auto-detection.
+    - Timestamps in messages.
+    - Improvements in offset methods: to be able to query offsets in an
+      easier, simpler and more complete way (including support for
+      version 0 and version 1 of message formats)
+    - Support for array of keys in Kafka::Producer->send with array of messages.
+
+    BUGFIXES:
+    - Improved timeouts handling for big payloads in Kafka::IO.
+
 1.001013 Fri Feb  24 2017
     CHANGES:
     - Removed support for custom CorrelationID in constructor arguments.

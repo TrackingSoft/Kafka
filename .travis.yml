@@ -2,7 +2,6 @@ language: perl
 
 perl:
     - "5.22"
-    - "5.16"
 
 jdk:
     - oraclejdk8
