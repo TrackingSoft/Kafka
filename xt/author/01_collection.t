@@ -206,6 +206,7 @@ IPv
 ISR
 Isr
 kafka
+Krotkine
 LeaderNotAvailable
 LLC
 MagicByte

@@ -403,7 +403,7 @@ If set to false, when communicating with a broker, the client will
 automatically try to find out the best version numbers to use for each of the
 API endpoints.
 
-If set to true, the client will alays use
+If set to true, the client will always use
 C<$Kafka::Protocol::DEFAULT_APIVERSION> as API version.
 
 =item C<api_versions_refresh_delay_sec =E<gt> $positive_integer>
