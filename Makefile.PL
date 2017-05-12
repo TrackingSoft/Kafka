@@ -88,43 +88,43 @@ my %config = (
         provides                => {
             'Kafka'                 => {
                 file                    => 'lib/Kafka.pm',
-                version                 => '1.001013'
+                version                 => '1.02'
             },
             'Kafka::Connection'     => {
                 file                    => 'lib/Kafka/Connection.pm',
-                version                 => '1.001013'
+                version                 => '1.02'
             },
             'Kafka::Consumer'       => {
                 file                    => 'lib/Kafka/Consumer.pm',
-                version                 => '1.001013'
+                version                 => '1.02'
             },
             'Kafka::Exceptions'     => {
                 file                    => 'lib/Kafka/Exceptions.pm',
-                version                 => '1.001013'
+                version                 => '1.02'
             },
             'Kafka::IO'             => {
                 file                    => 'lib/Kafka/IO.pm',
-                version                 => '1.001013'
+                version                 => '1.02'
             },
             'Kafka::Int64'          => {
                 file                    => 'lib/Kafka/Int64.pm',
-                version                 => '1.001013'
+                version                 => '1.02'
             },
             'Kafka::Internals'      => {
                 file                    => 'lib/Kafka/Internals.pm',
-                version                 => '1.001013'
+                version                 => '1.02'
             },
             'Kafka::Message'        => {
                 file                    => 'lib/Kafka/Message.pm',
-                version                 => '1.001013'
+                version                 => '1.02'
             },
             'Kafka::Producer'       => {
                 file                    => 'lib/Kafka/Producer.pm',
-                version                 => '1.001013'
+                version                 => '1.02'
             },
             'Kafka::Protocol'       => {
                 file                    => 'lib/Kafka/Protocol.pm',
-                version                 => '1.001013'
+                version                 => '1.02'
             },
         },
         'meta-spec'             => { version => 2 },

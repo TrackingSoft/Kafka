@@ -1,8 +1,8 @@
 #!/bin/bash
 set -eux
 
-MIRROR=http://mirrors.ibiblio.org/apache/kafka/0.10.2.0
-DIST=kafka_2.12-0.10.2.0.tgz
+MIRROR=http://mirrors.ibiblio.org/apache/kafka/0.10.2.1
+DIST=kafka_2.12-0.10.2.1.tgz
 
 if [[ ! -d vendor ]]; then
     mkdir -p vendor

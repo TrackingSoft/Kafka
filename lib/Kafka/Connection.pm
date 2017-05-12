@@ -6,7 +6,7 @@ Kafka::Connection - Object interface to connect to a kafka cluster.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Connection> version 1.001013 .
+This documentation refers to C<Kafka::Connection> version 1.02 .
 
 =cut
 
@@ -20,7 +20,7 @@ use warnings;
 
 our $DEBUG = 0;
 
-our $VERSION = '1.001013';
+our $VERSION = '1.02';
 
 use Exporter qw(
     import
