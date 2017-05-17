@@ -1,7 +1,5 @@
 #!/usr/bin/perl -w
 
-#-- Pragmas --------------------------------------------------------------------
-
 use 5.010;
 use strict;
 use warnings;
@@ -12,11 +10,7 @@ use lib qw(
     ../lib
 );
 
-# ENVIRONMENT ------------------------------------------------------------------
-
 use Test::More;
-
-#-- verify load the module
 
 BEGIN {
     eval 'use Test::Exception';     ## no critic
@@ -34,8 +28,6 @@ BEGIN {
 }
 
 plan 'no_plan';
-
-#-- load the modules -----------------------------------------------------------
 
 use IO::Socket::INET;
 use Net::EmptyPort qw(
@@ -69,8 +61,6 @@ use Kafka::TestInternals qw(
     @not_string
 );
 
-#-- setting up facilities ------------------------------------------------------
-
 # See Kafka::IO
 use constant DEBUG  => 0;
 #use constant DEBUG  => 1;
@@ -79,8 +69,6 @@ use constant DEBUG  => 0;
 Kafka::IO->debug_level( DEBUG ) if DEBUG;
 
 STDOUT->autoflush;
-
-#-- declarations ---------------------------------------------------------------
 
 my ( $server, $port, $io, $sig_handler, $marker_signal_handling, $original, $timer, $timeout, $sent, $resp, $test_message, $inet_aton, $hostname );
 
@@ -116,8 +104,6 @@ sub debug_msg {
     diag '[ time = ', Time::HiRes::time(), ' ] ', $message;
 }
 
-#-- Global data ----------------------------------------------------------------
-
 my $server_port = empty_port( $KAFKA_SERVER_PORT );
 $server = Test::TCP->new(
     code    => $server_code,
@@ -129,9 +115,7 @@ wait_port( $port );
 
 $test_message = "Test message\n";
 
-# INSTRUCTIONS -----------------------------------------------------------------
-
-# NOTE: In the process of Kafka::IO->new we are working with alarm clock internally
+# NOTE: Kafka::IO->new uses alarm clock internally
 
 #-- ALRM handler
 
@@ -399,6 +383,5 @@ SKIP: {
 #    throws_ok { $sent = $io->send( $test_message ); } 'Kafka::Exception::IO', 'error thrown';
 }
 
-# POSTCONDITIONS ---------------------------------------------------------------
-
 undef $server;
+

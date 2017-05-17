@@ -10,13 +10,13 @@ This documentation refers to C<Kafka::TestInternals> version 1.02 .
 
 =cut
 
-#-- Pragmas --------------------------------------------------------------------
+
 
 use 5.010;
 use strict;
 use warnings;
 
-# ENVIRONMENT ------------------------------------------------------------------
+
 
 our $VERSION = '1.02';
 
@@ -43,7 +43,7 @@ our @EXPORT_OK = qw(
     $topic
 );
 
-#-- load the modules -----------------------------------------------------------
+
 
 use Const::Fast;
 use Scalar::Util::Numeric qw(
@@ -60,7 +60,7 @@ use Kafka::Internals qw(
     $APIKEY_OFFSET
 );
 
-#-- declarations ---------------------------------------------------------------
+
 
 =head1 DESCRIPTION
 
@@ -459,7 +459,7 @@ L<https://github.com/TrackingSoft/Kafka>
 
 =head1 AUTHOR
 
-Sergey Gladkov, E<lt>sgladkov@trackingsoft.comE<gt>
+Sergey Gladkov
 
 =head1 CONTRIBUTORS
 

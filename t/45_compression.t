@@ -1,7 +1,5 @@
 #!/usr/bin/perl -w
 
-#-- Pragmas --------------------------------------------------------------------
-
 use 5.010;
 use strict;
 use warnings;
@@ -12,8 +10,6 @@ use lib qw(
     ../lib
 );
 
-# ENVIRONMENT ------------------------------------------------------------------
-
 use Test::More;
 
 BEGIN {
@@ -21,16 +17,12 @@ BEGIN {
         unless $ENV{KAFKA_BASE_DIR};
 }
 
-#-- verify load the module
-
 BEGIN {
     eval 'use Test::NoWarnings';    ## no critic
     plan skip_all => 'because Test::NoWarnings required for testing' if $@;
 }
 
 plan 'no_plan';
-
-#-- load the modules -----------------------------------------------------------
 
 use Kafka qw(
     $BLOCK_UNTIL_IS_COMMITTED
@@ -51,46 +43,33 @@ use Kafka::TestInternals qw(
     $topic
 );
 
-#-- setting up facilities ------------------------------------------------------
-
 STDOUT->autoflush;
 
 my $cluster = Kafka::Cluster->new(
-    kafka_dir           => $ENV{KAFKA_BASE_DIR},    # WARNING: must match the settings of your system
-    replication_factor  => 1,
+    replication_factor => 1,
 );
 
-#-- declarations ---------------------------------------------------------------
-
-my ( $port, $connect, $partition, $producer, $consumer, $offsets, $messages );
-
-#-- Global data ----------------------------------------------------------------
-
-$partition = $Kafka::MockIO::PARTITION;;
-
-# INSTRUCTIONS -----------------------------------------------------------------
+my $partition = $Kafka::MockIO::PARTITION;
 
 #-- Connecting to the Kafka server port (for example for node_id = 0)
-( $port ) =  $cluster->servers;
+my( $port ) =  $cluster->servers;
 
 #-- Connecting to the Kafka server port
 
-$connect = Kafka::Connection->new(
+my $connect = Kafka::Connection->new(
     host            => 'localhost',
     port            => $port,
     RETRY_BACKOFF   => $RETRY_BACKOFF * 2,
     dont_load_supported_api_versions => 1,
 );
 
-#-- Preparing data
-
-$producer = Kafka::Producer->new(
+my $producer = Kafka::Producer->new(
     Connection      => $connect,
     # Require verification the number of messages sent and recorded
     RequiredAcks    => $BLOCK_UNTIL_IS_COMMITTED,
 );
 
-$consumer = Kafka::Consumer->new(
+my $consumer = Kafka::Consumer->new(
     Connection  => $connect,
 );
 
@@ -116,7 +95,7 @@ foreach my $codec ( @compession_codecs )
 }
 
 # Get a list of valid offsets up max_number before the given time
-$offsets = $consumer->offsets(
+my $offsets = $consumer->offsets(
     $topic,
     $partition,
     $RECEIVE_LATEST_OFFSETS,         # time
@@ -133,7 +112,7 @@ foreach my $return_all ( 0, 1 ) {
         my $compression_codec = int( $start_offset / scalar( @compession_codecs ) );
 
         # Consuming messages
-        $messages = $consumer->fetch(
+        my $messages = $consumer->fetch(
             $topic,
             $partition,
             $start_offset,
@@ -170,6 +149,5 @@ foreach my $return_all ( 0, 1 ) {
     }
 }
 
-# POSTCONDITIONS ---------------------------------------------------------------
-
 $cluster->close;
+

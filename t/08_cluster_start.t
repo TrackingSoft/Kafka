@@ -1,7 +1,5 @@
 #!/usr/bin/perl -w
 
-#-- Pragmas --------------------------------------------------------------------
-
 use 5.010;
 use strict;
 use warnings;
@@ -12,8 +10,6 @@ use lib qw(
     ../lib
 );
 
-# ENVIRONMENT ------------------------------------------------------------------
-
 use Test::More;
 
 BEGIN {
@@ -21,7 +17,6 @@ BEGIN {
         unless $ENV{KAFKA_BASE_DIR};
 }
 
-#-- verify load the module
 
 BEGIN {
     eval 'use Test::NoWarnings';    ## no critic
@@ -30,27 +25,8 @@ BEGIN {
 
 plan 'no_plan';
 
-#-- load the modules -----------------------------------------------------------
-
-use Const::Fast;
-#use File::HomeDir;
-use File::Spec;
-
 use Kafka::Cluster;
 
-#-- setting up facilities ------------------------------------------------------
-
-#-- declarations ---------------------------------------------------------------
-
-# WARNING: must match the settings of your system
-#const my $KAFKA_BASE_DIR    => $ENV{KAFKA_BASE_DIR} || File::Spec->catdir( File::HomeDir->my_home, 'kafka' );
-const my $KAFKA_BASE_DIR    => $ENV{KAFKA_BASE_DIR};
-
-#-- Global data ----------------------------------------------------------------
-
-# INSTRUCTIONS -----------------------------------------------------------------
-
-my $cluster = Kafka::Cluster->new( kafka_dir => $KAFKA_BASE_DIR );
+my $cluster = Kafka::Cluster->new();
 isa_ok( $cluster, 'Kafka::Cluster' );
 
-# POSTCONDITIONS ---------------------------------------------------------------

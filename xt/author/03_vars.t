@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-#-- Pragmas --------------------------------------------------------------------
+
 
 use 5.010;
 use strict;
@@ -10,13 +10,13 @@ use lib qw(
     lib
 );
 
-# ENVIRONMENT ------------------------------------------------------------------
+
 
 use Test::More;
 
-#-- verify load the module
 
-#-- load the modules -----------------------------------------------------------
+
+
 
 use Cwd qw(
     abs_path
@@ -26,13 +26,13 @@ use File::Spec::Functions qw(
     catdir
 );
 
-#-- setting up facilities ------------------------------------------------------
 
-#-- declarations ---------------------------------------------------------------
+
+
 
 my ( $modules_dir, $t_modules_dir, @modules, @t_modules );
 
-#-- Global data ----------------------------------------------------------------
+
 
 $modules_dir    = abs_path( 'lib' );
 $t_modules_dir  = abs_path( catdir( 't', 'lib' ) );
@@ -53,13 +53,13 @@ foreach my $config (
     );
 }
 
-# INSTRUCTIONS -----------------------------------------------------------------
+
 
 eval 'use Test::Vars;'; ## no critic
 plan( skip_all => 'Test::Vars not installed: $@; skipping' ) if $@;
 
 vars_ok( $_ ) foreach @modules, @t_modules;
 
-# POSTCONDITIONS ---------------------------------------------------------------
+
 
 done_testing();

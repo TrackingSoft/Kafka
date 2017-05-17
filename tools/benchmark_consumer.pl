@@ -2,7 +2,7 @@
 
 # NAME: Consuming messages
 
-#-- Pragmas --------------------------------------------------------------------
+
 
 use 5.010;
 use strict;
@@ -13,9 +13,9 @@ use lib qw(
     ../lib
 );
 
-# ENVIRONMENT ------------------------------------------------------------------
 
-#-- load the modules -----------------------------------------------------------
+
+
 
 use Getopt::Long;
 use Scalar::Util qw(
@@ -34,7 +34,7 @@ use Kafka qw(
 use Kafka::Connection;
 use Kafka::Consumer;
 
-#-- setting up facilities ------------------------------------------------------
+
 
 my $host                = 'localhost',
 my $port                = undef;
@@ -98,7 +98,7 @@ sub tsk {
     $ctrl_c = 1;
 }
 
-#-- declarations ---------------------------------------------------------------
+
 
 my ( $connect, $consumer, $desired_size, $first_offset, $fetch, $dispatch_time, $messages_recv, $mbs );
 
@@ -141,7 +141,7 @@ sub fetch_messages {
     return $messages, $time_after - $time_before;
 }
 
-#-- Global data ----------------------------------------------------------------
+
 
 try {
     $connect  = Kafka::Connection->new( host => $host, port => $port );
@@ -152,7 +152,7 @@ try {
 
 $desired_size = ( $MESSAGE_SIZE_OVERHEAD + $msg_len ) * $number_of_messages;
 
-# INSTRUCTIONS -----------------------------------------------------------------
+
 
 $fetch          = [];
 $messages_recv  = 0;
@@ -208,7 +208,7 @@ INFINITE:                                       # an infinite loop
     redo INFINITE unless $no_infinite;
 }
 
-# POSTCONDITIONS ---------------------------------------------------------------
+
 
 # Closes and cleans up
 

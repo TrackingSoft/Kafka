@@ -2,7 +2,7 @@
 
 # NAME: Producer test
 
-#-- Pragmas --------------------------------------------------------------------
+
 
 use 5.010;
 use strict;
@@ -13,9 +13,9 @@ use lib qw(
     ../lib
 );
 
-# ENVIRONMENT ------------------------------------------------------------------
 
-#-- load the modules -----------------------------------------------------------
+
+
 
 use Getopt::Long;
 use Scalar::Util qw(
@@ -29,7 +29,7 @@ use Try::Tiny;
 use Kafka::Connection;
 use Kafka::Producer;
 
-#-- setting up facilities ------------------------------------------------------
+
 
 my $host                = 'localhost',
 my $port                = undef;
@@ -77,7 +77,7 @@ HELP
     exit 1;
 }
 
-#-- declarations ---------------------------------------------------------------
+
 
 my ( $connect, $producer, $messages, $messages_sent, $dispatch_time, $mbs );
 
@@ -122,7 +122,7 @@ sub send_message {
     return $time_after - $time_before;
 }
 
-#-- Global data ----------------------------------------------------------------
+
 
 try {
     $connect  = Kafka::Connection->new( host => $host, port => $port );
@@ -131,7 +131,7 @@ try {
     exit_on_error( $_ );
 };
 
-# INSTRUCTIONS -----------------------------------------------------------------
+
 
 $messages       = random_strings();
 $messages_sent  = 0;
@@ -163,7 +163,7 @@ while (1) {
     last if $dispatch_time; # achieved significant time
 }
 
-# POSTCONDITIONS ---------------------------------------------------------------
+
 
 # Closes and cleans up
 

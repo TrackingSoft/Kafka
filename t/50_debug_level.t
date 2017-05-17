@@ -1,7 +1,5 @@
 #!/usr/bin/perl -w
 
-#-- Pragmas --------------------------------------------------------------------
-
 use 5.010;
 use strict;
 use warnings;
@@ -12,11 +10,7 @@ use lib qw(
     ../lib
 );
 
-# ENVIRONMENT ------------------------------------------------------------------
-
 use Test::More;
-
-#-- verify load the module
 
 BEGIN {
     eval 'use Test::NoWarnings';    ## no critic
@@ -25,13 +19,9 @@ BEGIN {
 
 plan 'no_plan';
 
-#-- load the modules -----------------------------------------------------------
-
 use Kafka::Connection;
 use Kafka::IO;
 use Kafka::Internals;
-
-#-- setting up facilities ------------------------------------------------------
 
 my $PERL_KAFKA_DEBUG    = $ENV{PERL_KAFKA_DEBUG};
 my $DEBUG_Connection    = $Kafka::Connection::DEBUG;
@@ -39,8 +29,6 @@ my $DEBUG_IO            = $Kafka::IO::DEBUG;
 
 delete $ENV{PERL_KAFKA_DEBUG};
 %Kafka::Internals::_debug_levels = ();
-
-#-- declarations ---------------------------------------------------------------
 
 package Kafka::TestDebugLevel;
 
@@ -63,10 +51,6 @@ package Kafka::TestDebugLevel;
     }
 
 package main;
-
-#-- Global data ----------------------------------------------------------------
-
-# INSTRUCTIONS -----------------------------------------------------------------
 
 #-- direct control
 
@@ -180,10 +164,7 @@ is( $Kafka::TestDebugLevel::DEBUG,                              1, 'debug level 
 is( $Kafka::IO::DEBUG,                                          2, 'debug level set' );
 is( $Kafka::Connection::DEBUG,                                  0, 'debug level not set' );
 
-#-- Closes and cleans up
-
-# POSTCONDITIONS ---------------------------------------------------------------
-
 $Kafka::Connection::DEBUG   = $DEBUG_Connection;
 $Kafka::IO::DEBUG           = $DEBUG_IO;
 $ENV{PERL_KAFKA_DEBUG}      = $PERL_KAFKA_DEBUG;
+

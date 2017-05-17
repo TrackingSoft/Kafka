@@ -11,13 +11,13 @@ This documentation refers to C<Kafka::MockProtocol> version 1.02 .
 
 =cut
 
-#-- Pragmas --------------------------------------------------------------------
+
 
 use 5.010;
 use strict;
 use warnings;
 
-# ENVIRONMENT ------------------------------------------------------------------
+
 
 our $VERSION = '1.02';
 
@@ -35,7 +35,7 @@ our @EXPORT_OK = qw(
     encode_produce_response
 );
 
-#-- load the modules -----------------------------------------------------------
+
 
 use Params::Util qw(
     _ARRAY0
@@ -81,7 +81,7 @@ use Kafka::TestInternals qw(
     _is_suitable_int
 );
 
-#-- declarations ---------------------------------------------------------------
+
 
 =head1 DESCRIPTION
 
@@ -1051,7 +1051,7 @@ L<https://github.com/TrackingSoft/Kafka>
 
 =head1 AUTHOR
 
-Sergey Gladkov, E<lt>sgladkov@trackingsoft.comE<gt>
+Sergey Gladkov
 
 =head1 CONTRIBUTORS
 

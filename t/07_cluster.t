@@ -1,7 +1,5 @@
 #!/usr/bin/perl -w
 
-#-- Pragmas --------------------------------------------------------------------
-
 use 5.010;
 use strict;
 use warnings;
@@ -12,16 +10,12 @@ use lib qw(
     ../lib
 );
 
-# ENVIRONMENT ------------------------------------------------------------------
-
 use Test::More;
 
 BEGIN {
     plan skip_all => 'Unknown base directory of Kafka server'
         unless $ENV{KAFKA_BASE_DIR};
 }
-
-#-- verify load the module
 
 BEGIN {
     eval 'use Test::NoWarnings';    ## no critic
@@ -30,10 +24,6 @@ BEGIN {
 
 plan 'no_plan';
 
-#-- load the modules -----------------------------------------------------------
-
-use Const::Fast;
-use File::Spec;
 use Params::Util qw(
     _HASH
     _SCALAR
@@ -47,28 +37,17 @@ use Kafka::Protocol qw(
 
 use Kafka::Cluster;
 
-#-- declarations ---------------------------------------------------------------
-
-# WARNING: must match the settings of your system
-const my $KAFKA_BASE_DIR    => $ENV{KAFKA_BASE_DIR};
-
-#-- setting up facilities ------------------------------------------------------
-
-ok defined( Kafka::Cluster::data_cleanup( kafka_dir => $KAFKA_BASE_DIR ) ), 'data directory cleaned';
-
-#-- Global data ----------------------------------------------------------------
-
-my ( $response, $decode );
-
-# INSTRUCTIONS -----------------------------------------------------------------
+ok defined( Kafka::Cluster::data_cleanup() ), 'data directory cleaned';
 
 #Kafka::IO->debug_level( 1 );
-my $cluster = Kafka::Cluster->new( kafka_dir => $KAFKA_BASE_DIR );
+my $cluster = Kafka::Cluster->new();
 isa_ok( $cluster, 'Kafka::Cluster' );
 
 #Kafka::IO->debug_level( 1 );
 $cluster->init;
-$cluster->start;
+$cluster->start_all;
+
+my ( $response, $decode );
 
 #-- MetadataRequest
 #Kafka::IO->debug_level( 1 );
@@ -90,4 +69,3 @@ ok _HASH( $decode ), 'correct decode';
 
 $cluster->close;
 
-# POSTCONDITIONS ---------------------------------------------------------------

@@ -1,7 +1,5 @@
 #!/usr/bin/perl -w
 
-#-- Pragmas --------------------------------------------------------------------
-
 use 5.010;
 use strict;
 use warnings;
@@ -12,11 +10,7 @@ use lib qw(
     ../lib
 );
 
-# ENVIRONMENT ------------------------------------------------------------------
-
 use Test::More;
-
-#-- verify load the module
 
 BEGIN {
     eval 'use Test::Exception';     ## no critic
@@ -30,27 +24,19 @@ BEGIN {
 
 plan 'no_plan';
 
-#-- load the modules -----------------------------------------------------------
-
 use Kafka qw (
     $BITS64
     %ERROR
     $ERROR_MISMATCH_ARGUMENT
 );
 
-#-- setting up facilities ------------------------------------------------------
-
 SKIP: {
-    skip 'You have a 64 bit system', 1, if $BITS64;
 
-#-- declarations ---------------------------------------------------------------
-
-#-- Global data ----------------------------------------------------------------
+skip 'You have a 64 bit system', 1, if $BITS64;
 
 my $error_mismatch_argument = $ERROR{ $ERROR_MISMATCH_ARGUMENT };
 my $qr = qr/$error_mismatch_argument/;
 
-# INSTRUCTIONS -----------------------------------------------------------------
 
 eval { my $ret = unpack( 'Q', 0xff x 8 ) };
 if ( !$@ ) {
@@ -147,6 +133,5 @@ if ( !$@ ) {
     }
 }
 
-# POSTCONDITIONS ---------------------------------------------------------------
+} # end of SKIP
 
-}

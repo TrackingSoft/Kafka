@@ -143,7 +143,7 @@ my %config = (
     ( $] >= 5.005 ?                             ## Add these new keywords supported since 5.005
         (
             ABSTRACT            => 'Apache Kafka low-level synchronous API, which does not use Zookeeper.',
-            AUTHOR              => 'TrackingSoft LLC <sgladkov@trackingsoft.com>'
+            AUTHOR              => 'Sergey Gladkov',
         ) : ()
     ),
     dist                => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', },

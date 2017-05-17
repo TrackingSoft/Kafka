@@ -1,7 +1,5 @@
 #!/usr/bin/perl -w
 
-#-- Pragmas --------------------------------------------------------------------
-
 use 5.010;
 use strict;
 use warnings;
@@ -12,11 +10,7 @@ use lib qw(
     ../lib
 );
 
-# ENVIRONMENT ------------------------------------------------------------------
-
 use Test::More;
-
-#-- verify load the module
 
 BEGIN {
     eval 'use Test::NoWarnings';    ## no critic
@@ -25,13 +19,9 @@ BEGIN {
 
 plan 'no_plan';
 
-#-- load the modules -----------------------------------------------------------
-
 use Kafka qw (
     $BITS64
 );
-
-#-- setting up facilities ------------------------------------------------------
 
 our %ordinary;
 
@@ -58,11 +48,6 @@ BEGIN {
         ;
     }
 }
-
-
-#-- declarations ---------------------------------------------------------------
-
-#-- Global data ----------------------------------------------------------------
 
 our (
     $constants_Kafka,               $functions_Kafka,
@@ -95,10 +80,6 @@ my %OO = (
     'Kafka::Producer'       => [ $ours_Kafka_Producer,              $methods_Kafka_Producer ],
     'Kafka::Cluster'        => [ $ours_Kafka_Cluster,               $methods_Kafka_Cluster ],
 );
-
-# INSTRUCTIONS -----------------------------------------------------------------
-
-#-- verify load the module
 
 # Kafka
 
@@ -466,7 +447,6 @@ BEGIN {
         base_dir
         close
         init
-        is_run_in_base_dir
         log_dir
         new
         node_id
@@ -504,4 +484,3 @@ foreach my $module ( keys %OO ) {
     can_ok( $module, $_ ) for @{ $OO{ $module }->[1] };
 }
 
-# POSTCONDITIONS ---------------------------------------------------------------

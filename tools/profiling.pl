@@ -2,7 +2,7 @@
 
 # WARNING: Ensure kafka cluster is started before executing this program (see t/??_cluster_start.t for examples)
 
-#-- Pragmas --------------------------------------------------------------------
+
 
 use 5.010;
 use strict;
@@ -15,11 +15,11 @@ use lib qw(
     ../t/lib
 );
 
-# ENVIRONMENT ------------------------------------------------------------------
+
 
 defined( $ENV{KAFKA_BASE_DIR} ) or exit_on_error( 'Unknown base directory of Kafka server' );
 
-#-- load the modules -----------------------------------------------------------
+
 
 use Const::Fast;
 #use File::HomeDir;
@@ -45,9 +45,9 @@ use Kafka::MockIO;
 use Kafka::Producer;
 use Kafka::TestInternals;
 
-#-- setting up facilities ------------------------------------------------------
 
-#-- declarations ---------------------------------------------------------------
+
+
 
 const my @T_DIRS                => ( 't', catdir( '..', 't' ) );
 const my @TEST_OFFSETS          => ( $RECEIVE_LATEST_OFFSETS, $RECEIVE_EARLIEST_OFFSET );
@@ -123,7 +123,7 @@ sub random_strings {
     return \@strings, $number_of * $msg_len;
 }
 
-#-- Global data ----------------------------------------------------------------
+
 
 foreach my $t_dir ( @T_DIRS ) {
     if ( -d $t_dir ) {
@@ -155,7 +155,7 @@ try {
     exit_on_error( $_ );
 };
 
-# INSTRUCTIONS -----------------------------------------------------------------
+
 
 try {
     $offsets = $consumer->offsets( $topic, $partition, $RECEIVE_LATEST_OFFSETS );
@@ -205,7 +205,7 @@ foreach my $num ( 1..$number_of_messages )
 }
 print STDERR "\n";
 
-# POSTCONDITIONS ---------------------------------------------------------------
+
 
 $connect->close;
 $connect = $consumer = $producer = undef;

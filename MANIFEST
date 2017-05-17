@@ -50,11 +50,6 @@ t/90_mock_io.t
 t/91_mock_usage.t
 t/92_mock_bench.t
 t/99_data_cleanup.t
-t/bin/kafka-run-class.sh
-t/config/log4j.properties
-t/config/server.properties
-t/config/server.properties.ipv6
-t/config/zookeeper.properties
 tools/benchmark_consumer.pl
 tools/benchmark_producer.pl
 tools/coverage.sh                   Control code coverage

@@ -1,7 +1,5 @@
 #!/usr/bin/env perl
 
-#-- Pragmas --------------------------------------------------------------------
-
 use 5.010;
 use strict;
 use warnings;
@@ -12,11 +10,7 @@ use lib qw(
     ../lib
 );
 
-# ENVIRONMENT ------------------------------------------------------------------
-
 use Test::More;
-
-#-- verify load the module
 
 BEGIN {
     eval 'use Test::Exception';     ## no critic
@@ -34,8 +28,6 @@ BEGIN {
 }
 
 plan 'no_plan';
-
-#-- load the modules -----------------------------------------------------------
 
 use Socket qw(
     getaddrinfo
@@ -61,8 +53,6 @@ use Kafka qw(
     $REQUEST_TIMEOUT
 );
 use Kafka::IO;
-
-#-- setting up facilities ------------------------------------------------------
 
 {
     package TestServer;
@@ -118,8 +108,6 @@ use Kafka::IO;
     1;
 }
 
-#-- declarations ---------------------------------------------------------------
-
 sub is_alive_v4 {
     my ( $ip, $port ) = @_;
 
@@ -143,7 +131,7 @@ sub doit {
             my $io = Kafka::IO->new(
                 host    => $host,
                 port    => $port,
-#                timeout => $REQUEST_TIMEOUT,
+                #timeout => $REQUEST_TIMEOUT,
             );
             ok $io->_is_alive, 'socket alive';
             is $io->{af}, $af, 'Address family ok';
@@ -244,9 +232,9 @@ sub doit {
     );
 }
 
-#-- Global data ----------------------------------------------------------------
 
-# INSTRUCTIONS -----------------------------------------------------------------
+
+
 
 subtest 'v6' => sub {
     plan skip_all => 'IPv6 not supported'
@@ -255,10 +243,9 @@ subtest 'v6' => sub {
     foreach my $host_name (
         '0:0:0:0:0:0:0:1',
         '::1',
-#TODO: v6 fqdn resolve test
+        #TODO: v6 fqdn resolve test
     ) {
         doit( $host_name, AF_INET6, PF_INET6 );
     }
 };
 
-# POSTCONDITIONS ---------------------------------------------------------------

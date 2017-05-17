@@ -10,17 +10,17 @@ This documentation refers to C<Kafka::Producer> version 1.02 .
 
 =cut
 
-#-- Pragmas --------------------------------------------------------------------
+
 
 use 5.010;
 use strict;
 use warnings;
 
-# ENVIRONMENT ------------------------------------------------------------------
+
 
 our $VERSION = '1.02';
 
-#-- load the modules -----------------------------------------------------------
+
 
 use Carp;
 use Params::Util qw(
@@ -61,7 +61,7 @@ use Kafka::Internals qw(
     format_message
 );
 
-#-- declarations ---------------------------------------------------------------
+
 
 =head1 SYNOPSIS
 
@@ -387,7 +387,7 @@ sub _error {
     return;
 }
 
-#-- Closes and cleans up -------------------------------------------------------
+
 
 1;
 
@@ -487,7 +487,7 @@ L<https://github.com/TrackingSoft/Kafka>
 
 =head1 AUTHOR
 
-Sergey Gladkov, E<lt>sgladkov@trackingsoft.comE<gt>
+Sergey Gladkov
 
 Please use GitHub project link above to report problems or contact authors.
 

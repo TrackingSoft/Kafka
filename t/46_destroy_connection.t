@@ -1,7 +1,5 @@
 #!/usr/bin/perl -w
 
-#-- Pragmas --------------------------------------------------------------------
-
 use 5.010;
 use strict;
 use warnings;
@@ -12,16 +10,12 @@ use lib qw(
     ../lib
 );
 
-# ENVIRONMENT ------------------------------------------------------------------
-
 use Test::More;
 
 BEGIN {
     plan skip_all => 'Unknown base directory of Kafka server'
         unless $ENV{KAFKA_BASE_DIR};
 }
-
-#-- verify load the module
 
 BEGIN {
     eval 'use Test::NoWarnings';    ## no critic
@@ -30,27 +24,19 @@ BEGIN {
 
 plan 'no_plan';
 
-#-- load the modules -----------------------------------------------------------
-
 use Kafka qw(
     $RETRY_BACKOFF
 );
 use Kafka::Cluster;
 use Kafka::Connection;
 
-#-- setting up facilities ------------------------------------------------------
-
 my $CLUSTER = Kafka::Cluster->new(
-    kafka_dir           => $ENV{KAFKA_BASE_DIR},    # WARNING: must match the settings of your system
-    replication_factor  => 1,
+    replication_factor => 1,
 );
-
-#-- Global data ----------------------------------------------------------------
+isa_ok( $CLUSTER, 'Kafka::Cluster' );
 
 #-- Connecting to the Kafka server port (for example for node_id = 0)
 my ( $PORT ) =  $CLUSTER->servers;
-
-#-- declarations ---------------------------------------------------------------
 
 my ( $CONNECTION, $HOSTS, $IO_CACHE );
 
@@ -104,7 +90,7 @@ sub is_sockets_closed {
     }
 }
 
-# INSTRUCTIONS -----------------------------------------------------------------
+
 
 ( $CONNECTION, $HOSTS, $IO_CACHE ) = new_connection( $PORT );
 
@@ -116,6 +102,5 @@ is_sockets_opened( $HOSTS, $IO_CACHE );
 $CONNECTION->close;
 is_sockets_closed( $HOSTS, $IO_CACHE );
 
-# POSTCONDITIONS ---------------------------------------------------------------
-
 $CLUSTER->close;
+

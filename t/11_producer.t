@@ -1,7 +1,5 @@
 #!/usr/bin/perl -w
 
-#-- Pragmas --------------------------------------------------------------------
-
 use 5.010;
 use strict;
 use warnings;
@@ -12,11 +10,7 @@ use lib qw(
     ../lib
 );
 
-# ENVIRONMENT ------------------------------------------------------------------
-
 use Test::More;
-
-#-- verify load the module
 
 BEGIN {
     eval 'use Test::Exception';     ## no critic
@@ -29,8 +23,6 @@ BEGIN {
 }
 
 plan 'no_plan';
-
-#-- load the modules -----------------------------------------------------------
 
 use Const::Fast;
 use Params::Util qw(
@@ -64,12 +56,8 @@ use Kafka::TestInternals qw(
     $topic
 );
 
-#-- setting up facilities ------------------------------------------------------
-
-#-- declarations ---------------------------------------------------------------
-
 # WARNING: must match the settings of your system
-const my $KAFKA_BASE_DIR    => $ENV{KAFKA_BASE_DIR};
+const my $KAFKA_BASE_DIR => $ENV{KAFKA_BASE_DIR};
 
 my ( $port, $connect, $partition, $producer, $response );
 
@@ -149,11 +137,7 @@ sub communication_error {
     } );
 }
 
-#-- Global data ----------------------------------------------------------------
-
 $partition = $Kafka::MockIO::PARTITION;;
-
-# INSTRUCTIONS -----------------------------------------------------------------
 
 testing();
 testing( $KAFKA_BASE_DIR ) if $KAFKA_BASE_DIR;
@@ -169,8 +153,6 @@ sub testing {
         Kafka::MockIO::override();
     }
 
-#-- Connecting to the Kafka server port
-
     $connect = Kafka::Connection->new(
         host            => 'localhost',
         port            => $port,
@@ -178,7 +160,7 @@ sub testing {
         dont_load_supported_api_versions => 1,
     );
 
-#-- simple start
+    #-- simple start
 
     $producer = Kafka::Producer->new(
         Connection  => $connect,
@@ -188,31 +170,19 @@ sub testing {
     undef $producer;
     ok !$producer, 'producer object is destroyed';
 
-#-- new
+    #-- new
 
-# Connection
     new_ERROR_MISMATCH_ARGUMENT( 'Connection', @not_right_object );
-
-# ClientId
     new_ERROR_MISMATCH_ARGUMENT( 'ClientId', @not_empty_string );
-
-# RequiredAcks
     new_ERROR_MISMATCH_ARGUMENT( 'RequiredAcks', @not_isint );
-
-# Timeout
     new_ERROR_MISMATCH_ARGUMENT( 'Timeout', @not_number );
 
-#-- send
-
-# topic
+    #-- send
     send_ERROR_MISMATCH_ARGUMENT( $_, $partition, 'Some value', 'Some key' )
         foreach @not_empty_string;
-
-# partition
     send_ERROR_MISMATCH_ARGUMENT( $topic, $_, 'Some value', 'Some key' )
         foreach @not_isint;
 
-# messages
     foreach my $bad_message (
             grep( { !_ARRAY0( $_ ) } @not_empty_string ),
             @not_string_array,
@@ -220,16 +190,14 @@ sub testing {
         send_ERROR_MISMATCH_ARGUMENT( $topic, $partition, $bad_message, 'Some key' );
     }
 
-# key
     send_ERROR_MISMATCH_ARGUMENT( $topic, $partition, 'Some value', $_ )
         foreach grep { !( _ARRAY0( $_ ) && @$_ == 1 ) } @not_empty_string;
 
-# compression_codec
     send_ERROR_MISMATCH_ARGUMENT( $topic, $partition, 'Some value', 'Some key', $_ )
         foreach ( @not_isint, $COMPRESSION_NONE - 1, $COMPRESSION_SNAPPY + 1 );
-# Valid values for $compression_codec checked in the test *_consumer.t
+    # Valid values for $compression_codec checked in the test *_consumer.t
 
-#-- ProduceRequest
+    #-- ProduceRequest
 
     for my $mode (
         $NOT_SEND_ANY_RESPONSE,
@@ -264,17 +232,15 @@ sub testing {
         ok _HASH( $response ), 'response is received';
     }
 
-#-- Response to errors in communication modules
+    #-- Response to errors in communication modules
 
-# Kafka::IO
+    # Kafka::IO
     communication_error( 'Kafka::IO', 'send' );
 
-# Kafka::Connection
+    # Kafka::Connection
     communication_error( 'Kafka::Connection', 'receive_response_to_request' );
 
-#-- finish
     Kafka::MockIO::restore()
         unless $kafka_base_dir;
 }
 
-# POSTCONDITIONS ---------------------------------------------------------------

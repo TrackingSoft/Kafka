@@ -1,7 +1,5 @@
 #!/usr/bin/perl -w
 
-#-- Pragmas --------------------------------------------------------------------
-
 use 5.010;
 use strict;
 use warnings;
@@ -12,16 +10,12 @@ use lib qw(
     ../lib
 );
 
-# ENVIRONMENT ------------------------------------------------------------------
-
 use Test::More;
 
 BEGIN {
     plan skip_all => 'Unknown base directory of Kafka server'
         unless $ENV{KAFKA_BASE_DIR};
 }
-
-#-- verify load the module
 
 BEGIN {
     eval 'use Test::Exception';     ## no critic
@@ -35,10 +29,7 @@ BEGIN {
 
 plan 'no_plan';
 
-#-- load the modules -----------------------------------------------------------
-
 use Const::Fast;
-use File::HomeDir;
 use Socket;
 
 # Usage - Basic functionalities to include a simple Producer and Consumer
@@ -58,32 +49,24 @@ use Kafka::Connection;
 use Kafka::Consumer;
 use Kafka::Producer;
 
-#-- setting up facilities ------------------------------------------------------
-
 # If the reader closes the connection, though, the writer will get a SIGPIPE when it next tries to write there.
 $SIG{PIPE} = sub { die };
-
-#-- declarations ---------------------------------------------------------------
 
 # port to start the search Kafka server
 const my $START_PORT        => 9094;        # Port Number 9094-9099 Unassigned
 const my $ITERATIONS        => 100;         # The maximum number of attempts
 
-# WARNING: must match the settings of your system
-const my $KAFKA_BASE_DIR    => $ENV{KAFKA_BASE_DIR} || File::Spec->catdir( File::HomeDir->my_home, 'kafka' );
-
 const my $topic             => $Kafka::Cluster::DEFAULT_TOPIC;
 const my $partition         => 0;
 
-#-- Global data ----------------------------------------------------------------
 
-my ( $port, $connect, $producer, $consumer, $response, $offsets );
-
-# INSTRUCTIONS -----------------------------------------------------------------
+my ( $connect, $producer, $consumer, $response, $offsets );
 
 #-- Connecting to the Kafka server port
+my $cluster = Kafka::Cluster->new( reuse_existing => 1 );
+isa_ok( $cluster, 'Kafka::Cluster' );
 
-( $port ) = Kafka::Cluster->new( kafka_dir => $KAFKA_BASE_DIR, reuse_existing => 1 )->servers;  # for example for node_id = 0
+my( $port ) = $cluster->servers;  # for example for node_id = 0
 
 for my $host_name ( 'localhost', '127.0.0.1' ) {
 
@@ -231,4 +214,3 @@ $connect->close;
 
 }
 
-# POSTCONDITIONS ---------------------------------------------------------------

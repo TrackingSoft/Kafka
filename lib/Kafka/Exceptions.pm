@@ -10,13 +10,13 @@ This documentation refers to C<Kafka::Exceptions> version 1.02 .
 
 =cut
 
-#-- Pragmas --------------------------------------------------------------------
+
 
 use 5.010;
 use strict;
 use warnings;
 
-# ENVIRONMENT ------------------------------------------------------------------
+
 
 our $DEBUG = 0;
 
@@ -29,7 +29,7 @@ our @EXPORT = qw(
     throw_args
 );
 
-#-- load the modules -----------------------------------------------------------
+
 
 use Exception::Class (
     'Kafka::Exception' => {
@@ -68,7 +68,7 @@ if( Kafka::Internals::debug_level( __PACKAGE__ ) ) {
     Kafka::Exception->Trace(1); # include stack traces
 }
 
-#-- declarations ---------------------------------------------------------------
+
 
 =head1 SYNOPSIS
 
@@ -228,7 +228,7 @@ sub throw_args {
 
 #-- private methods ------------------------------------------------------------
 
-#-- Closes and cleans up -------------------------------------------------------
+
 
 1;
 
@@ -275,7 +275,7 @@ L<https://github.com/TrackingSoft/Kafka>
 
 =head1 AUTHOR
 
-Sergey Gladkov, E<lt>sgladkov@trackingsoft.comE<gt>
+Sergey Gladkov
 
 Please use GitHub project link above to report problems or contact authors.
 

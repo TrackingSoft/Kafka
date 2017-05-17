@@ -10,13 +10,13 @@ This documentation refers to C<Kafka::Protocol> version 1.02 .
 
 =cut
 
-#-- Pragmas --------------------------------------------------------------------
+
 
 use 5.010;
 use strict;
 use warnings;
 
-# ENVIRONMENT ------------------------------------------------------------------
+
 
 our $VERSION = '1.02';
 
@@ -50,7 +50,7 @@ our @EXPORT_OK = qw(
     $_int64_template
 );
 
-#-- load the modules -----------------------------------------------------------
+
 
 use Compress::Snappy;
 use Const::Fast;
@@ -93,7 +93,7 @@ use Kafka::Internals qw(
     format_message
 );
 
-#-- declarations ---------------------------------------------------------------
+
 
 =head1 SYNOPSIS
 
@@ -1795,7 +1795,7 @@ L<https://github.com/TrackingSoft/Kafka>
 
 =head1 AUTHOR
 
-Sergey Gladkov, E<lt>sgladkov@trackingsoft.comE<gt>
+Sergey Gladkov
 
 Please use GitHub project link above to report problems or contact authors.
 

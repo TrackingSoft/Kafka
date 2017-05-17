@@ -1,7 +1,7 @@
 {
    "abstract" : "Apache Kafka low-level synchronous API, which does not use Zookeeper.",
    "author" : [
-      "TrackingSoft LLC <sgladkov@trackingsoft.com>"
+      "Sergey Gladkov"
    ],
    "dynamic_config" : 0,
    "generated_by" : "ExtUtils::MakeMaker version 6.8, CPAN::Meta::Converter version 2.132830, CPAN::Meta::Converter version 2.142690",

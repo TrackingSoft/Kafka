@@ -2,8 +2,6 @@
 
 # Performance test
 
-#-- Pragmas --------------------------------------------------------------------
-
 use 5.010;
 use strict;
 use warnings;
@@ -14,16 +12,12 @@ use lib qw(
     ../lib
 );
 
-# ENVIRONMENT ------------------------------------------------------------------
-
 use Test::More;
 
 BEGIN {
     plan skip_all => 'Unknown base directory of Kafka server'
         unless $ENV{KAFKA_BASE_DIR};
 }
-
-#-- verify load the module
 
 BEGIN {
     eval 'use Test::Deep';          ## no critic
@@ -37,11 +31,8 @@ BEGIN {
 
 plan 'no_plan';
 
-#-- load the modules -----------------------------------------------------------
-
 use Const::Fast;
 #use Data::Dumper;
-use File::HomeDir;
 use Params::Util qw(
     _ARRAY0
     _HASH
@@ -68,27 +59,17 @@ use Kafka::Connection;
 use Kafka::Producer;
 use Kafka::Consumer;
 
-#-- setting up facilities ------------------------------------------------------
-
 STDOUT->autoflush;
-
-#-- declarations ---------------------------------------------------------------
 
 # port to start the search Kafka server
 const my $START_PORT        => 9094;        # Port Number 9094-9099 Unassigned
 const my $ITERATIONS        => 100;         # The maximum number of attempts
 
-# WARNING: must match the settings of your system
-const my $KAFKA_BASE_DIR    => $ENV{KAFKA_BASE_DIR} || File::Spec->catdir( File::HomeDir->my_home, 'kafka' );
-
 const my $topic             => $Kafka::Cluster::DEFAULT_TOPIC;
 const my $partition         => 0;
 const my $attempts          => 200;
 
-#-- Global data ----------------------------------------------------------------
-
 my (
-    $port,
     $connect,
     $producer,
     $consumer,
@@ -105,8 +86,6 @@ my (
     $number_of_package_ser,
 );
 
-# INSTRUCTIONS -----------------------------------------------------------------
-
 my $timeout = $ENV{KAFKA_BENCHMARK_TIMEOUT} || $REQUEST_TIMEOUT;
 
 my @chars               = ( " ", "A" .. "Z", "a" .. "z", 0 .. 9, qw(! @ $ % ^ & *) );
@@ -119,8 +98,10 @@ my $max_size            = $DEFAULT_MAX_BYTES * 512; # ~512 MB
 my %bench;
 
 #-- Connecting to the Kafka server port
+my $cluster = Kafka::Cluster->new( reuse_existing => 1 );
+isa_ok( $cluster, 'Kafka::Cluster' );
 
-( $port ) = Kafka::Cluster->new( kafka_dir => $KAFKA_BASE_DIR, reuse_existing => 1 )->servers;  # for example for node_id = 0
+my( $port ) = $cluster->servers;  # for example for node_id = 0
 
 unless ( $connect = Kafka::Connection->new(
     host    => 'localhost',
@@ -150,7 +131,7 @@ unless ( $consumer = Kafka::Consumer->new(
 }
 isa_ok( $consumer, 'Kafka::Consumer');
 
-#-- definition of the functions
+
 
 sub next_offset {
     my ( $consumer, $topic, $partition, $is_package ) = @_;
@@ -320,7 +301,7 @@ sub report {
     }
 }
 
-# INSTRUCTIONS -----------------------------------------------------------------
+
 
 $in_package = $number_of_package;
 
@@ -492,8 +473,6 @@ report( $mode );
 
 }
 
-# POSTCONDITIONS ---------------------------------------------------------------
-
 # Closes and cleans up
 undef $producer;
 ok( !$producer, 'the producer object is an empty' );
@@ -502,4 +481,3 @@ ok( !$consumer, 'the consumer object is an empty' );
 
 $connect->close;
 
-__DATA__

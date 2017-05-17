@@ -1,7 +1,5 @@
 #!/usr/bin/perl -w
 
-#-- Pragmas --------------------------------------------------------------------
-
 use 5.010;
 use strict;
 use warnings;
@@ -12,11 +10,7 @@ use lib qw(
     ../lib
 );
 
-# ENVIRONMENT ------------------------------------------------------------------
-
 use Test::More;
-
-#-- verify load the module
 
 BEGIN {
     eval 'use Test::NoWarnings';    ## no critic
@@ -24,8 +18,6 @@ BEGIN {
 }
 
 plan 'no_plan';
-
-#-- load the modules -----------------------------------------------------------
 
 use Const::Fast;
 #use Data::Dumper;
@@ -69,15 +61,9 @@ use Kafka::Protocol qw(
     encode_produce_request
 );
 
-#-- setting up facilities ------------------------------------------------------
-
-#-- declarations ---------------------------------------------------------------
-
 const my $TOPIC             => 'mytopic';
 # Use Kafka::MockIO only with the following information:
 const my $PARTITION         => $Kafka::MockIO::PARTITION;
-
-#-- Global data ----------------------------------------------------------------
 
 my ( $io, $decoded_request, $encoded_request, $decoded_response, $encoded_response, $len );
 
@@ -91,8 +77,6 @@ sub fulfill_request {
     $$encoded_response .= ${ $io->receive( $len ) };
     ok _STRING( $$encoded_response ), 'response received';
 }
-
-# INSTRUCTIONS -----------------------------------------------------------------
 
 Kafka::MockIO::override();
 
@@ -276,8 +260,7 @@ $encoded_request = encode_offset_request( $decoded_request );
 fulfill_request();
 $decoded_response = decode_offset_response( $encoded_response );
 
-# POSTCONDITIONS ---------------------------------------------------------------
-
 $io->close;
 
 Kafka::MockIO::restore();
+

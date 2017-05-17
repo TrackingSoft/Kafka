@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-#-- Pragmas --------------------------------------------------------------------
+
 
 use 5.010;
 use strict;
@@ -11,11 +11,11 @@ use lib qw(
     t/lib
 );
 
-# ENVIRONMENT ------------------------------------------------------------------
+
 
 use Test::More;
 
-#-- verify load the module
+
 
 BEGIN {
     eval 'use Test::NoWarnings';    ## no critic
@@ -30,7 +30,7 @@ sub plan_skip {
 
 plan 'no_plan';
 
-#-- load the modules -----------------------------------------------------------
+
 
 use Cwd qw(
     abs_path
@@ -40,13 +40,13 @@ use File::Spec::Functions qw(
     catdir
 );
 
-#-- setting up facilities ------------------------------------------------------
 
-#-- declarations ---------------------------------------------------------------
+
+
 
 my ( $modules_dir, $t_dir, $author_dir, $release_dir, $t_modules_dir, $tools_dir, @modules, @t_modules, @t_scripts, @tools_scripts, @author_scripts, @release_scripts );
 
-#-- Global data ----------------------------------------------------------------
+
 
 $modules_dir    = abs_path( 'lib' );
 $t_dir          = abs_path( 't' );
@@ -75,7 +75,7 @@ foreach my $config (
     );
 }
 
-# INSTRUCTIONS -----------------------------------------------------------------
+
 
 #-- Test::Version - Check to see that version's in modules are sane
 eval {
@@ -163,7 +163,7 @@ minimum_version_ok( $_, 5.010 ) foreach
     @release_scripts,
     ;
 
-# POSTCONDITIONS ---------------------------------------------------------------
+
 
 __END__
 acks

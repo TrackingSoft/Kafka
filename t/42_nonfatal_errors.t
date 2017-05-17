@@ -1,7 +1,5 @@
 #!/usr/bin/perl -w
 
-#-- Pragmas --------------------------------------------------------------------
-
 use 5.010;
 use strict;
 use warnings;
@@ -12,11 +10,7 @@ use lib qw(
     ../lib
 );
 
-# ENVIRONMENT ------------------------------------------------------------------
-
 use Test::More;
-
-#-- verify load the module
 
 BEGIN {
     eval 'use Test::Exception';     ## no critic
@@ -29,8 +23,6 @@ BEGIN {
 }
 
 plan 'no_plan';
-
-#-- load the modules -----------------------------------------------------------
 
 use Const::Fast;
 #use Data::Dumper;
@@ -117,12 +109,8 @@ use Kafka::Protocol qw(
 
 use Kafka::MockIO;
 
-#-- setting up facilities ------------------------------------------------------
-
 Kafka::MockIO::override();
 #$Kafka::Connection::DEBUG = 1;
-
-#-- declarations ---------------------------------------------------------------
 
 const my $host              => $Kafka::MockIO::KAFKA_MOCK_HOSTNAME;
 const my $port              => $Kafka::MockIO::KAFKA_MOCK_SERVER_PORT;
@@ -350,11 +338,9 @@ sub Kafka_IO_error {
     );
 }
 
-#-- Global data ----------------------------------------------------------------
+
 
 my ( $connection, $error );
-
-# INSTRUCTIONS -----------------------------------------------------------------
 
 #-- Connecting to the Kafka mocked server port
 
@@ -517,10 +503,7 @@ Kafka::MockIO::add_special_case(
     }
 );
 
-#-- Closes and cleans up
-
 $connection->close;
 
-# POSTCONDITIONS ---------------------------------------------------------------
-
 Kafka::MockIO::restore();
+

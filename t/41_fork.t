@@ -1,7 +1,5 @@
 #!/usr/bin/perl -w
 
-#-- Pragmas --------------------------------------------------------------------
-
 use 5.010;
 use strict;
 use warnings;
@@ -12,16 +10,12 @@ use lib qw(
     ../lib
 );
 
-# ENVIRONMENT ------------------------------------------------------------------
-
 use Test::More;
 
 BEGIN {
     plan skip_all => 'Unknown base directory of Kafka server'
         unless $ENV{KAFKA_BASE_DIR};
 }
-
-#-- verify load the module
 
 BEGIN {
     eval 'use Test::Exception';     ## no critic
@@ -34,8 +28,6 @@ BEGIN {
 }
 
 plan 'no_plan';
-
-#-- load the modules -----------------------------------------------------------
 
 use Clone qw(
     clone
@@ -55,18 +47,14 @@ use Kafka::MockIO;
 use Kafka::Consumer;
 use Kafka::Producer;
 
-#-- setting up facilities ------------------------------------------------------
-
 STDOUT->autoflush;
 
 my $cluster = Kafka::Cluster->new(
-    kafka_dir           => $ENV{KAFKA_BASE_DIR},    # WARNING: must match the settings of your system
     replication_factor  => 1,
 );
+isa_ok( $cluster, 'Kafka::Cluster' );
 
-#-- declarations ---------------------------------------------------------------
-
-my ( $port, $connection, $topic, $partition, $producer, $response, $consumer, $is_ready, $pid, $ppid, $success, $etalon_messages, $starting_offset );
+my ( $connection, $topic, $partition, $producer, $response, $consumer, $is_ready, $pid, $ppid, $success, $etalon_messages, $starting_offset );
 
 sub random_strings {
     my @chars               = ( " ", "A" .. "Z", "a" .. "z", 0 .. 9, qw(! @ $ % ^ & *) );
@@ -176,15 +164,11 @@ sub wait_until_ready {
 $SIG{USR1} = sub { ++$is_ready };
 $SIG{USR2} = sub { ++$success };
 
-#-- Global data ----------------------------------------------------------------
-
 $partition  = $Kafka::MockIO::PARTITION;
 $topic      = $DEFAULT_TOPIC;
 
 #-- Connecting to the Kafka server port (for example for node_id = 0)
-( $port ) =  $cluster->servers;
-
-# INSTRUCTIONS -----------------------------------------------------------------
+my( $port ) =  $cluster->servers;
 
 # connecting to the Kafka server port
 $connection = Kafka::Connection->new(
@@ -354,6 +338,5 @@ if ( $pid = fork ) {                # herein the parent
 
 ok $success == 1, 'Testing of destruction in the parent';
 
-# POSTCONDITIONS ---------------------------------------------------------------
-
 $cluster->close;
+

@@ -1,7 +1,7 @@
 ---
 abstract: 'Apache Kafka low-level synchronous API, which does not use Zookeeper.'
 author:
-  - 'TrackingSoft LLC <sgladkov@trackingsoft.com>'
+  - 'Sergey Gladkov'
 configure_requires:
   ExtUtils::MakeMaker: '0'
 dynamic_config: 0

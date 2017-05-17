@@ -11,17 +11,17 @@ This documentation refers to C<Kafka::MockIO> version 1.02 .
 
 =cut
 
-#-- Pragmas --------------------------------------------------------------------
+
 
 use 5.010;
 use strict;
 use warnings;
 
-# ENVIRONMENT ------------------------------------------------------------------
+
 
 our $VERSION = '1.02';
 
-#-- load the modules -----------------------------------------------------------
+
 
 use Carp;
 use Const::Fast;
@@ -68,7 +68,7 @@ use Kafka::MockProtocol qw(
     encode_produce_response
 );
 
-#-- declarations ---------------------------------------------------------------
+
 
 =head1 DESCRIPTION
 
@@ -131,7 +131,7 @@ const our $KAFKA_MOCK_SERVER_PORT   => $KAFKA_SERVER_PORT;
 =cut
 const our $KAFKA_MOCK_HOSTNAME      => 'localhost';
 
-#-- Global data ----------------------------------------------------------------
+
 
 my %_reinstall = (
     new                         => [ \&Kafka::IO::new,      \&new ],
@@ -685,7 +685,7 @@ sub _verify_string {
     return 1;
 }
 
-#-- Closes and cleans up -------------------------------------------------------
+
 
 1;
 
@@ -736,7 +736,7 @@ L<https://github.com/TrackingSoft/Kafka>
 
 =head1 AUTHOR
 
-Sergey Gladkov, E<lt>sgladkov@trackingsoft.comE<gt>
+Sergey Gladkov
 
 =head1 CONTRIBUTORS
 
