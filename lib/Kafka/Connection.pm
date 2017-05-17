@@ -10,13 +10,13 @@ This documentation refers to C<Kafka::Connection> version 1.02 .
 
 =cut
 
-#-- Pragmas --------------------------------------------------------------------
+
 
 use 5.010;
 use strict;
 use warnings;
 
-# ENVIRONMENT ------------------------------------------------------------------
+
 
 our $DEBUG = 0;
 
@@ -29,7 +29,7 @@ our @EXPORT = qw(
     %RETRY_ON_ERRORS
 );
 
-#-- load the modules -----------------------------------------------------------
+
 
 use Data::Validate::Domain qw(
     is_hostname
@@ -141,7 +141,7 @@ use Kafka::Protocol qw(
     encode_api_versions_request
 );
 
-#-- declarations ---------------------------------------------------------------
+
 
 =head1 SYNOPSIS
 
@@ -406,12 +406,6 @@ API endpoints.
 If set to true, the client will always use
 C<$Kafka::Protocol::DEFAULT_APIVERSION> as API version.
 
-=item C<api_versions_refresh_delay_sec =E<gt> $positive_integer>
-
-Optional, default value is 60 (1 minute).
-
-The delay after which the client will refresh the supported API versions.
-
 =back
 
 =cut
@@ -429,7 +423,6 @@ sub new {
         AutoCreateTopicsEnable  => 0,
         MaxLoggedErrors         => 100,
         dont_load_supported_api_versions => 0,
-        api_versions_refresh_delay_sec => 60,
     }, $class;
 
     while ( @args ) {
@@ -1225,9 +1218,8 @@ sub _update_metadata {
     $IO_cache->{ $_ }->{NodeId} = undef for @brokers;
 
     #  In the IO cache update/add obtained server information
-    my $server;
     foreach my $received_broker ( @{ $decoded_response->{Broker} } ) {
-        $server = $self->_build_server_name( @{ $received_broker }{ 'Host', 'Port' } );
+        my $server = $self->_build_server_name( @{ $received_broker }{ 'Host', 'Port' } );
         $IO_cache->{ $server } = {                      # can add new servers
             IO      => $IO_cache->{ $server }->{IO},    # IO or undef
             NodeId  => $received_broker->{NodeId},
@@ -1242,13 +1234,12 @@ sub _update_metadata {
     my $received_metadata   = {};
     my $leaders             = {};
 
-    my ( $TopicName, $partition );
     my $ErrorCode = $ERROR_NO_ERROR;
+    my( $TopicName, $partition );
     METADATA_CREATION:
     foreach my $topic_metadata ( @{ $decoded_response->{TopicMetadata} } ) {
-        $partition = undef;
-
         $TopicName = $topic_metadata->{TopicName};
+        undef $partition;
         last METADATA_CREATION
             if ( $ErrorCode = $topic_metadata->{ErrorCode} ) != $ERROR_NO_ERROR;
 
@@ -1275,10 +1266,6 @@ sub _update_metadata {
             $self->_error( $ErrorCode, format_message( "topic='%s'%s", $TopicName, defined( $partition ) ? ", partition=$partition" : '' ) );
         }
     }
-
-    %$received_metadata
-        # FATAL error
-        or $self->_error( $ERROR_CANNOT_GET_METADATA, format_message( "topic='%s'", $topic ) );
 
     # Update metadata for received topics
     $self->{_metadata}->{ $_ }  = $received_metadata->{ $_ } foreach keys %{ $received_metadata };
@@ -1477,7 +1464,7 @@ sub _error {
     Kafka::Exception::Connection->throw( throw_args( @_ ) );
 }
 
-#-- Closes and cleans up -------------------------------------------------------
+
 
 1;
 
@@ -1587,7 +1574,7 @@ L<https://github.com/TrackingSoft/Kafka>
 
 =head1 AUTHOR
 
-Sergey Gladkov, E<lt>sgladkov@trackingsoft.comE<gt>
+Sergey Gladkov
 
 Please use GitHub project link above to report problems or contact authors.
 
