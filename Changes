@@ -11,6 +11,7 @@ Revision history for Kafka package
       easier, simpler and more complete way (including support for
       version 0 and version 1 of message formats)
     - Support for array of keys in Kafka::Producer->send with array of messages.
+    - Use Gzip::Faster to improve compression speed.
 
     BUGFIXES:
     - Improved timeouts handling for big payloads in Kafka::IO.

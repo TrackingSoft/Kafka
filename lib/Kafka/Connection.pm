@@ -10,13 +10,9 @@ This documentation refers to C<Kafka::Connection> version 1.02 .
 
 =cut
 
-
-
 use 5.010;
 use strict;
 use warnings;
-
-
 
 our $DEBUG = 0;
 
@@ -28,8 +24,6 @@ use Exporter qw(
 our @EXPORT = qw(
     %RETRY_ON_ERRORS
 );
-
-
 
 use Data::Validate::Domain qw(
     is_hostname
@@ -140,8 +134,6 @@ use Kafka::Protocol qw(
     encode_produce_request
     encode_api_versions_request
 );
-
-
 
 =head1 SYNOPSIS
 
@@ -406,6 +398,9 @@ API endpoints.
 If set to true, the client will always use
 C<$Kafka::Protocol::DEFAULT_APIVERSION> as API version.
 
+WARNING: API versions are supported starting from Kafka 0.10. Set this parameter to true
+if you're connecting to 0.9.
+
 =back
 
 =cut
@@ -540,12 +535,28 @@ sub _get_api_versions {
 
     # call the server and try to get the supported API versions
     my $api_versions = [];
+    my $error;
     try {
         # The ApiVersions API endpoint is only supported on Kafka versions >
         # 0.10.0.0 so this call may fail. We simply ignore this failure and
         # carry on.
-        $api_versions = $self->_get_supported_api_versions($server);
+        $api_versions = $self->_get_supported_api_versions( $server );
+    }
+    catch {
+        $error = $_;
     };
+
+    if( defined $error ) {
+        if ( blessed( $error ) && $error->isa( 'Kafka::Exception' ) ) {
+            if( $error->code == $ERROR_MISMATCH_ARGUMENT ) {
+                # rethrow known fatal errors
+                die $error;
+            }
+            $self->_remember_nonfatal_error( $error->code, $error, $server );
+        } else {
+            die $error;
+        }
+    }
 
     foreach my $element (@$api_versions) {
         # we want to choose which api version to use for each API call. We
@@ -567,7 +578,6 @@ sub _get_api_versions {
 
     return $server_api_versions;
 }
-
 
 # Returns the list of supported API versions. This is not really. *Warning*,
 # this call works only against Kafka 1.10.0.0
@@ -825,14 +835,22 @@ sub receive_response_to_request {
 
         # Send a request to the leader
         if ( $self->_connectIO( $server ) ) {
-
             # we can connect to this leader, so let's detect the api versions
             # it and use whatever it supports, except if the request forces us
             # to use an api version. Warning, the version might end up being
             # undef if detection against the Kafka server failed, or if
             # dont_load_supported_api_versions is true. However the Encoder
             # code knows how to handle it.
-            $request->{ApiVersion} = $original_request_api_version // $self->_get_api_versions($server)->{$api_key};
+            $request->{ApiVersion} = $original_request_api_version;
+            unless( defined $request->{ApiVersion} ) {
+                $request->{ApiVersion} = $self->_get_api_versions( $server )->{ $api_key };
+                # API versions request may fail and the server may be disconnected
+                unless( $self->_is_IO_connected( $server ) ) {
+                    # this attempt does not count, assuming that _get_api_versions will not try to get them from failing broker again
+                    redo ATTEMPT;
+                }
+            }
+
             my $encoded_request = $protocol{ $api_key }->{encode}->( $request, $compression_codec );
 
             unless ( $self->_sendIO( $server, $encoded_request ) ) {
@@ -1338,6 +1356,12 @@ sub _io_error {
     return $error;
 }
 
+sub _is_IO_connected {
+    my ( $self, $server ) = @_;
+    my $server_data = $self->{_IO_cache}->{ $server } or return;
+    return $server_data->{IO};
+}
+
 # connects to a server (host:port or [IPv6_host]:port)
 sub _connectIO {
     my ( $self, $server ) = @_;
@@ -1368,20 +1392,25 @@ sub _connectIO {
     return $server_data->{IO};
 }
 
-# Send encoded request ($encoded_request) to server ($server)
-sub _sendIO {
-    my ( $self, $server, $encoded_request ) = @_;
-
+sub _server_data_IO {
+    my ( $self, $server ) = @_;
     my $server_data = $self->{_IO_cache}->{ $server }
         or $self->_error( $ERROR_MISMATCH_ARGUMENT, format_message( "Unknown server '%s' (is not found in the metadata)", $server ) )
     ;
     $self->_error( $ERROR_MISMATCH_ARGUMENT, format_message( "Server '%s' is not connected", $server ) )
         unless $server_data->{IO}
     ;
+    return ( $server_data, $server_data->{IO} );
+}
+
+# Send encoded request ($encoded_request) to server ($server)
+sub _sendIO {
+    my ( $self, $server, $encoded_request ) = @_;
+    my( $server_data, $io ) = $self->_server_data_IO( $server );
     my $sent;
     my $error;
     try {
-        $sent = $server_data->{IO}->send( $encoded_request );
+        $sent = $io->send( $encoded_request );
     } catch {
         $error = $_;
     };
@@ -1396,13 +1425,7 @@ sub _sendIO {
 # Receive response from a given server
 sub _receiveIO {
     my ( $self, $server, $response_timeout ) = @_;
-
-    my $server_data = $self->{_IO_cache}->{ $server }
-        or $self->_error( $ERROR_MISMATCH_ARGUMENT, format_message( "Unknown server '%s' (is not found in the metadata)", $server ) )
-    ;
-    my $io = $server_data->{IO}
-        or $self->_error( $ERROR_MISMATCH_ARGUMENT, format_message( "Server '%s' is not connected", $server ) )
-    ;
+    my( $server_data, $io ) = $self->_server_data_IO( $server );
     my $response_ref;
     my $error;
     try {
@@ -1463,8 +1486,6 @@ sub _error {
     my $self = shift;
     Kafka::Exception::Connection->throw( throw_args( @_ ) );
 }
-
-
 
 1;
 
@@ -1603,3 +1624,4 @@ without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
 PARTICULAR PURPOSE.
 
 =cut
+
