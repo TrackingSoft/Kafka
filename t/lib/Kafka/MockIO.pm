@@ -45,6 +45,7 @@ use Kafka qw(
     $ERROR_MISMATCH_ARGUMENT
     $ERROR_NO_ERROR
     $ERROR_NOT_BINARY_STRING
+    $ERROR_CANNOT_RECV
     $KAFKA_SERVER_PORT
     $RECEIVE_LATEST_OFFSETS    $RECEIVE_EARLIEST_OFFSET
     $REQUEST_TIMEOUT
@@ -459,6 +460,8 @@ sub send {
         return length( $message );
     }
 
+    undef $encoded_response;
+
     $ApiKey = unpack( q{
         x[l]                # Size
         s>                  # ApiKey
@@ -600,6 +603,9 @@ sub send {
         $encoded_response = encode_metadata_response( $decoded_metadata_response )
             or Kafka::IO::_error( $self, $ERROR_MISMATCH_ARGUMENT, $description );
     }
+    else {
+        Kafka::IO::_error( $self, $ERROR_MISMATCH_ARGUMENT, "Unsupported API key in MockIO::send: $ApiKey" );
+    }
 
     return $len;
 }
@@ -615,7 +621,11 @@ sub receive {
     _POSINT( $length )
         or Kafka::IO::_error( $self, $ERROR_MISMATCH_ARGUMENT, 'Kafka::IO->receive' );
 
-    my $message = substr( $encoded_response // '', 0, $length, q{} );
+    unless( defined $encoded_response ) {
+        Kafka::IO::_error( $self, $ERROR_CANNOT_RECV, 'No response' );
+    }
+
+    my $message = substr( $encoded_response, 0, $length, '' );
 
     Kafka::IO::_debug_msg( $self, $message, 'Response from', 'yellow' )
         if Kafka::IO->debug_level == 1;

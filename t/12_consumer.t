@@ -185,18 +185,22 @@ testing( $KAFKA_BASE_DIR ) if $KAFKA_BASE_DIR;
 sub testing {
     my ( $kafka_base_dir ) = @_;
 
+    my $no_api_versions = 0;
+
     if ( $kafka_base_dir ) {
         #-- Connecting to the Kafka server port (for example for node_id = 0)
         ( $port ) =  Kafka::Cluster->new( kafka_dir => $KAFKA_BASE_DIR, reuse_existing => 1 )->servers;
     } else {
         $port = $Kafka::MockIO::KAFKA_MOCK_SERVER_PORT;
         Kafka::MockIO::override();
+        $no_api_versions = 1; # no API versions support in Mock protocol
     }
 
     $connect = Kafka::Connection->new(
         host            => 'localhost',
         port            => $port,
         RETRY_BACKOFF   => $RETRY_BACKOFF * 2,
+        dont_load_supported_api_versions => $no_api_versions,
     );
 
     #-- simple start
