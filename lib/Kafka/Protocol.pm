@@ -1918,7 +1918,10 @@ sub _decode_MessageSet_sized_template {
     CREATE_TEMPLATE:
     while ( $MessageSetSize ) {
 # Not the full MessageSet
-        last CREATE_TEMPLATE if $MessageSetSize < 22; # 22 is the minimal size of a v0 message format
+# 22 is the minimal size of a v0 message format until (and including) the Key
+# Length. If the message version is v1, then it's 22 + 8. We'll check later
+        last CREATE_TEMPLATE if $MessageSetSize < 22;
+
                 # [q] Offset
                 # [l] MessageSize
                 # [l] Crc
@@ -1942,6 +1945,11 @@ sub _decode_MessageSet_sized_template {
             );
 
             my $is_v1_msg_format = $MagicByte == 1;
+            if ($is_v1_msg_format && $MessageSetSize < (22+8)) {
+                # Not the full MessageSet
+                $local_template = q{};
+                last MESSAGE_SET;
+            }
             $local_template .= ( $is_v1_msg_format ? $_Message_template_with_timestamp : $_Message_template );
 
             $response->{stream_offset} += ($is_v1_msg_format ? 18: 10);
