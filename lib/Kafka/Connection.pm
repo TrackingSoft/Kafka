@@ -113,6 +113,8 @@ use Kafka::Internals qw(
     $APIKEY_OFFSET
     $APIKEY_PRODUCE
     $APIKEY_APIVERSIONS
+    $APIKEY_OFFSETCOMMIT
+    $APIKEY_OFFSETFETCH
     $MAX_CORRELATIONID
     $MAX_INT32
     debug_level
@@ -128,11 +130,15 @@ use Kafka::Protocol qw(
     decode_offset_response
     decode_produce_response
     decode_api_versions_response
+    decode_offsetcommit_response
+    decode_offsetfetch_response
     encode_fetch_request
     encode_metadata_request
     encode_offset_request
     encode_produce_request
     encode_api_versions_request
+    encode_offsetcommit_request
+    encode_offsetfetch_request
 );
 
 =head1 SYNOPSIS
@@ -210,6 +216,14 @@ my %protocol = (
     "$APIKEY_APIVERSIONS"  => {
         decode                  => \&decode_api_versions_response,
         encode                  => \&encode_api_versions_request,
+    },
+    "$APIKEY_OFFSETCOMMIT"  => {
+        decode                  => \&decode_offsetcommit_response,
+        encode                  => \&encode_offsetcommit_request,
+    },
+    "$APIKEY_OFFSETFETCH"  => {
+        decode                  => \&decode_offsetfetch_response,
+        encode                  => \&encode_offsetfetch_request,
     },
 );
 
@@ -405,7 +419,7 @@ if you're connecting to 0.9.
 
 =cut
 sub new {
-    my ( $class, @args ) = @_;
+    my ( $class, %p ) = @_;
 
     my $self = bless {
         host                    => q{},
@@ -420,10 +434,7 @@ sub new {
         dont_load_supported_api_versions => 0,
     }, $class;
 
-    while ( @args ) {
-        my $k = shift @args;
-        $self->{ $k } = shift @args if exists $self->{ $k };
-    }
+    exists $p{$_} and $self->{$_} = $p{$_} foreach keys %$self;
 
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'host' )
         unless defined( $self->{host} ) && ( $self->{host} eq q{} || defined( _STRING( $self->{host} ) ) ) && !utf8::is_utf8( $self->{host} );

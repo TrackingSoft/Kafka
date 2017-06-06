@@ -54,6 +54,8 @@ use Kafka::Exceptions;
 use Kafka::Internals qw(
     $APIKEY_FETCH
     $APIKEY_OFFSET
+    $APIKEY_OFFSETCOMMIT
+    $APIKEY_OFFSETFETCH
     $MAX_INT32
     _get_CorrelationId
     _isbig
@@ -256,7 +258,7 @@ is the default that can be imported from the L<Kafka|Kafka> module.
 
 =cut
 sub new {
-    my ( $class, @args ) = @_;
+    my ( $class, %p ) = @_;
 
     my $self = bless {
         Connection          => undef,
@@ -267,11 +269,7 @@ sub new {
         MaxNumberOfOffsets  => $DEFAULT_MAX_NUMBER_OF_OFFSETS,
     }, $class;
 
-    while ( @args )
-    {
-        my $k = shift @args;
-        $self->{ $k } = shift @args if exists $self->{ $k };
-    }
+    exists $p{$_} and $self->{$_} = $p{$_} foreach keys %$self;
 
     $self->{ClientId}       //= 'consumer';
 
@@ -686,6 +684,137 @@ sub _query_offsets {
     }
 
     return $offsets;
+}
+
+=head3 C<commit_offsets( $topic, $partition, $offset, $group )>
+
+Commit offsets using the offset commit/fetch API.
+
+Returns a non-blank value (a reference to a hash with server response description)
+if the message is successfully sent.
+
+C<commit_offsets()> takes the following arguments:
+
+=over 3
+
+=item C<$topic>
+
+The C<$topic> must be a normal non-false string of non-zero length.
+
+=item C<$partition>
+
+The C<$partition> must be a non-negative integer.
+
+=item C<$offset>
+
+Offset in topic and partition to commit.
+
+The argument must be a positive number.
+
+The argument may be a L<Math::BigInt|Math::BigInt> integer on 32 bit
+system.
+
+=item C<$group>
+
+The name of the consumer group
+
+The argument must be a normal non-false string of non-zero length.
+
+=back
+
+=cut
+sub commit_offsets {
+    my ( $self, $topic, $partition, $offset, $group ) = @_;
+
+
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'topic' )
+        unless defined( $topic ) && ( $topic eq q{} || defined( _STRING( $topic ) ) ) && !utf8::is_utf8( $topic );
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'partition' )
+        unless defined( $partition ) && isint( $partition ) && $partition >= 0;
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'offset' )
+        unless defined( $offset ) && ( ( _isbig( $offset ) && $offset >= 0 ) || defined( _NONNEGINT( $offset ) ) );
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'group' )
+        unless defined( $group ) && ( $group eq q{} || defined( _STRING( $group ) ) ) && !utf8::is_utf8( $group );
+
+    my $request = {
+        ApiKey                    => $APIKEY_OFFSETCOMMIT,
+        CorrelationId             => _get_CorrelationId(),
+        ClientId                  => $self->{ClientId},
+        GroupId                   => $group,
+        topics  => [
+            {
+                TopicName         => $topic,
+                partitions        => [
+                    {
+                        Partition => $partition,
+                        Offset    => $offset,
+                        Metadata  => '',
+                    },
+                ],
+            },
+        ],
+    };
+
+    return $self->{Connection}->receive_response_to_request( $request );
+}
+
+=head3 C<fetch_offsets( $topic, $partition, $group )>
+
+Fetch Committed offsets using the offset commit/fetch API.
+
+Returns a non-blank value (a reference to a hash with server response description)
+if the message is successfully sent.
+
+C<fetch_offsets()> takes the following arguments:
+
+=over 3
+
+=item C<$topic>
+
+The C<$topic> must be a normal non-false string of non-zero length.
+
+=item C<$partition>
+
+The C<$partition> must be a non-negative integer.
+
+=item C<$group>
+
+The name of the consumer group
+
+The argument must be a normal non-false string of non-zero length.
+
+=back
+
+=cut
+sub fetch_offsets {
+    my ( $self, $topic, $partition, $group ) = @_;
+
+
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'topic' )
+        unless defined( $topic ) && ( $topic eq q{} || defined( _STRING( $topic ) ) ) && !utf8::is_utf8( $topic );
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'partition' )
+        unless defined( $partition ) && isint( $partition ) && $partition >= 0;
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'group' )
+        unless defined( $group ) && ( $group eq q{} || defined( _STRING( $group ) ) ) && !utf8::is_utf8( $group );
+
+    my $request = {
+        ApiKey                    => $APIKEY_OFFSETFETCH,
+        CorrelationId             => _get_CorrelationId(),
+        ClientId                  => $self->{ClientId},
+        GroupId                   => $group,
+        topics  => [
+            {
+                TopicName         => $topic,
+                partitions        => [
+                    {
+                        Partition => $partition,
+                    },
+                ],
+            },
+        ],
+    };
+
+    return $self->{Connection}->receive_response_to_request( $request );
 }
 
 #-- private attributes ---------------------------------------------------------

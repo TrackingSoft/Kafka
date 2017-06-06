@@ -252,3 +252,7 @@ untainted
 Vlad
 ZooKeeper
 Zuban
+OffsetCommit
+OffsetFetch
+OFFSETCOMMIT
+OFFSETFETCH

@@ -202,7 +202,7 @@ L<Kafka|Kafka> module.
 
 =cut
 sub new {
-    my ( $class, @args ) = @_;
+    my ( $class, %p ) = @_;
 
     my $self = bless {
         Connection      => undef,
@@ -211,10 +211,7 @@ sub new {
         Timeout         => $REQUEST_TIMEOUT,
     }, $class;
 
-    while ( @args ) {
-        my $k = shift @args;
-        $self->{ $k } = shift @args if exists $self->{ $k };
-    }
+    exists $p{$_} and $self->{$_} = $p{$_} foreach keys %$self;
 
     $self->{ClientId}       //= 'producer';
 
