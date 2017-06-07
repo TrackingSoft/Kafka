@@ -6,19 +6,15 @@ Kafka::Protocol - Functions to process messages in the Apache Kafka protocol.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Protocol> version 1.03 .
+This documentation refers to C<Kafka::Protocol> version 1.04 .
 
 =cut
-
-
 
 use 5.010;
 use strict;
 use warnings;
 
-
-
-our $VERSION = '1.03';
+our $VERSION = '1.04';
 
 use Exporter qw(
     import
@@ -53,8 +49,6 @@ our @EXPORT_OK = qw(
     $NULL_BYTES_LENGTH
     $_int64_template
 );
-
-
 
 use Compress::Snappy;
 use Const::Fast;
@@ -98,7 +92,6 @@ use Kafka::Internals qw(
     $PRODUCER_ANY_OFFSET
     format_message
 );
-
 
 
 =head1 SYNOPSIS
@@ -518,7 +511,7 @@ The following functions are available for C<Kafka::MockProtocol> module.
 Encodes the argument and returns a reference to the encoded binary string
 representing a Request buffer.
 
-This function take arguments. The following argument is currently recognized:
+This function takes the following arguments:
 
 =over 3
 
@@ -570,7 +563,7 @@ my $_decode_api_version_response_template = q{x[l]l>s>l>X[l]l>/(s>s>s>)};
 Decodes the argument and returns a reference to the hash representing
 the structure of the APIVERSIONS Response.
 
-This function take argument. The following argument is currently recognized:
+This function takes the following arguments:
 
 =over 3
 
@@ -615,7 +608,7 @@ sub decode_api_versions_response {
 Encodes the argument and returns a reference to the encoded binary string
 representing a Request buffer.
 
-This function take arguments. The following arguments are currently recognized:
+This function takes the following arguments:
 
 =over 3
 
@@ -752,7 +745,7 @@ my $_decode_produce_response_template_v2 = qq{x[l]l>l>X[l]l>/(s>/al>X[l]l>/(l>s>
 Decodes the argument and returns a reference to the hash representing
 the structure of the PRODUCE Response (examples see C<t/*_decode_encode.t>).
 
-This function take argument. The following argument is currently recognized:
+This function takes the following arguments:
 
 =over 3
 
@@ -815,7 +808,7 @@ sub decode_produce_response {
 Encodes the argument and returns a reference to the encoded binary string
 representing a Request buffer.
 
-This function take argument. The following argument is currently recognized:
+This function takes the following arguments:
 
 =over 3
 
@@ -893,7 +886,7 @@ sub encode_fetch_request {
 Decodes the argument and returns a reference to the hash representing
 the structure of the FETCH Response (examples see C<t/*_decode_encode.t>).
 
-This function take argument. The following argument is currently recognized:
+This function takes the following arguments:
 
 =over 3
 
@@ -976,7 +969,7 @@ sub decode_fetch_response {
 Encodes the argument and returns a reference to the encoded binary string
 representing a Request buffer.
 
-This function take argument. The following argument is currently recognized:
+This function takes the following arguments:
 
 =over 3
 
@@ -1091,7 +1084,7 @@ my $_decode_offset_response_template_v1 = qq{x[l]l>l>X[l]l>/(s>/al>X[l]l>/(l>s>$
 Decodes the argument and returns a reference to the hash representing
 the structure of the OFFSET Response (examples see C<t/*_decode_encode.t>).
 
-This function take argument. The following argument is currently recognized:
+This function takes the following arguments:
 
 =over 3
 
@@ -1160,7 +1153,7 @@ sub decode_offset_response {
 Encodes the argument and returns a reference to the encoded binary string
 representing a Request buffer.
 
-This function take argument. The following argument is currently recognized:
+This function takes the following arguments:
 
 =over 3
 
@@ -1250,7 +1243,7 @@ my $_decode_metadata_response_template = q{x[l]l>l>X[l]l>/(l>s>/al>)l>X[l]l>/(s>
 Decodes the argument and returns a reference to the hash representing
 the structure of the METADATA Response (examples see C<t/*_decode_encode.t>).
 
-This function take argument. The following argument is currently recognized:
+This function takes the following arguments:
 
 =over 3
 
@@ -1328,7 +1321,7 @@ sub decode_metadata_response {
 Encodes the argument and returns a reference to the encoded binary string
 representing a Request buffer.
 
-This function take argument. The following argument is currently recognized:
+This function takes the following arguments:
 
 =over 3
 
@@ -1415,7 +1408,7 @@ my $_decode_offsetcommit_response_template = qq{x[l]l>l>X[l]l>/(s>/al>X[l]l>/(l>
 Decodes the argument and returns a reference to the hash representing
 the structure of the OFFSETCOMMIT Response (examples see C<t/*_decode_encode.t>).
 
-This function take argument. The following argument is currently recognized:
+This function takes the following arguments:
 
 =over 3
 
@@ -1465,7 +1458,7 @@ sub decode_offsetcommit_response {
 Encodes the argument and returns a reference to the encoded binary string
 representing a Request buffer.
 
-This function take argument. The following argument is currently recognized:
+This function takes the following arguments:
 
 =over 3
 
@@ -1549,7 +1542,7 @@ my $_decode_offsetfetch_response_template = qq{x[l]l>l>X[l]l>/(s>/al>X[l]l>/(l>$
 Decodes the argument and returns a reference to the hash representing
 the structure of the OFFSETFETCH Response (examples see C<t/*_decode_encode.t>).
 
-This function take argument. The following argument is currently recognized:
+This function takes the following arguments:
 
 =over 3
 
@@ -2097,6 +2090,8 @@ Sergiy Zuban
 Vlad Marchenko
 
 Damien Krotkine
+
+Greg Franklin
 
 =head1 COPYRIGHT AND LICENSE
 

@@ -1,5 +1,14 @@
 Revision history for Kafka package
 
+1.04 Wed June 07 2017
+
+    CHANGES:
+    - Added offset commit/fetch API (thanks to Greg Franklin and Damien Krotkine).
+
+    BUGFIXES:
+    - Fix key-value arguments validation.
+    - Fix MessageSet incomplete data check.
+
 1.03 Mon May  22 2017
 
     BUGFIXES:

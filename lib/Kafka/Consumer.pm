@@ -6,21 +6,15 @@ Kafka::Consumer - Perl interface for Kafka consumer client.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Consumer> version 1.03 .
+This documentation refers to C<Kafka::Consumer> version 1.04 .
 
 =cut
-
-
 
 use 5.010;
 use strict;
 use warnings;
 
-
-
-our $VERSION = '1.03';
-
-
+our $VERSION = '1.04';
 
 use Carp;
 use Params::Util qw(
@@ -65,8 +59,6 @@ use Kafka::Connection;
 use Kafka::Message;
 
 if ( !$BITS64 ) { eval 'use Kafka::Int64; 1;' or die "Cannot load Kafka::Int64 : $@"; } ## no critic
-
-
 
 =head1 SYNOPSIS
 
@@ -942,6 +934,10 @@ Jeremy Jordan
 Sergiy Zuban
 
 Vlad Marchenko
+
+Damien Krotkine
+
+Greg Franklin
 
 =head1 COPYRIGHT AND LICENSE
 

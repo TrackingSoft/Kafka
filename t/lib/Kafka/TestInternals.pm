@@ -6,7 +6,7 @@ Kafka::TestInternals - Constants and functions used in the tests.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::TestInternals> version 1.03 .
+This documentation refers to C<Kafka::TestInternals> version 1.04 .
 
 =cut
 
@@ -18,7 +18,7 @@ use warnings;
 
 
 
-our $VERSION = '1.03';
+our $VERSION = '1.04';
 
 use Exporter qw(
     import

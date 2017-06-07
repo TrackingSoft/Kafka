@@ -7,7 +7,7 @@ server via socket.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::MockIO> version 1.03 .
+This documentation refers to C<Kafka::MockIO> version 1.04 .
 
 =cut
 
@@ -19,7 +19,7 @@ use warnings;
 
 
 
-our $VERSION = '1.03';
+our $VERSION = '1.04';
 
 
 
@@ -318,7 +318,7 @@ sub restore {
 
 Adds special cases for use in the simulation of interaction with kafka server.
 
-This function take argument. The following argument is currently recognized:
+This function takes the following arguments:
 
 =over 3
 
@@ -356,7 +356,7 @@ sub add_special_case {
 
 Removes the special case.
 
-This function take argument. The following argument is currently recognized:
+This function takes the following arguments:
 
 =over 3
 
