@@ -1,4 +1,4 @@
-Kafka package version 1.001013
+Kafka package version 1.04
 ==============================
 
 The Kafka package is a set of Perl modules which provides a
@@ -129,7 +129,7 @@ The basic operation of the Kafka package modules:
 
 COPYRIGHT AND LICENCE
 
-Copyright (C) 2012-2016 by TrackingSoft LLC.
+Copyright (C) 2012-2017 by TrackingSoft LLC.
 
 This package is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself. See perlartistic at

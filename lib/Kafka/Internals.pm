@@ -6,19 +6,19 @@ Kafka::Internals - Constants and functions used internally.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Internals> version 1.001013 .
+This documentation refers to C<Kafka::Internals> version 1.04 .
 
 =cut
 
-#-- Pragmas --------------------------------------------------------------------
+
 
 use 5.010;
 use strict;
 use warnings;
 
-# ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '1.001013';
+
+our $VERSION = '1.04';
 
 use Exporter qw(
     import
@@ -45,7 +45,7 @@ our @EXPORT_OK = qw(
     format_reference
 );
 
-#-- load the modules -----------------------------------------------------------
+
 
 use overload;
 use Carp;
@@ -61,7 +61,7 @@ use Kafka qw(
     $ERROR_MISMATCH_ARGUMENT
 );
 
-#-- declarations ---------------------------------------------------------------
+
 
 =head1 SYNOPSIS
 
@@ -372,7 +372,7 @@ L<https://github.com/TrackingSoft/Kafka>
 
 =head1 AUTHOR
 
-Sergey Gladkov, E<lt>sgladkov@trackingsoft.comE<gt>
+Sergey Gladkov
 
 Please use GitHub project link above to report problems or contact authors.
 
@@ -388,7 +388,7 @@ Vlad Marchenko
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2012-2016 by TrackingSoft LLC.
+Copyright (C) 2012-2017 by TrackingSoft LLC.
 
 This package is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself. See I<perlartistic> at

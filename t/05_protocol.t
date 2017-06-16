@@ -1,7 +1,5 @@
 #!/usr/bin/perl -w
 
-#-- Pragmas --------------------------------------------------------------------
-
 use 5.010;
 use strict;
 use warnings;
@@ -12,11 +10,7 @@ use lib qw(
     ../lib
 );
 
-# ENVIRONMENT ------------------------------------------------------------------
-
 use Test::More;
-
-#-- verify load the module
 
 BEGIN {
     eval 'use Test::NoWarnings';    ## no critic
@@ -24,8 +18,6 @@ BEGIN {
 }
 
 plan 'no_plan';
-
-#-- load the modules -----------------------------------------------------------
 
 use Kafka qw(
     $COMPRESSION_NONE
@@ -44,17 +36,9 @@ use Kafka::Protocol qw(
     decode_fetch_response
 );
 
-#-- setting up facilities ------------------------------------------------------
-
-#-- declarations ---------------------------------------------------------------
-
-my ( $request, $encoded_response, $decoded );
-
-#-- Global data ----------------------------------------------------------------
-
-# INSTRUCTIONS -----------------------------------------------------------------
-
 # NOTE: We presume that the verification of the correctness of the arguments made by the user.
+
+my $request = {};
 
 # CorrelationId
 $request->{CorrelationId} = 0;
@@ -121,7 +105,7 @@ $request->{topics}->[0]->{partitions}->[0]->{MessageSet}->[0]->{Value} = q{};
 # description of responses, see t/??_decode_encode.t
 
 # the correct encoded fetch response hex stream
-$encoded_response = pack( "H*", '0000006e000000000000000100076d79746f706963000000010000000000000000000000000002000000470000000000000000000000148dc795a20000ffffffff0000000648656c6c6f2100000000000000010000001b989feb390000ffffffff0000000d48656c6c6f2c20576f726c6421' );
+my $encoded_response = pack( "H*", '0000006e000000000000000100076d79746f706963000000010000000000000000000000000002000000470000000000000000000000148dc795a20000ffffffff0000000648656c6c6f2100000000000000010000001b989feb390000ffffffff0000000d48656c6c6f2c20576f726c6421' );
 # the correct decoded fetch response
 #$decoded_response = {
 #    CorrelationId                           => 0,
@@ -154,11 +138,12 @@ $encoded_response = pack( "H*", '0000006e000000000000000100076d79746f70696300000
 #        },
 #    ],
 #};
-$decoded = decode_fetch_response( \$encoded_response );
+
+my $decoded = decode_fetch_response( \$encoded_response );
 is scalar( @{ $decoded->{topics}->[0]->{partitions}->[0]->{MessageSet} } ), 2, 'all messages are decoded';
 
 foreach my $corrupted (
-# Not the full MessageSet: $MessageSetSize < 22;
+        # Not the full MessageSet: $MessageSetSize < 22;
                 # [q] Offset
                 # [l] MessageSize
                 # [l] Crc
@@ -176,7 +161,7 @@ foreach my $corrupted (
             received        => 0,
             description     => 'no decoded messages',
         },
-# Not the full MessageSet: not the full Key or Value length
+        # Not the full MessageSet: not the full Key or Value length
         {
             hex_stream      => '0000006e000000000000000100076d79746f706963000000010000000000000000000000000002000000470000000000000000000000148dc795a20000ffffffff000000',
             received        => 0,
@@ -187,7 +172,7 @@ foreach my $corrupted (
             received        => 1,
             description     => 'the first message is decoded',
         },
-# Not the full MessageSet: not the full Value
+        # Not the full MessageSet: not the full Value
         {
             hex_stream      => '0000006e000000000000000100076d79746f706963000000010000000000000000000000000002000000470000000000000000000000148dc795a20000ffffffff0000000648656c6c6f',
             received        => 0,
@@ -204,4 +189,3 @@ foreach my $corrupted (
     is scalar( @{ $decoded->{topics}->[0]->{partitions}->[0]->{MessageSet} } ), $corrupted->{received}, $corrupted->{description};
 }
 
-# POSTCONDITIONS ---------------------------------------------------------------

@@ -1,7 +1,5 @@
 #!/usr/bin/perl -w
 
-#-- Pragmas --------------------------------------------------------------------
-
 use 5.010;
 use strict;
 use warnings;
@@ -12,16 +10,12 @@ use lib qw(
     ../lib
 );
 
-# ENVIRONMENT ------------------------------------------------------------------
-
 use Test::More;
 
 BEGIN {
     plan skip_all => 'Unknown base directory of Kafka server'
         unless $ENV{KAFKA_BASE_DIR};
 }
-
-#-- verify load the module
 
 BEGIN {
     eval 'use Test::Exception';     ## no critic
@@ -35,11 +29,7 @@ BEGIN {
 
 plan 'no_plan';
 
-#-- load the modules -----------------------------------------------------------
-
-use Config::IniFiles;
 use Const::Fast;
-use File::Copy;
 use FindBin qw(
     $Bin
 );
@@ -59,61 +49,15 @@ use Kafka qw(
     $RECEIVE_LATEST_OFFSETS
     $RETRY_BACKOFF
 );
-use Kafka::Cluster qw(
-    $DEFAULT_REPLICATION_FACTOR
-);
+use Kafka::Cluster;
 use Kafka::Connection;
 use Kafka::Consumer;
 use Kafka::MockIO;
 use Kafka::Producer;
 
-#-- setting up facilities ------------------------------------------------------
-
-const my $KAFKA_PROPERTIES_FILE => 'server.properties';
-
-my ( $properties_file, $bak_properties_file );
-{
-    my $start_dir           = ( substr( $Bin, -1 ) eq 't' ) ? $Bin : catdir( $Bin, 't' );
-    my $kafka_config_dir    = catdir( $start_dir, 'config' );
-    $properties_file        = catfile( $kafka_config_dir, $KAFKA_PROPERTIES_FILE );
-}
-$bak_properties_file = $properties_file.'.bak';
-
-unlink $bak_properties_file;
-copy( $properties_file, $bak_properties_file );
-
-#-- declarations ---------------------------------------------------------------
-
-# WARNING: must match the settings of your system
-const my $KAFKA_BASE_DIR        => $ENV{KAFKA_BASE_DIR};
 const my $TOPIC_PATTERN         => 'stranger0';
-const my $INI_SECTION           => 'GENERAL';
 
-my ( $cluster, $port, $connection, $topic, $partition, $producer, $response, $consumer, $offsets, $messages );
-
-sub restore_properties {
-    unlink $properties_file;
-    rename $bak_properties_file, $properties_file;
-}
-
-# Setting the server configuration file
-sub setup {
-    my ( $auto_create_topics_mode ) = @_;
-
-    if ( !( my $cfg = Config::IniFiles->new(
-            -file       => $properties_file,
-            -fallback   => $INI_SECTION,
-        ) ) ) {
-        restore_properties();
-        my $error = q{};
-        map { $error .= "\n$_" } @Config::IniFiles::errors;
-        BAIL_OUT "$properties_file error: $error";
-    } else {
-        $cfg->setval( $INI_SECTION, 'auto.create.topics.enable'     => $auto_create_topics_mode );
-        $cfg->setval( $INI_SECTION, 'default.replication.factor'    => $DEFAULT_REPLICATION_FACTOR );
-        $cfg->RewriteConfig( $properties_file );
-    }
-}
+my ( $connection, $topic, $partition, $producer, $response, $consumer, $offsets, $messages );
 
 sub sending {
     return $producer->send(
@@ -140,23 +84,19 @@ sub fetching {
     );
 }
 
-#-- Global data ----------------------------------------------------------------
-
 $partition  = $Kafka::MockIO::PARTITION;;
 $topic      = $TOPIC_PATTERN;
 
-# INSTRUCTIONS -----------------------------------------------------------------
-
 for my $auto_create_topics_enable ( 'true', 'false' ) {
-    setup( $auto_create_topics_enable );
-
-    $cluster = Kafka::Cluster->new(
-        kafka_dir           => $KAFKA_BASE_DIR,
-        replication_factor  => $DEFAULT_REPLICATION_FACTOR,
+    my $cluster = Kafka::Cluster->new(
+        properties => {
+            'auto.create.topics.enable' => $auto_create_topics_enable,
+        },
     );
+    isa_ok( $cluster, 'Kafka::Cluster' );
 
     #-- Connecting to the Kafka server port (for example for node_id = 0)
-    ( $port ) =  $cluster->servers;
+    my( $port ) =  $cluster->servers;
 
     for my $AutoCreateTopicsEnable ( 0, 1 ) {
         #-- Connecting to the Kafka server port
@@ -222,6 +162,3 @@ for my $auto_create_topics_enable ( 'true', 'false' ) {
     $cluster->close;
 }
 
-# POSTCONDITIONS ---------------------------------------------------------------
-
-restore_properties();

@@ -2,8 +2,6 @@
 
 # Performance test
 
-#-- Pragmas --------------------------------------------------------------------
-
 use 5.010;
 use strict;
 use warnings;
@@ -14,11 +12,7 @@ use lib qw(
     ../lib
 );
 
-# ENVIRONMENT ------------------------------------------------------------------
-
 use Test::More;
-
-#-- verify load the module
 
 BEGIN {
     eval 'use Test::Deep';          ## no critic
@@ -31,8 +25,6 @@ BEGIN {
 }
 
 plan 'no_plan';
-
-#-- load the modules -----------------------------------------------------------
 
 use Const::Fast;
 #use Data::Dumper;
@@ -62,18 +54,11 @@ use Kafka::Consumer;
 
 use Kafka::MockIO;
 
-#-- setting up facilities ------------------------------------------------------
-
-#-- declarations ---------------------------------------------------------------
-
 const my $TOPIC             => 'mytopic';
 # Use Kafka::MockIO only with the following information:
 const my $PARTITION         => $Kafka::MockIO::PARTITION;
 
-#-- Global data ----------------------------------------------------------------
-
 my (
-    $port,
     $connect,
     $producer,
     $consumer,
@@ -90,8 +75,6 @@ my (
     $number_of_package_ser,
 );
 
-# INSTRUCTIONS -----------------------------------------------------------------
-
 my $timeout = $ENV{KAFKA_BENCHMARK_TIMEOUT} || $REQUEST_TIMEOUT;
 
 my @chars               = ( " ", "A" .. "Z", "a" .. "z", 0 .. 9, qw(! @ $ % ^ & *) );
@@ -105,7 +88,7 @@ my %bench;
 
 #-- Connection
 
-$port = $KAFKA_SERVER_PORT;
+my $port = $KAFKA_SERVER_PORT;
 
 Kafka::MockIO::override();
 
@@ -134,8 +117,6 @@ unless ( $consumer = Kafka::Consumer->new(
     BAIL_OUT 'consumer is not created';
 }
 isa_ok( $consumer, 'Kafka::Consumer');
-
-#-- definition of the functions
 
 sub next_offset {
     my ( $consumer, $topic, $partition, $is_package ) = @_;
@@ -278,7 +259,7 @@ sub report {
     }
 }
 
-# INSTRUCTIONS -----------------------------------------------------------------
+
 
 $in_package = $number_of_package;
 
@@ -433,7 +414,7 @@ while (1) {
 
 cmp_deeply( $fetch, $messages, 'all messages are received correctly' );
 
-# POSTCONDITIONS ---------------------------------------------------------------
+
 
 # Closes and cleans up
 undef $producer;
@@ -441,8 +422,8 @@ ok( !$producer, 'the producer object is an empty' );
 undef $consumer;
 ok( !$consumer, 'the consumer object is an empty' );
 
-
 $connect->close;
 
 # Statistics
 report();
+

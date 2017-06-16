@@ -1,7 +1,5 @@
 #!/usr/bin/perl -w
 
-#-- Pragmas --------------------------------------------------------------------
-
 use 5.010;
 use strict;
 use warnings;
@@ -12,16 +10,12 @@ use lib qw(
     ../lib
 );
 
-# ENVIRONMENT ------------------------------------------------------------------
-
 use Test::More;
 
 BEGIN {
     plan skip_all => 'Unknown base directory of Kafka server'
         unless $ENV{KAFKA_BASE_DIR};
 }
-
-#-- verify load the module
 
 BEGIN {
     eval 'use Test::Exception';     ## no critic
@@ -34,8 +28,6 @@ BEGIN {
 }
 
 plan 'no_plan';
-
-#-- load the modules -----------------------------------------------------------
 
 use Const::Fast;
 use Data::Dumper;
@@ -59,16 +51,11 @@ use Kafka::Consumer;
 use Kafka::MockIO;
 use Kafka::Producer;
 
-#-- setting up facilities ------------------------------------------------------
-
 STDOUT->autoflush;
 
 my $cluster = Kafka::Cluster->new(
-    kafka_dir           => $ENV{KAFKA_BASE_DIR},    # WARNING: must match the settings of your system
-    replication_factor  => 3,
+    replication_factor => 3,
 );
-
-#-- declarations ---------------------------------------------------------------
 
 const my $PARTITION             => $Kafka::MockIO::PARTITION;
 const my $TOPIC                 => $DEFAULT_TOPIC;
@@ -271,12 +258,10 @@ sub get_new_objects {
     } 'Expecting to live new CONSUMER';
 }
 
-#-- Global data ----------------------------------------------------------------
+
 
 #-- Connecting to the Kafka server port (for example for node_id = 0)
 ( $port ) =  $cluster->servers;
-
-# INSTRUCTIONS -----------------------------------------------------------------
 
 diag 'Started at '.localtime."\n";
 my $stored_messages;
@@ -332,6 +317,5 @@ diag "sendings with other errors not stored $other_message_not_stored";
 $Data::Dumper::Sortkeys = 1;
 diag( Data::Dumper->Dump( [ \%found_ERRORS ], [ 'found_ERRORS' ] ) );
 
-# POSTCONDITIONS ---------------------------------------------------------------
-
 $cluster->close;
+

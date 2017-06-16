@@ -6,19 +6,19 @@ Kafka::TestInternals - Constants and functions used in the tests.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::TestInternals> version 1.001013 .
+This documentation refers to C<Kafka::TestInternals> version 1.04 .
 
 =cut
 
-#-- Pragmas --------------------------------------------------------------------
+
 
 use 5.010;
 use strict;
 use warnings;
 
-# ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '1.001013';
+
+our $VERSION = '1.04';
 
 use Exporter qw(
     import
@@ -43,7 +43,7 @@ our @EXPORT_OK = qw(
     $topic
 );
 
-#-- load the modules -----------------------------------------------------------
+
 
 use Const::Fast;
 use Scalar::Util::Numeric qw(
@@ -60,7 +60,7 @@ use Kafka::Internals qw(
     $APIKEY_OFFSET
 );
 
-#-- declarations ---------------------------------------------------------------
+
 
 =head1 DESCRIPTION
 
@@ -459,7 +459,7 @@ L<https://github.com/TrackingSoft/Kafka>
 
 =head1 AUTHOR
 
-Sergey Gladkov, E<lt>sgladkov@trackingsoft.comE<gt>
+Sergey Gladkov
 
 =head1 CONTRIBUTORS
 

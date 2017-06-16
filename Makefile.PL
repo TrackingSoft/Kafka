@@ -88,43 +88,43 @@ my %config = (
         provides                => {
             'Kafka'                 => {
                 file                    => 'lib/Kafka.pm',
-                version                 => '1.001013'
+                version                 => '1.04'
             },
             'Kafka::Connection'     => {
                 file                    => 'lib/Kafka/Connection.pm',
-                version                 => '1.001013'
+                version                 => '1.04'
             },
             'Kafka::Consumer'       => {
                 file                    => 'lib/Kafka/Consumer.pm',
-                version                 => '1.001013'
+                version                 => '1.04'
             },
             'Kafka::Exceptions'     => {
                 file                    => 'lib/Kafka/Exceptions.pm',
-                version                 => '1.001013'
+                version                 => '1.04'
             },
             'Kafka::IO'             => {
                 file                    => 'lib/Kafka/IO.pm',
-                version                 => '1.001013'
+                version                 => '1.04'
             },
             'Kafka::Int64'          => {
                 file                    => 'lib/Kafka/Int64.pm',
-                version                 => '1.001013'
+                version                 => '1.04'
             },
             'Kafka::Internals'      => {
                 file                    => 'lib/Kafka/Internals.pm',
-                version                 => '1.001013'
+                version                 => '1.04'
             },
             'Kafka::Message'        => {
                 file                    => 'lib/Kafka/Message.pm',
-                version                 => '1.001013'
+                version                 => '1.04'
             },
             'Kafka::Producer'       => {
                 file                    => 'lib/Kafka/Producer.pm',
-                version                 => '1.001013'
+                version                 => '1.04'
             },
             'Kafka::Protocol'       => {
                 file                    => 'lib/Kafka/Protocol.pm',
-                version                 => '1.001013'
+                version                 => '1.04'
             },
         },
         'meta-spec'             => { version => 2 },
@@ -143,7 +143,7 @@ my %config = (
     ( $] >= 5.005 ?                             ## Add these new keywords supported since 5.005
         (
             ABSTRACT            => 'Apache Kafka low-level synchronous API, which does not use Zookeeper.',
-            AUTHOR              => 'TrackingSoft LLC <sgladkov@trackingsoft.com>'
+            AUTHOR              => 'Sergey Gladkov',
         ) : ()
     ),
     dist                => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', },

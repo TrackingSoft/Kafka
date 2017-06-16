@@ -1,7 +1,5 @@
 #!/usr/bin/perl -w
 
-#-- Pragmas --------------------------------------------------------------------
-
 use 5.010;
 use strict;
 use warnings;
@@ -12,16 +10,12 @@ use lib qw(
     ../lib
 );
 
-# ENVIRONMENT ------------------------------------------------------------------
-
 use Test::More;
 
 BEGIN {
     plan skip_all => 'Unknown base directory of Kafka server'
         unless $ENV{KAFKA_BASE_DIR};
 }
-
-#-- verify load the module
 
 BEGIN {
     eval 'use Test::Exception';     ## no critic
@@ -34,8 +28,6 @@ BEGIN {
 }
 
 plan 'no_plan';
-
-#-- load the modules -----------------------------------------------------------
 
 use Kafka::Cluster;
 use Const::Fast;
@@ -58,15 +50,10 @@ use Kafka::Connection;
 use Kafka::Consumer;
 use Kafka::Producer;
 
-#-- setting up facilities ------------------------------------------------------
-
 STDOUT->autoflush;
 
 #Kafka::Connection->debug_level( 1 );
 
-#-- declarations ---------------------------------------------------------------
-
-const my $KAFKA_BASE_DIR    => $ENV{KAFKA_BASE_DIR};    # WARNING: must match the settings of your system
 const my $TOPIC             => $Kafka::Cluster::DEFAULT_TOPIC;
 const my $HOST              => 'localhost';
 const my $PARTITION         => 0;
@@ -345,17 +332,11 @@ sub next_offset {
     }
 }
 
-#-- Global data ----------------------------------------------------------------
-
-# INSTRUCTIONS -----------------------------------------------------------------
-
-# Demonstrate the following conclusions:
-# - When the server receives the not complete request, the messages is not stored
+# Demonstrate the following:
+# - When the server receives incomplete request, the messages are not stored
 # - NOTE: errors in the server logfiles are not seen
 
-$cluster = Kafka::Cluster->new(
-    kafka_dir           => $KAFKA_BASE_DIR,
-);
+$cluster = Kafka::Cluster->new();
 isa_ok( $cluster, 'Kafka::Cluster' );
 
 ( $port )   =  $cluster->servers;
@@ -380,10 +361,7 @@ send_not_complete_messages_with_lost_connection();
 get_new_objects();
 fetching_no_messages();
 
-#-- Closes and cleans up
-
 $connection->close;
 
 $cluster->close;
 
-# POSTCONDITIONS ---------------------------------------------------------------

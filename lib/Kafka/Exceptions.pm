@@ -6,21 +6,21 @@ Kafka::Exceptions - Perl Kafka API exception definitions.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Exceptions> version 1.001013 .
+This documentation refers to C<Kafka::Exceptions> version 1.04 .
 
 =cut
 
-#-- Pragmas --------------------------------------------------------------------
+
 
 use 5.010;
 use strict;
 use warnings;
 
-# ENVIRONMENT ------------------------------------------------------------------
+
 
 our $DEBUG = 0;
 
-our $VERSION = '1.001013';
+our $VERSION = '1.04';
 
 use Exporter qw(
     import
@@ -29,7 +29,7 @@ our @EXPORT = qw(
     throw_args
 );
 
-#-- load the modules -----------------------------------------------------------
+
 
 use Exception::Class (
     'Kafka::Exception' => {
@@ -68,7 +68,7 @@ if( Kafka::Internals::debug_level( __PACKAGE__ ) ) {
     Kafka::Exception->Trace(1); # include stack traces
 }
 
-#-- declarations ---------------------------------------------------------------
+
 
 =head1 SYNOPSIS
 
@@ -228,7 +228,7 @@ sub throw_args {
 
 #-- private methods ------------------------------------------------------------
 
-#-- Closes and cleans up -------------------------------------------------------
+
 
 1;
 
@@ -275,7 +275,7 @@ L<https://github.com/TrackingSoft/Kafka>
 
 =head1 AUTHOR
 
-Sergey Gladkov, E<lt>sgladkov@trackingsoft.comE<gt>
+Sergey Gladkov
 
 Please use GitHub project link above to report problems or contact authors.
 
@@ -291,7 +291,7 @@ Vlad Marchenko
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2012-2016 by TrackingSoft LLC.
+Copyright (C) 2012-2017 by TrackingSoft LLC.
 
 This package is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself. See I<perlartistic> at

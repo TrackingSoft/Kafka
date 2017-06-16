@@ -1,7 +1,5 @@
 #!/usr/bin/perl -w
 
-#-- Pragmas --------------------------------------------------------------------
-
 use 5.010;
 use strict;
 use warnings;
@@ -12,11 +10,7 @@ use lib qw(
     ../lib
 );
 
-# ENVIRONMENT ------------------------------------------------------------------
-
 use Test::More;
-
-#-- verify load the module
 
 BEGIN {
     eval 'use Test::Exception';     ## no critic
@@ -29,8 +23,6 @@ BEGIN {
 }
 
 plan 'no_plan';
-
-#-- load the modules -----------------------------------------------------------
 
 use Params::Util qw(
     _STRING
@@ -47,14 +39,6 @@ use Kafka::TestInternals qw(
     @not_string
 );
 
-#-- setting up facilities ------------------------------------------------------
-
-#-- declarations ---------------------------------------------------------------
-
-my ( %original_IO_API, $io, $test_message, $topic, $partition );
-
-#-- Global data ----------------------------------------------------------------
-
 my @IO_API_names = qw(
     new
     send
@@ -63,22 +47,19 @@ my @IO_API_names = qw(
     _is_alive
 );
 
-$test_message   = "Test message\n";
+#-- Mocking Kafka::IO ----------
+my %original_IO_API = map { $_ => \&{ "Kafka::IO::$_" } } @IO_API_names;
 
-$topic      = 'mytopic';
-$partition  = $Kafka::MockIO::PARTITION;
+my $test_message   = "Test message\n";
+
+my $topic      = 'mytopic';
+my $partition  = $Kafka::MockIO::PARTITION;
 
 # description of requests, see t/??_decode_encode.t
 my $encoded_produce_request     = pack( "H*", '00000049000000000000000400000001000005dc0000000100076d79746f7069630000000100000000000000200000000000000000000000148dc795a20000ffffffff0000000648656c6c6f21' );
 my $encoded_fetch_request       = pack( "H*", '0000004d00010000000000000016636f6e736f6c652d636f6e73756d65722d3235353535ffffffff00000064000000010000000100076d79746f7069630000000100000000000000000000000000100000' );
 my $encoded_offset_request      = pack( "H*", '0000004500020000000000000016636f6e736f6c652d636f6e73756d65722d3235353535ffffffff0000000100076d79746f7069630000000100000000fffffffffffffffe00000001' );
 my $encoded_metadata_request    = pack( "H*", '0000002d00030000000000000016636f6e736f6c652d636f6e73756d65722d32353535350000000100076d79746f706963' );
-
-# INSTRUCTIONS -----------------------------------------------------------------
-
-#-- Mocking Kafka::IO ----------
-
-$original_IO_API{ $_ } = \&{ "Kafka::IO::$_" } foreach @IO_API_names;
 
 #-- override
 
@@ -114,7 +95,7 @@ Kafka::MockIO::add_special_case( { $test_message => $test_message } );
 
 # NOTE: Is duplicated test code t/02_io.t partially (Section INSTRUCTIONS)
 
-$io = Kafka::IO->new(
+my $io = Kafka::IO->new(
     host    => 'localhost',
     port    => $KAFKA_SERVER_PORT,
     timeout => $REQUEST_TIMEOUT,
@@ -248,6 +229,5 @@ foreach my $encoded_request (
 
 #-- APIKEY_METADATA
 
-# POSTCONDITIONS ---------------------------------------------------------------
-
 Kafka::MockIO::restore();
+

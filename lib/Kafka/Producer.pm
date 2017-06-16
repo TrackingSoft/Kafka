@@ -6,25 +6,25 @@ Kafka::Producer - Perl interface for Kafka producer client.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Producer> version 1.001013 .
+This documentation refers to C<Kafka::Producer> version 1.04 .
 
 =cut
 
-#-- Pragmas --------------------------------------------------------------------
+
 
 use 5.010;
 use strict;
 use warnings;
 
-# ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '1.001013';
 
-#-- load the modules -----------------------------------------------------------
+our $VERSION = '1.04';
+
+
 
 use Carp;
 use Params::Util qw(
-    _ARRAY0
+    _ARRAY
     _INSTANCE
     _NONNEGINT
     _NUMBER
@@ -61,7 +61,7 @@ use Kafka::Internals qw(
     format_message
 );
 
-#-- declarations ---------------------------------------------------------------
+
 
 =head1 SYNOPSIS
 
@@ -218,7 +218,7 @@ sub new {
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'Connection' )
         unless _INSTANCE( $self->{Connection}, 'Kafka::Connection' );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'ClientId' )
-        unless ( $self->{ClientId} eq q{} || defined( _STRING( $self->{ClientId} ) ) ) && !utf8::is_utf8( $self->{ClientId} );
+        unless ( $self->{ClientId} eq '' || defined( _STRING( $self->{ClientId} ) ) ) && !utf8::is_utf8( $self->{ClientId} );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, format_message( 'Timeout (%s)', $self->{Timeout} ) )
         unless defined _NUMBER( $self->{Timeout} ) && int( $self->{Timeout} * 1000 ) >= 1 && int( $self->{Timeout} * 1000 ) <= $MAX_INT32;
 
@@ -247,7 +247,7 @@ The following methods are defined for the C<Kafka::Producer> class:
 
 #-- public methods -------------------------------------------------------------
 
-=head3 C<send( $topic, $partition, $messages, $key, $compression_codec )>
+=head3 C<send( $topic, $partition, $messages, $keys, $compression_codec )>
 
 Sends a messages on a L<Kafka::Connection|Kafka::Connection> object.
 
@@ -271,11 +271,12 @@ The C<$partition> must be a non-negative integer.
 The C<$messages> is an arbitrary amount of data (a simple data string or
 a reference to an array of the data strings).
 
-=item C<$key>
+=item C<$keys>
 
-The C<$key> is an optional message key, must be a string.
-C<$key> may used in the producer for partitioning with each message,
+The C<$keys> are optional message keys, for partitioning with each message,
 so the consumer knows the partitioning key.
+This argument should be either a single string (common key for all messages),
+or an array of strings with length matching messages array.
 
 =item C<$compression_codec>
 
@@ -296,25 +297,44 @@ Do not use C<$Kafka::SEND_MAX_ATTEMPTS> in C<Kafka::Producer-<gt>send> request t
 
 =cut
 sub send {
-    my ( $self, $topic, $partition, $messages, $key, $compression_codec ) = @_;
-
-    $key //= q{};
+    my ( $self, $topic, $partition, $messages, $keys, $compression_codec ) = @_;
 
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'topic' )
-        unless defined( $topic ) && ( $topic eq q{} || defined( _STRING( $topic ) ) ) && !utf8::is_utf8( $topic );
+        unless defined( $topic ) && ( $topic eq '' || defined( _STRING( $topic ) ) ) && !utf8::is_utf8( $topic );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'partition' )
         unless defined( $partition ) && isint( $partition ) && $partition >= 0;
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'messages' )
-        unless defined( _STRING( $messages ) ) || _ARRAY0( $messages );
-    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'key' )
-        unless ( $key eq q{} || defined( _STRING( $key ) ) ) && !utf8::is_utf8( $key );
+        unless defined( _STRING( $messages ) ) || _ARRAY( $messages );
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'keys' )
+        unless ( !defined $keys || defined( _STRING( $keys ) ) || _ARRAY( $keys ) );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'compression_codec' )
         unless ( !defined( $compression_codec ) || $known_compression_codecs{ $compression_codec } );
 
     $messages = [ $messages ] unless ref( $messages );
     foreach my $message ( @$messages ) {
         $self->_error( $ERROR_MISMATCH_ARGUMENT, format_message( 'message = %s', $message ) )
-            unless defined( $message ) && ( $message eq q{} || ( defined( _STRING( $message ) ) && !utf8::is_utf8( $message ) ) );
+            unless defined( $message ) && ( $message eq '' || ( defined( _STRING( $message ) ) && !utf8::is_utf8( $message ) ) );
+    }
+
+    my $common_key;
+
+    if( _ARRAY( $keys ) ) {
+        # ensure that keys array maytches messages array
+        $self->_error( $ERROR_MISMATCH_ARGUMENT, 'keys' )
+            unless scalar( @$keys ) == scalar( @$messages );
+
+        foreach my $key ( @$keys ) {
+            $self->_error( $ERROR_MISMATCH_ARGUMENT, format_message( 'key = %s', $key ) )
+                unless !defined( $key ) || $key eq '' || ( defined( _STRING( $key ) ) && !utf8::is_utf8( $key ) );
+        }
+    }
+    elsif( defined $keys ) {
+        $self->_error( $ERROR_MISMATCH_ARGUMENT, format_message( 'key = %s', $keys ) )
+            unless $keys eq '' || ( defined( _STRING( $keys ) ) && !utf8::is_utf8( $keys ) );
+        $common_key = $keys;
+    }
+    else {
+        $common_key = '';
     }
 
     my $MessageSet = [];
@@ -337,12 +357,14 @@ sub send {
         ],
     };
 
+    my $key_index = 0;
     foreach my $message ( @$messages ) {
         push @$MessageSet, {
             Offset  => $PRODUCER_ANY_OFFSET,
-            Key     => $key,
+            Key     => defined $common_key ? $common_key : ( $keys->[ $key_index ] // '' ),
             Value   => $message,
         };
+        ++$key_index;
     }
 
     my $result = $self->{Connection}->receive_response_to_request( $request, $compression_codec, $self->{Timeout} );
@@ -362,7 +384,7 @@ sub _error {
     return;
 }
 
-#-- Closes and cleans up -------------------------------------------------------
+
 
 1;
 
@@ -462,7 +484,7 @@ L<https://github.com/TrackingSoft/Kafka>
 
 =head1 AUTHOR
 
-Sergey Gladkov, E<lt>sgladkov@trackingsoft.comE<gt>
+Sergey Gladkov
 
 Please use GitHub project link above to report problems or contact authors.
 
@@ -478,7 +500,7 @@ Vlad Marchenko
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2012-2016 by TrackingSoft LLC.
+Copyright (C) 2012-2017 by TrackingSoft LLC.
 
 This package is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself. See I<perlartistic> at

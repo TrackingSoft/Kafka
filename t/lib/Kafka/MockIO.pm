@@ -7,21 +7,21 @@ server via socket.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::MockIO> version 1.001013 .
+This documentation refers to C<Kafka::MockIO> version 1.04 .
 
 =cut
 
-#-- Pragmas --------------------------------------------------------------------
+
 
 use 5.010;
 use strict;
 use warnings;
 
-# ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '1.001013';
 
-#-- load the modules -----------------------------------------------------------
+our $VERSION = '1.04';
+
+
 
 use Carp;
 use Const::Fast;
@@ -45,6 +45,7 @@ use Kafka qw(
     $ERROR_MISMATCH_ARGUMENT
     $ERROR_NO_ERROR
     $ERROR_NOT_BINARY_STRING
+    $ERROR_CANNOT_RECV
     $KAFKA_SERVER_PORT
     $RECEIVE_LATEST_OFFSETS    $RECEIVE_EARLIEST_OFFSET
     $REQUEST_TIMEOUT
@@ -68,7 +69,7 @@ use Kafka::MockProtocol qw(
     encode_produce_response
 );
 
-#-- declarations ---------------------------------------------------------------
+
 
 =head1 DESCRIPTION
 
@@ -131,7 +132,7 @@ const our $KAFKA_MOCK_SERVER_PORT   => $KAFKA_SERVER_PORT;
 =cut
 const our $KAFKA_MOCK_HOSTNAME      => 'localhost';
 
-#-- Global data ----------------------------------------------------------------
+
 
 my %_reinstall = (
     new                         => [ \&Kafka::IO::new,      \&new ],
@@ -317,7 +318,7 @@ sub restore {
 
 Adds special cases for use in the simulation of interaction with kafka server.
 
-This function take argument. The following argument is currently recognized:
+This function takes the following arguments:
 
 =over 3
 
@@ -355,7 +356,7 @@ sub add_special_case {
 
 Removes the special case.
 
-This function take argument. The following argument is currently recognized:
+This function takes the following arguments:
 
 =over 3
 
@@ -458,6 +459,8 @@ sub send {
         $encoded_response = $_special_cases{ $message };
         return length( $message );
     }
+
+    undef $encoded_response;
 
     $ApiKey = unpack( q{
         x[l]                # Size
@@ -600,6 +603,9 @@ sub send {
         $encoded_response = encode_metadata_response( $decoded_metadata_response )
             or Kafka::IO::_error( $self, $ERROR_MISMATCH_ARGUMENT, $description );
     }
+    else {
+        Kafka::IO::_error( $self, $ERROR_MISMATCH_ARGUMENT, "Unsupported API key in MockIO::send: $ApiKey" );
+    }
 
     return $len;
 }
@@ -615,7 +621,11 @@ sub receive {
     _POSINT( $length )
         or Kafka::IO::_error( $self, $ERROR_MISMATCH_ARGUMENT, 'Kafka::IO->receive' );
 
-    my $message = substr( $encoded_response // '', 0, $length, q{} );
+    unless( defined $encoded_response ) {
+        Kafka::IO::_error( $self, $ERROR_CANNOT_RECV, 'No response' );
+    }
+
+    my $message = substr( $encoded_response, 0, $length, '' );
 
     Kafka::IO::_debug_msg( $self, $message, 'Response from', 'yellow' )
         if Kafka::IO->debug_level == 1;
@@ -685,7 +695,7 @@ sub _verify_string {
     return 1;
 }
 
-#-- Closes and cleans up -------------------------------------------------------
+
 
 1;
 
@@ -736,7 +746,7 @@ L<https://github.com/TrackingSoft/Kafka>
 
 =head1 AUTHOR
 
-Sergey Gladkov, E<lt>sgladkov@trackingsoft.comE<gt>
+Sergey Gladkov
 
 =head1 CONTRIBUTORS
 

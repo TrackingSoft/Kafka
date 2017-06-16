@@ -1,7 +1,5 @@
 #!/usr/bin/perl -w
 
-#-- Pragmas --------------------------------------------------------------------
-
 use 5.010;
 use strict;
 use warnings;
@@ -12,11 +10,7 @@ use lib qw(
     ../lib
 );
 
-# ENVIRONMENT ------------------------------------------------------------------
-
 use Test::More;
-
-#-- verify load the module
 
 BEGIN {
     eval 'use Test::Exception';     ## no critic
@@ -29,8 +23,6 @@ BEGIN {
 }
 
 plan 'no_plan';
-
-#-- load the modules -----------------------------------------------------------
 
 use Const::Fast;
 use Params::Util qw(
@@ -68,14 +60,12 @@ use Kafka::TestInternals qw(
     $topic
 );
 
-#-- setting up facilities ------------------------------------------------------
+
 
 STDOUT->autoflush;
 
-#-- declarations ---------------------------------------------------------------
-
 # WARNING: must match the settings of your system
-const my $KAFKA_BASE_DIR    => $ENV{KAFKA_BASE_DIR};
+const my $KAFKA_BASE_DIR => $ENV{KAFKA_BASE_DIR};
 
 my ( $port, $connect, $partition, $consumer, $offsets, $messages );
 
@@ -141,7 +131,6 @@ sub communication_error {
         host            => 'localhost',
         port            => $port,
         RETRY_BACKOFF   => $RETRY_BACKOFF * 2,
-        dont_load_supported_api_versions => 1,
     );
 
     Sub::Install::reinstall_sub( {
@@ -153,7 +142,7 @@ sub communication_error {
         as      => $name,
     } );
 
-# fetch
+    # fetch
     $consumer = Kafka::Consumer->new(
         Connection  => $connect,
     );
@@ -167,7 +156,7 @@ sub communication_error {
         );
     } 'Kafka::Exception::Connection', 'error thrown';
 
-# offsets
+    # offsets
     $consumer = Kafka::Consumer->new(
         Connection  => $connect,
     );
@@ -188,11 +177,7 @@ sub communication_error {
     } );
 }
 
-#-- Global data ----------------------------------------------------------------
-
 $partition = $Kafka::MockIO::PARTITION;;
-
-# INSTRUCTIONS -----------------------------------------------------------------
 
 testing();
 testing( $KAFKA_BASE_DIR ) if $KAFKA_BASE_DIR;
@@ -200,24 +185,25 @@ testing( $KAFKA_BASE_DIR ) if $KAFKA_BASE_DIR;
 sub testing {
     my ( $kafka_base_dir ) = @_;
 
+    my $no_api_versions = 0;
+
     if ( $kafka_base_dir ) {
         #-- Connecting to the Kafka server port (for example for node_id = 0)
         ( $port ) =  Kafka::Cluster->new( kafka_dir => $KAFKA_BASE_DIR, reuse_existing => 1 )->servers;
     } else {
         $port = $Kafka::MockIO::KAFKA_MOCK_SERVER_PORT;
         Kafka::MockIO::override();
+        $no_api_versions = 1; # no API versions support in Mock protocol
     }
-
-#-- Connecting to the Kafka server port
 
     $connect = Kafka::Connection->new(
         host            => 'localhost',
         port            => $port,
         RETRY_BACKOFF   => $RETRY_BACKOFF * 2,
-        dont_load_supported_api_versions => 1,
+        dont_load_supported_api_versions => $no_api_versions,
     );
 
-#-- simple start
+    #-- simple start
 
     $consumer = Kafka::Consumer->new(
         Connection  => $connect,
@@ -227,63 +213,44 @@ sub testing {
     undef $consumer;
     ok !$consumer, 'consumer object is destroyed';
 
-#-- new
+    #-- new
 
-# Connection
     new_ERROR_MISMATCH_ARGUMENT( 'Connection', @not_right_object );
-
-# ClientId
     new_ERROR_MISMATCH_ARGUMENT( 'ClientId', @not_empty_string );
-
-# MaxWaitTime
     new_ERROR_MISMATCH_ARGUMENT( 'MaxWaitTime', @not_posnumber );
-
-# MinBytes
     new_ERROR_MISMATCH_ARGUMENT( 'MinBytes', @not_nonnegint );
-
-# MaxBytes
     new_ERROR_MISMATCH_ARGUMENT( 'MaxBytes', @not_posint, $MESSAGE_SIZE_OVERHEAD - 1 );
-
-# MaxNumberOfOffsets
     new_ERROR_MISMATCH_ARGUMENT( 'MaxNumberOfOffsets', @not_posint );
 
-#-- fetch
+    #-- fetch
 
-# topic
     fetch_ERROR_MISMATCH_ARGUMENT( $_, $partition, 0, $DEFAULT_MAX_BYTES )
         foreach @not_empty_string;
 
-# partition
     fetch_ERROR_MISMATCH_ARGUMENT( $topic, $_, 0, $DEFAULT_MAX_BYTES )
         foreach @not_isint;
 
-# offset
     fetch_ERROR_MISMATCH_ARGUMENT( $topic, $partition, $_, $DEFAULT_MAX_BYTES )
         foreach @not_nonnegint;
 
-# max_size
     fetch_ERROR_MISMATCH_ARGUMENT( $topic, $partition, 0, $_ )
         foreach grep( { defined $_ } @not_nonnegint ), $MESSAGE_SIZE_OVERHEAD - 1;
 
-#-- offsets
+    #-- offsets
 
-# topic
     offsets_ERROR_MISMATCH_ARGUMENT( $_, $partition, $RECEIVE_EARLIEST_OFFSET, $DEFAULT_MAX_NUMBER_OF_OFFSETS )
         foreach @not_empty_string;
 
-# partition
     offsets_ERROR_MISMATCH_ARGUMENT( $topic, $_, $RECEIVE_EARLIEST_OFFSET, $DEFAULT_MAX_NUMBER_OF_OFFSETS )
         foreach @not_isint;
 
-# time
     offsets_ERROR_MISMATCH_ARGUMENT( $topic, $partition, $_, $DEFAULT_MAX_NUMBER_OF_OFFSETS )
         foreach @not_isint, -3;
 
-# max_number
     offsets_ERROR_MISMATCH_ARGUMENT( $topic, $partition, $RECEIVE_EARLIEST_OFFSET, $_ )
         foreach grep( { defined $_ } @not_posint );
 
-#-- Preparing data
+    #-- Preparing data
 
     my $producer = Kafka::Producer->new(
         Connection      => $connect,
@@ -319,7 +286,7 @@ sub testing {
     );
     isa_ok( $consumer, 'Kafka::Consumer' );
 
-#-- OffsetRequest
+    #-- OffsetRequest
 
 # According to Apache Kafka documentation:
 # The Offset API describes the valid offset range available for a set of topic-partitions.
@@ -345,7 +312,7 @@ sub testing {
         }
     }
 
-#-- FetchRequest
+    #-- FetchRequest
 
     # Consuming messages
     $messages = $consumer->fetch(
@@ -370,17 +337,14 @@ sub testing {
         }
     }
 
-#-- Response to errors in communication modules
+    #-- Response to errors in communication modules
 
-# Kafka::IO
     communication_error( 'Kafka::IO', 'send' );
 
-# Kafka::Connection
     communication_error( 'Kafka::Connection', 'receive_response_to_request' );
 
-#-- finish
     Kafka::MockIO::restore()
         unless $kafka_base_dir;
 }
 
-# POSTCONDITIONS ---------------------------------------------------------------
+

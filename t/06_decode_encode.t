@@ -1,7 +1,5 @@
 #!/usr/bin/perl -w
 
-#-- Pragmas --------------------------------------------------------------------
-
 use 5.010;
 use strict;
 use warnings;
@@ -12,11 +10,7 @@ use lib qw(
     ../lib
 );
 
-# ENVIRONMENT ------------------------------------------------------------------
-
 use Test::More;
-
-#-- verify load the module
 
 BEGIN {
     eval 'use Test::Exception';     ## no critic
@@ -29,8 +23,6 @@ BEGIN {
 }
 
 plan 'no_plan';
-
-#-- load the modules -----------------------------------------------------------
 
 #use Data::Dumper;
 
@@ -68,15 +60,9 @@ use Kafka::MockProtocol qw(
     encode_produce_response
 );
 
-#-- setting up facilities ------------------------------------------------------
-
-#-- declarations ---------------------------------------------------------------
-
-#-- Global data ----------------------------------------------------------------
 
 my ( $encoded, $decoded );
 
-# INSTRUCTIONS -----------------------------------------------------------------
 
 #-- ProduceRequest -------------------------------------------------------------
 
@@ -879,4 +865,3 @@ $decoded = {
 is_deeply( decode_metadata_response( \$encoded ), $decoded, 'decoded correctly' );
 is( encode_metadata_response( $decoded ), $encoded, 'encoded correctly' );
 
-# POSTCONDITIONS ---------------------------------------------------------------

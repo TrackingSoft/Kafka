@@ -1,7 +1,5 @@
 #!/usr/bin/perl -w
 
-#-- Pragmas --------------------------------------------------------------------
-
 use 5.010;
 use strict;
 use warnings;
@@ -12,11 +10,7 @@ use lib qw(
     ../lib
 );
 
-# ENVIRONMENT ------------------------------------------------------------------
-
 use Test::More;
-
-#-- verify load the module
 
 BEGIN {
     eval 'use Test::Exception';     ## no critic
@@ -25,10 +19,7 @@ BEGIN {
 
 plan 'no_plan';
 
-#-- load the modules -----------------------------------------------------------
-
 use Const::Fast;
-#use File::HomeDir;
 use Params::Util qw(
     _HASH
     _INSTANCE
@@ -77,13 +68,7 @@ use Kafka::TestInternals qw(
     $topic
 );
 
-#-- setting up facilities ------------------------------------------------------
-
-#-- declarations ---------------------------------------------------------------
-
-# WARNING: must match the settings of your system
-#const my $KAFKA_BASE_DIR    => $ENV{KAFKA_BASE_DIR} || File::Spec->catdir( File::HomeDir->my_home, 'kafka' );
-const my $KAFKA_BASE_DIR    => $ENV{KAFKA_BASE_DIR};
+const my $KAFKA_BASE_DIR => $ENV{KAFKA_BASE_DIR};
 
 my ( $port, $connect, $server, $request, $response, $tmp );
 
@@ -121,10 +106,6 @@ sub is_ERROR_MISMATCH_ARGUMENT {
     }
 }
 
-#-- Global data ----------------------------------------------------------------
-
-# INSTRUCTIONS -----------------------------------------------------------------
-
 my $ip_version_verified;
 testing();
 testing( $KAFKA_BASE_DIR ) if $KAFKA_BASE_DIR;
@@ -145,7 +126,7 @@ sub testing {
         Kafka::MockIO::override();
     }
 
-#-- simple start
+    #-- simple start
 
     $connect = Kafka::Connection->new(
         host    => 'localhost',
@@ -164,7 +145,7 @@ sub testing {
     isa_ok( $connect, 'Kafka::Connection' );
     is $connect->{ip_version}, $IP_V4, 'ip_version OK';
 
-#-- get_known_servers
+    #-- get_known_servers
     is scalar( $connect->get_known_servers() ), 1, 'Known only one server';
     ( $server ) = $connect->get_known_servers();
     ok $connect->is_server_known( $server ), 'known server';
@@ -175,33 +156,20 @@ sub testing {
     undef $connect;
     ok !$connect, 'connection object is destroyed';
 
-#-- new
+    #-- new
 
-# host
     new_ERROR_MISMATCH_ARGUMENT( 'host', @not_string );
-
-# port
     new_ERROR_MISMATCH_ARGUMENT( 'port', @not_posint );
-
-# timeout
     new_ERROR_MISMATCH_ARGUMENT( 'timeout', grep { defined $_ } @not_number );
-
-# broker_list
     new_ERROR_MISMATCH_ARGUMENT( 'broker_list', @not_array0 );
     new_ERROR_MISMATCH_ARGUMENT( 'broker_list', @not_is_like_server_list );
-
-# ip_version
     new_ERROR_MISMATCH_ARGUMENT( 'ip_version', -1, $IP_V6 * 2 );
-
-# SEND_MAX_ATTEMPTS
     new_ERROR_MISMATCH_ARGUMENT( 'SEND_MAX_ATTEMPTS', @not_posint );
-
-# RETRY_BACKOFF
     new_ERROR_MISMATCH_ARGUMENT( 'RETRY_BACKOFF', @not_posint );
 
-#-- receive_response_to_request
+    #-- receive_response_to_request
 
-#-- ProduceRequest
+    #-- ProduceRequest
 
     $connect = Kafka::Connection->new(
         host        => 'localhost',
@@ -210,7 +178,7 @@ sub testing {
         dont_load_supported_api_versions => 1,
     );
 
-# Here and below, the query explicitly indicate ApiKey - producer and consumer must act also
+    # Here and below, the query explicitly indicate ApiKey - producer and consumer must act also
 
     for my $mode (
             $NOT_SEND_ANY_RESPONSE,
@@ -249,7 +217,7 @@ sub testing {
 #say Data::Dumper->Dump( [ $response ], [ 'produce_response' ] );
     }
 
-#-- FetchRequest
+    #-- FetchRequest
 
     for my $mode (
         $MIN_BYTES_RESPOND_IMMEDIATELY,
@@ -282,7 +250,7 @@ sub testing {
 #say Data::Dumper->Dump( [ $response ], [ 'fetch_response' ] );
     }
 
-#-- OffsetRequest
+    #-- OffsetRequest
 
     for my $mode (
         $RECEIVE_EARLIEST_OFFSET,
@@ -313,10 +281,10 @@ sub testing {
 #say Data::Dumper->Dump( [ $response ], [ 'offset_response' ] );
     }
 
-#-- get_known_servers
+    #-- get_known_servers
     ok scalar( $connect->get_known_servers() ), 'Known some servers';
 
-#-- is_server_connected
+    #-- is_server_connected
     foreach my $server ( keys %{ $connect->{_IO_cache} } ) {
         my $io = $connect->{_IO_cache}->{ $server }->{IO};
         if ( exists $io->{ip_version} ) {
@@ -336,7 +304,7 @@ sub testing {
     }
     is_ERROR_MISMATCH_ARGUMENT( '_is_server_connected' );
 
-#-- _is_server_alive
+    #-- _is_server_alive
     foreach my $server ( $connect->get_known_servers() ) {
         ok $connect->_is_server_alive( $server ), 'server is alive';
         ok $connect->close_connection( $server ), 'close connection';
@@ -345,7 +313,7 @@ sub testing {
     is_ERROR_MISMATCH_ARGUMENT( '_is_server_alive' );
     throws_ok { $connect->_is_server_alive( 'nothing:9999' ) } 'Kafka::Exception::Connection', 'error thrown';
 
-#-- get_metadata
+    #-- get_metadata
     my $metadata = $connect->get_metadata( $topic );
     ok $metadata, 'metadata received';
     ok scalar( keys %$metadata ) == 1 && exists( $metadata->{ $topic } ), "metadata for '$topic' only";
@@ -364,22 +332,22 @@ sub testing {
         throws_ok { $connect->get_metadata( '' ) } 'Kafka::Exception::Connection', 'error thrown';
     }
 
-#-- exists_topic_partition
+    #-- exists_topic_partition
     ok $connect->exists_topic_partition( $topic, 0 ), 'existing topic';
     ok !$connect->exists_topic_partition( 99999, 0 ), 'not yet existing topic';
     ok !$connect->exists_topic_partition( $topic, 99999 ), 'not yet existing topic';
 
-#-- is_server_known
+    #-- is_server_known
     is_ERROR_MISMATCH_ARGUMENT( 'is_server_known' );
 
     foreach my $server ( $connect->get_known_servers() ) {
         ok $connect->is_server_known( $server ), 'known server';
     }
 
-#-- close_connection
+    #-- close_connection
     is_ERROR_MISMATCH_ARGUMENT( 'close_connection' );
 
-#-- close
+    #-- close
     $connect->receive_response_to_request( $request );
     $tmp = 0;
     foreach my $server ( $connect->get_known_servers() ) {
@@ -393,7 +361,6 @@ sub testing {
     }
     ok !$tmp, 'server is not connected';
 
-#-- finish
     Kafka::MockIO::restore()
         unless $kafka_base_dir;
 }
@@ -437,7 +404,7 @@ sub communication_error {
         as      => 'send',
     } );
 
-#-- $ERROR_RESPONSEMESSAGE_NOT_RECEIVED
+    #-- $ERROR_RESPONSEMESSAGE_NOT_RECEIVED
 
     $method = \&Kafka::IO::receive;
 
@@ -455,11 +422,6 @@ sub communication_error {
         into    => 'Kafka::IO',
         as      => 'receive',
     } );
-
-#    $connect = Kafka::Connection->new(
-#        host        => 'localhost',
-#        port        => $port,
-#    );
 
     $request = {
         ApiKey                              => $APIKEY_FETCH,
@@ -494,4 +456,3 @@ sub communication_error {
     Kafka::MockIO::restore();
 }
 
-# POSTCONDITIONS ---------------------------------------------------------------

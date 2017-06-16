@@ -7,19 +7,19 @@ by the kafka server (in the Apache Kafka's Protocol).
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::MockProtocol> version 1.001013 .
+This documentation refers to C<Kafka::MockProtocol> version 1.04 .
 
 =cut
 
-#-- Pragmas --------------------------------------------------------------------
+
 
 use 5.010;
 use strict;
 use warnings;
 
-# ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '1.001013';
+
+our $VERSION = '1.04';
 
 use Exporter qw(
     import
@@ -35,7 +35,7 @@ our @EXPORT_OK = qw(
     encode_produce_response
 );
 
-#-- load the modules -----------------------------------------------------------
+
 
 use Params::Util qw(
     _ARRAY0
@@ -81,7 +81,7 @@ use Kafka::TestInternals qw(
     _is_suitable_int
 );
 
-#-- declarations ---------------------------------------------------------------
+
 
 =head1 DESCRIPTION
 
@@ -180,7 +180,7 @@ The following functions are available for C<Kafka::MockProtocol> module.
 Decodes the argument and returns a reference to the hash representing
 the structure of the PRODUCE Request (examples see C<t/*_decode_encode.t>).
 
-This function take argument. The following argument is currently recognized:
+This function takes the following arguments:
 
 =over 3
 
@@ -257,7 +257,7 @@ sub decode_produce_request {
 Encodes the argument and returns a reference to the encoded binary string
 representing a Response buffer.
 
-This function take argument. The following argument is currently recognized:
+This function takes the following arguments:
 
 =over 3
 
@@ -355,7 +355,7 @@ my $_decode_fetch_request_template = qq{x[l]s>s>l>s>/al>l>l>l>X[l]l>/(s>/al>X[l]
 Decodes the argument and returns a reference to the hash representing
 the structure of the FETCH Request (examples see C<t/*_decode_encode.t>).
 
-This function take argument. The following argument is currently recognized:
+This function takes the following arguments:
 
 =over 3
 
@@ -421,7 +421,7 @@ sub decode_fetch_request {
 Encodes the argument and returns a reference to the encoded binary string
 representing a Response buffer.
 
-This function take argument. The following argument is currently recognized:
+This function takes the following arguments:
 
 =over 3
 
@@ -519,7 +519,7 @@ my $_decode_offset_request_template = qq{x[l]s>s>l>s>/al>l>X[l]l>/(s>/al>X[l]l>/
 Decodes the argument and returns a reference to the hash representing
 the structure of the OFFSET Request (examples see C<t/*_decode_encode.t>).
 
-This function take argument. The following argument is currently recognized:
+This function takes the following arguments:
 
 =over 3
 
@@ -583,7 +583,7 @@ sub decode_offset_request {
 Encodes the argument and returns a reference to the encoded binary string
 representing a Response buffer.
 
-This function take argument. The following argument is currently recognized:
+This function takes the following arguments:
 
 =over 3
 
@@ -678,7 +678,7 @@ my $_decode_metadata_request_template = q{x[l]s>s>l>s>/al>X[l]l>/(s>/a)};
 Decodes the argument and returns a reference to the hash representing
 the structure of the METADATA Request (examples see C<t/*_decode_encode.t>).
 
-This function take argument. The following argument is currently recognized:
+This function takes the following arguments:
 
 =over 3
 
@@ -723,7 +723,7 @@ sub decode_metadata_request {
 Encodes the argument and returns a reference to the encoded binary string
 representing a Response buffer.
 
-This function take argument. The following argument is currently recognized:
+This function takes the following arguments:
 
 =over 3
 
@@ -1051,7 +1051,7 @@ L<https://github.com/TrackingSoft/Kafka>
 
 =head1 AUTHOR
 
-Sergey Gladkov, E<lt>sgladkov@trackingsoft.comE<gt>
+Sergey Gladkov
 
 =head1 CONTRIBUTORS
 

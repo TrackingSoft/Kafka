@@ -1,7 +1,5 @@
 #!/usr/bin/perl -w
 
-#-- Pragmas --------------------------------------------------------------------
-
 use 5.010;
 use strict;
 use warnings;
@@ -12,30 +10,20 @@ use lib qw(
     ../lib
 );
 
-# ENVIRONMENT ------------------------------------------------------------------
-
 use Test::More;
 
 plan 'no_plan';
 
-# WARNING: must match the settings of your system
-our $KAFKA_BASE_DIR;
-
 BEGIN {
-# WARNING: must match the settings of your system
-    $KAFKA_BASE_DIR = $ENV{KAFKA_BASE_DIR};
     plan skip_all => 'Unknown base directory of Kafka server'
-        unless $KAFKA_BASE_DIR;
+        unless $ENV{KAFKA_BASE_DIR};
 }
-
-#-- verify load the module
 
 BEGIN {
     eval 'use Test::NoWarnings';    ## no critic
     plan skip_all => 'because Test::NoWarnings required for testing' if $@;
 }
 
-#-- load the modules -----------------------------------------------------------
 
 use Const::Fast;
 use Kafka qw(
@@ -49,27 +37,18 @@ use Kafka::TestInternals qw(
     $topic
 );
 
-#-- setting up facilities ------------------------------------------------------
-
-ok defined( Kafka::Cluster::data_cleanup( kafka_dir => $KAFKA_BASE_DIR ) ), 'data directory cleaned';
-
-#-- declarations ---------------------------------------------------------------
+ok defined( Kafka::Cluster::data_cleanup() ), 'data directory cleaned';
 
 const my $HOST          => 'localhost'; # use only 'localhost' for test
 const my $PARTITIONS    => 5;
 const my $SENDINGS      => 1_000;
 
-#-- Global data ----------------------------------------------------------------
-
 my $CLUSTER = Kafka::Cluster->new(
-    kafka_dir           => $KAFKA_BASE_DIR,
     replication_factor  => 1,
     partition           => $PARTITIONS,
 );
 
 my ( $PORT ) = $CLUSTER->servers;
-
-# INSTRUCTIONS -----------------------------------------------------------------
 
 my $connection = get_new_connection();
 
@@ -101,7 +80,7 @@ is scalar( @first_used_sockets ), scalar( @second_used_sockets ), "used socket n
 is scalar( @second_used_sockets ), 1, 'only one socket used';
 ok "@first_used_sockets" ne "@second_used_sockets", 'the new socket used';
 
-# POSTCONDITIONS ---------------------------------------------------------------
+
 
 $CLUSTER->close;
 
@@ -164,3 +143,4 @@ sub send_beacon {
 
     undef $producer;
 }
+

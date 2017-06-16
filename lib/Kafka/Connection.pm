@@ -6,21 +6,17 @@ Kafka::Connection - Object interface to connect to a kafka cluster.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Connection> version 1.001013 .
+This documentation refers to C<Kafka::Connection> version 1.04 .
 
 =cut
-
-#-- Pragmas --------------------------------------------------------------------
 
 use 5.010;
 use strict;
 use warnings;
 
-# ENVIRONMENT ------------------------------------------------------------------
-
 our $DEBUG = 0;
 
-our $VERSION = '1.001013';
+our $VERSION = '1.04';
 
 use Exporter qw(
     import
@@ -28,8 +24,6 @@ use Exporter qw(
 our @EXPORT = qw(
     %RETRY_ON_ERRORS
 );
-
-#-- load the modules -----------------------------------------------------------
 
 use Data::Validate::Domain qw(
     is_hostname
@@ -146,8 +140,6 @@ use Kafka::Protocol qw(
     encode_offsetcommit_request
     encode_offsetfetch_request
 );
-
-#-- declarations ---------------------------------------------------------------
 
 =head1 SYNOPSIS
 
@@ -420,11 +412,8 @@ API endpoints.
 If set to true, the client will always use
 C<$Kafka::Protocol::DEFAULT_APIVERSION> as API version.
 
-=item C<api_versions_refresh_delay_sec =E<gt> $positive_integer>
-
-Optional, default value is 60 (1 minute).
-
-The delay after which the client will refresh the supported API versions.
+WARNING: API versions are supported starting from Kafka 0.10. Set this parameter to true
+if you're connecting to 0.9.
 
 =back
 
@@ -443,7 +432,6 @@ sub new {
         AutoCreateTopicsEnable  => 0,
         MaxLoggedErrors         => 100,
         dont_load_supported_api_versions => 0,
-        api_versions_refresh_delay_sec => 60,
     }, $class;
 
     exists $p{$_} and $self->{$_} = $p{$_} foreach keys %$self;
@@ -558,12 +546,28 @@ sub _get_api_versions {
 
     # call the server and try to get the supported API versions
     my $api_versions = [];
+    my $error;
     try {
         # The ApiVersions API endpoint is only supported on Kafka versions >
         # 0.10.0.0 so this call may fail. We simply ignore this failure and
         # carry on.
-        $api_versions = $self->_get_supported_api_versions($server);
+        $api_versions = $self->_get_supported_api_versions( $server );
+    }
+    catch {
+        $error = $_;
     };
+
+    if( defined $error ) {
+        if ( blessed( $error ) && $error->isa( 'Kafka::Exception' ) ) {
+            if( $error->code == $ERROR_MISMATCH_ARGUMENT ) {
+                # rethrow known fatal errors
+                die $error;
+            }
+            $self->_remember_nonfatal_error( $error->code, $error, $server );
+        } else {
+            die $error;
+        }
+    }
 
     foreach my $element (@$api_versions) {
         # we want to choose which api version to use for each API call. We
@@ -585,7 +589,6 @@ sub _get_api_versions {
 
     return $server_api_versions;
 }
-
 
 # Returns the list of supported API versions. This is not really. *Warning*,
 # this call works only against Kafka 1.10.0.0
@@ -843,14 +846,22 @@ sub receive_response_to_request {
 
         # Send a request to the leader
         if ( $self->_connectIO( $server ) ) {
-
             # we can connect to this leader, so let's detect the api versions
             # it and use whatever it supports, except if the request forces us
             # to use an api version. Warning, the version might end up being
             # undef if detection against the Kafka server failed, or if
             # dont_load_supported_api_versions is true. However the Encoder
             # code knows how to handle it.
-            $request->{ApiVersion} = $original_request_api_version // $self->_get_api_versions($server)->{$api_key};
+            $request->{ApiVersion} = $original_request_api_version;
+            unless( defined $request->{ApiVersion} ) {
+                $request->{ApiVersion} = $self->_get_api_versions( $server )->{ $api_key };
+                # API versions request may fail and the server may be disconnected
+                unless( $self->_is_IO_connected( $server ) ) {
+                    # this attempt does not count, assuming that _get_api_versions will not try to get them from failing broker again
+                    redo ATTEMPT;
+                }
+            }
+
             my $encoded_request = $protocol{ $api_key }->{encode}->( $request, $compression_codec );
 
             unless ( $self->_sendIO( $server, $encoded_request ) ) {
@@ -1236,9 +1247,8 @@ sub _update_metadata {
     $IO_cache->{ $_ }->{NodeId} = undef for @brokers;
 
     #  In the IO cache update/add obtained server information
-    my $server;
     foreach my $received_broker ( @{ $decoded_response->{Broker} } ) {
-        $server = $self->_build_server_name( @{ $received_broker }{ 'Host', 'Port' } );
+        my $server = $self->_build_server_name( @{ $received_broker }{ 'Host', 'Port' } );
         $IO_cache->{ $server } = {                      # can add new servers
             IO      => $IO_cache->{ $server }->{IO},    # IO or undef
             NodeId  => $received_broker->{NodeId},
@@ -1253,13 +1263,12 @@ sub _update_metadata {
     my $received_metadata   = {};
     my $leaders             = {};
 
-    my ( $TopicName, $partition );
     my $ErrorCode = $ERROR_NO_ERROR;
+    my( $TopicName, $partition );
     METADATA_CREATION:
     foreach my $topic_metadata ( @{ $decoded_response->{TopicMetadata} } ) {
-        $partition = undef;
-
         $TopicName = $topic_metadata->{TopicName};
+        undef $partition;
         last METADATA_CREATION
             if ( $ErrorCode = $topic_metadata->{ErrorCode} ) != $ERROR_NO_ERROR;
 
@@ -1286,10 +1295,6 @@ sub _update_metadata {
             $self->_error( $ErrorCode, format_message( "topic='%s'%s", $TopicName, defined( $partition ) ? ", partition=$partition" : '' ) );
         }
     }
-
-    %$received_metadata
-        # FATAL error
-        or $self->_error( $ERROR_CANNOT_GET_METADATA, format_message( "topic='%s'", $topic ) );
 
     # Update metadata for received topics
     $self->{_metadata}->{ $_ }  = $received_metadata->{ $_ } foreach keys %{ $received_metadata };
@@ -1362,6 +1367,12 @@ sub _io_error {
     return $error;
 }
 
+sub _is_IO_connected {
+    my ( $self, $server ) = @_;
+    my $server_data = $self->{_IO_cache}->{ $server } or return;
+    return $server_data->{IO};
+}
+
 # connects to a server (host:port or [IPv6_host]:port)
 sub _connectIO {
     my ( $self, $server ) = @_;
@@ -1392,20 +1403,25 @@ sub _connectIO {
     return $server_data->{IO};
 }
 
-# Send encoded request ($encoded_request) to server ($server)
-sub _sendIO {
-    my ( $self, $server, $encoded_request ) = @_;
-
+sub _server_data_IO {
+    my ( $self, $server ) = @_;
     my $server_data = $self->{_IO_cache}->{ $server }
         or $self->_error( $ERROR_MISMATCH_ARGUMENT, format_message( "Unknown server '%s' (is not found in the metadata)", $server ) )
     ;
     $self->_error( $ERROR_MISMATCH_ARGUMENT, format_message( "Server '%s' is not connected", $server ) )
         unless $server_data->{IO}
     ;
+    return ( $server_data, $server_data->{IO} );
+}
+
+# Send encoded request ($encoded_request) to server ($server)
+sub _sendIO {
+    my ( $self, $server, $encoded_request ) = @_;
+    my( $server_data, $io ) = $self->_server_data_IO( $server );
     my $sent;
     my $error;
     try {
-        $sent = $server_data->{IO}->send( $encoded_request );
+        $sent = $io->send( $encoded_request );
     } catch {
         $error = $_;
     };
@@ -1420,13 +1436,7 @@ sub _sendIO {
 # Receive response from a given server
 sub _receiveIO {
     my ( $self, $server, $response_timeout ) = @_;
-
-    my $server_data = $self->{_IO_cache}->{ $server }
-        or $self->_error( $ERROR_MISMATCH_ARGUMENT, format_message( "Unknown server '%s' (is not found in the metadata)", $server ) )
-    ;
-    my $io = $server_data->{IO}
-        or $self->_error( $ERROR_MISMATCH_ARGUMENT, format_message( "Server '%s' is not connected", $server ) )
-    ;
+    my( $server_data, $io ) = $self->_server_data_IO( $server );
     my $response_ref;
     my $error;
     try {
@@ -1487,8 +1497,6 @@ sub _error {
     my $self = shift;
     Kafka::Exception::Connection->throw( throw_args( @_ ) );
 }
-
-#-- Closes and cleans up -------------------------------------------------------
 
 1;
 
@@ -1598,7 +1606,7 @@ L<https://github.com/TrackingSoft/Kafka>
 
 =head1 AUTHOR
 
-Sergey Gladkov, E<lt>sgladkov@trackingsoft.comE<gt>
+Sergey Gladkov
 
 Please use GitHub project link above to report problems or contact authors.
 
@@ -1612,9 +1620,13 @@ Sergiy Zuban
 
 Vlad Marchenko
 
+Damien Krotkine
+
+Greg Franklin
+
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2012-2016 by TrackingSoft LLC.
+Copyright (C) 2012-2017 by TrackingSoft LLC.
 
 This package is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself. See I<perlartistic> at
@@ -1625,3 +1637,4 @@ without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
 PARTICULAR PURPOSE.
 
 =cut
+

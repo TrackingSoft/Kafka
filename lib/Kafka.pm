@@ -9,19 +9,19 @@ Kafka - Apache Kafka interface for Perl.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka> package version 1.001013 .
+This documentation refers to C<Kafka> package version 1.04 .
 
 =cut
 
-#-- Pragmas --------------------------------------------------------------------
+
 
 use 5.010;
 use strict;
 use warnings;
 
-# ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '1.001013';
+
+our $VERSION = '1.04';
 
 use Exporter qw(
     import
@@ -136,12 +136,12 @@ our @EXPORT_OK = qw(
     $WAIT_WRITTEN_TO_LOCAL_LOG
 );
 
-#-- load the modules -----------------------------------------------------------
+
 
 use Config;
 use Const::Fast;
 
-#-- declarations ---------------------------------------------------------------
+
 
 =head1 SYNOPSIS
 
@@ -818,10 +818,10 @@ const our $ERROR_SEND_NO_ACK                    => -1002;
 
 =item C<ERROR_CANNOT_RECV>
 
--1003 - Cannot receive
+-1.04 - Cannot receive
 
 =cut
-const our $ERROR_CANNOT_RECV                    => -1003;
+const our $ERROR_CANNOT_RECV                    => -1.04;
 
 =item C<ERROR_CANNOT_BIND>
 
@@ -1631,7 +1631,7 @@ L<https://github.com/TrackingSoft/Kafka>
 
 =head1 AUTHOR
 
-Sergey Gladkov, E<lt>sgladkov@trackingsoft.comE<gt>
+Sergey Gladkov
 
 Please use GitHub project link above to report problems or contact authors.
 
@@ -1645,9 +1645,13 @@ Sergiy Zuban
 
 Vlad Marchenko
 
+Damien Krotkine
+
+Greg Franklin
+
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2012-2016 by TrackingSoft LLC.
+Copyright (C) 2012-2017 by TrackingSoft LLC.
 
 This package is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself. See I<perlartistic> at

@@ -1,7 +1,5 @@
 #!/usr/bin/perl -w
 
-#-- Pragmas --------------------------------------------------------------------
-
 use 5.010;
 use strict;
 use warnings;
@@ -12,16 +10,12 @@ use lib qw(
     ../lib
 );
 
-# ENVIRONMENT ------------------------------------------------------------------
-
 use Test::More;
 
 BEGIN {
     plan skip_all => 'Unknown base directory of Kafka server'
         unless $ENV{KAFKA_BASE_DIR};
 }
-
-#-- verify load the module
 
 BEGIN {
     eval 'use Test::NoWarnings';    ## no critic
@@ -30,19 +24,8 @@ BEGIN {
 
 plan 'no_plan';
 
-#-- load the modules -----------------------------------------------------------
-
-use Config::IniFiles;
 use Const::Fast;
 use Data::Dumper;
-use File::Copy;
-use FindBin qw(
-    $Bin
-);
-use File::Spec::Functions qw(
-    catdir
-    catfile
-);
 use List::Util qw(
     min
     shuffle
@@ -66,24 +49,7 @@ use Kafka::Internals qw(
 use Kafka::MockIO;
 use Kafka::Producer;
 
-#-- setting up facilities ------------------------------------------------------
-
 STDOUT->autoflush;
-
-const my $KAFKA_PROPERTIES_FILE => 'server.properties';
-
-my ( $properties_file, $bak_properties_file );
-{
-    my $start_dir           = ( substr( $Bin, -1 ) eq 't' ) ? $Bin : catdir( $Bin, 't' );
-    my $kafka_config_dir    = catdir( $start_dir, 'config' );
-    $properties_file        = catfile( $kafka_config_dir, $KAFKA_PROPERTIES_FILE );
-}
-$bak_properties_file = $properties_file.'.bak';
-
-unlink $bak_properties_file;
-copy( $properties_file, $bak_properties_file );
-
-#-- declarations ---------------------------------------------------------------
 
 # Restrictions:
 # All pairs clients work with a common topic
@@ -106,8 +72,6 @@ const my $KAFKA_BASE_DIR        => $ENV{KAFKA_BASE_DIR};    # WARNING: must matc
 const my $TOPIC                 => $Kafka::MockIO::TOPIC;
 const my $HOST                  => 'localhost';
 
-const my $INI_SECTION           => 'GENERAL';
-
 my ( @msg_pool, $cluster, $port, @clients, $pid, $ppid, $connection, $producer, $consumer, $is_ready );
 
 $SIG{USR1} = sub { ++$is_ready };
@@ -121,27 +85,6 @@ sub create_msg_pool {
         $msg_pool[ $i ] = join( q{}, @chars[ map { rand( scalar( @chars ) ) } ( 1 .. $MSG_LEN ) ] );
     }
     note 'generation of messages complited';
-}
-
-sub setup {
-    if ( !( my $cfg = Config::IniFiles->new(
-            -file       => $properties_file,
-            -fallback   => $INI_SECTION,
-        ) ) ) {
-        restore_properties();
-        my $error = q{};
-        map { $error .= "\n$_" } @Config::IniFiles::errors;
-        BAIL_OUT "$properties_file error: $error";
-    } else {
-        $cfg->setval( $INI_SECTION, 'auto.create.topics.enable'     => $AUTO_CREATE_TOPICS );
-        $cfg->setval( $INI_SECTION, 'default.replication.factor'    => $REPLICATION_FACTOR );
-        $cfg->RewriteConfig( $properties_file );
-    }
-}
-
-sub restore_properties {
-    unlink $properties_file;
-    rename $bak_properties_file, $properties_file;
 }
 
 sub sending {
@@ -363,25 +306,21 @@ sub create_client {
     }
 }
 
-#-- Global data ----------------------------------------------------------------
-
-# INSTRUCTIONS -----------------------------------------------------------------
-
 create_msg_pool();
 
-setup();
-
-#-- FORK competition
+ok defined( Kafka::Cluster::data_cleanup() ), 'data directory cleaned';
 
 $cluster = Kafka::Cluster->new(
-    kafka_dir           => $KAFKA_BASE_DIR,
     replication_factor  => $REPLICATION_FACTOR,
     partition           => $PAIRS_CLIENTS,
+    properties          => {
+        'auto.create.topics.enable' => $AUTO_CREATE_TOPICS,
+    },
 );
 isa_ok( $cluster, 'Kafka::Cluster' );
 
 #-- Connecting to the Kafka server port (for example for node_id = 0)
-( $port )   =  $cluster->servers;
+( $port ) = $cluster->servers;
 
 foreach my $i ( 1 .. $PAIRS_CLIENTS ) {
     foreach my $client_type ( 'producer', 'consumer' ) {
@@ -399,16 +338,20 @@ wait_child_success();
 
 $cluster->close;
 
+ok defined( Kafka::Cluster::data_cleanup() ), 'data directory cleaned';
+
 #-- Inside a process competition
 
 $cluster = Kafka::Cluster->new(
-    kafka_dir           => $KAFKA_BASE_DIR,
     replication_factor  => $REPLICATION_FACTOR,
     partition           => $PAIRS_CLIENTS,
+    properties          => {
+        'auto.create.topics.enable' => $AUTO_CREATE_TOPICS,
+    },
 );
 isa_ok( $cluster, 'Kafka::Cluster' );
 #-- Connecting to the Kafka server port (for example for node_id = 0)
-( $port )   =  $cluster->servers;
+( $port ) = $cluster->servers;
 
 $connection = Kafka::Connection->new(
     host                    => $HOST,
@@ -472,7 +415,7 @@ while ( scalar @clients ) {
 
         #-- total
         if ( $client_type eq 'producer' ) {
-            is $count, next_offset( $partition ), "total number of recorded messages coincides with the number of messages sent ($count)";
+            is $count, next_offset( $partition ), "total number of recorded messages matches the number of messages sent ($count)";
         }
 
         splice( @clients, $i, 1 );
@@ -486,7 +429,3 @@ while ( scalar @clients ) {
 note_nonfatals();
 
 $cluster->close;
-
-# POSTCONDITIONS ---------------------------------------------------------------
-
-restore_properties();

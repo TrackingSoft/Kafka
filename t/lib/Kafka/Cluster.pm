@@ -6,32 +6,24 @@ Kafka::Cluster - object interface to manage a test kafka cluster.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Cluster> version 1.001013 .
+This documentation refers to C<Kafka::Cluster> version 1.04 .
 
 =cut
-
-#-- Pragmas --------------------------------------------------------------------
 
 use 5.010;
 use strict;
 use warnings;
 
-
-# ENVIRONMENT ------------------------------------------------------------------
-
-our $VERSION = '1.001013';
+our $VERSION = '1.04';
 
 use Exporter qw(
     import
 );
 
 our @EXPORT_OK = qw(
-    $DEFAULT_REPLICATION_FACTOR
     $DEFAULT_TOPIC
     $START_PORT
 );
-
-#-- load the modules -----------------------------------------------------------
 
 use Capture::Tiny qw(
     capture
@@ -59,6 +51,7 @@ use Net::EmptyPort qw(
     empty_port
 );
 use Params::Util qw(
+    _HASH0
     _NONNEGINT
     _POSINT
     _STRING
@@ -71,7 +64,6 @@ use Kafka::Internals qw(
 );
 use Kafka::IO;
 
-#-- declarations ---------------------------------------------------------------
 
 =head1 SYNOPSIS
 
@@ -141,22 +133,16 @@ const our   $DEFAULT_REPLICATION_FACTOR     => 3;       # Cluster consists of 3 
 const my    $MAX_START_ATTEMPT              => 10;
 const my    $MAX_STOP_ATTEMPT               => 30;
 const my    $INI_SECTION                    => 'GENERAL';
-const my    $RELATIVE_LOG4J_PROPERTY_FILE   => catfile( '..', '..', 'config', 'log4j.properties' );
 const my    $ZOOKEEPER_PROPERTIES_FILE      => 'zookeeper.properties';
 const my    $KAFKA_PROPERTIES_FILE          => 'server.properties';
 const my    $KAFKA_LOGS_DIR_MASK            => 'kafka-logs-';
-const my    $SERVER_START_CMD               => 'kafka-run-class.sh';
-const my    $START_KAFKA_ARG                => 'kafka.Kafka';
-const my    $START_ZOOKEEPER_ARG            => 'org.apache.zookeeper.server.quorum.QuorumPeerMain';
+const my    $START_KAFKA_CMD                => 'kafka-server-start.sh';
+const my    $START_ZOOKEEPER_CMD            => 'zookeeper-server-start.sh';
 
-# File mask specific to version 0.8
-const my    $KAFKA_0_8_REF_FILE_MASK        => catfile( 'bin', 'kafka-preferred-replica-election.sh' );
-
+const our   $KAFKA_HOST                     => 'localhost';
 const our   $ZOOKEEPER_HOST                 => 'localhost';
 
 const my    $RESTRICTED_PATH                => '/bin:/usr/bin:/usr/local/bin';
-
-my ( $start_dir, $kafka_properties_file, $kafka_host );
 
 #-- constructor ----------------------------------------------------------------
 
@@ -221,23 +207,25 @@ sub new {
     !$_used
         || confess "The object of class '$class' already exists";
 
-    # The argument is needed because multiple versions can be installed simultaneously
-    defined( _STRING( $args{kafka_dir} ) )      # must match local kafka insatll dir
+    my $kafka_base_dir = $args{kafka_dir} // $ENV{KAFKA_BASE_DIR};
+    defined( _STRING( $kafka_base_dir ) )      # must match local kafka insatll dir
         // confess( "The value of 'kafka_dir' should be a string" );
 
-    my $kafka_replication_factor = $args{replication_factor} //= $DEFAULT_REPLICATION_FACTOR;
+    $kafka_base_dir = Cwd::abs_path( $kafka_base_dir );
+    unless( defined $kafka_base_dir && -d $kafka_base_dir ) {
+        confess("Kafka directory not found: $kafka_base_dir");
+    }
+
+    my $kafka_replication_factor = $args{replication_factor} // $DEFAULT_REPLICATION_FACTOR;
     _POSINT( $kafka_replication_factor )
         // confess( "The value of 'replication_factor' should be a positive integer" );
     _POSINT( $args{partition} //= 1 )
         // confess( "The value of 'partition' should be a positive integer" );
 
-    $start_dir = $args{t_dir} // $Bin;
-
-    $kafka_properties_file = $args{kafka_properties_file} // $KAFKA_PROPERTIES_FILE;
+    my $start_dir = $args{t_dir} // $Bin;
 
     my $self = {
-        kafka   => {},                          # {
-                                                #   'reuse_existing'        => ..., # boolean
+        kafka   => { base_dir => $kafka_base_dir }, # {
                                                 #   'base_dir'              => ...,
                                                 #   'bin_dir'               => ...,
                                                 #   'config_dir'            => ...,
@@ -255,58 +243,62 @@ sub new {
     };
     bless( $self, $class );
 
-    $self->{kafka}->{partition} = $args{partition};
-
-    # basic definitions (existence of most service directories is assumed)
-    my ( $reuse_existing, $kafka_base_dir, $kafka_bin_dir, $kafka_config_dir, $kafka_data_dir );
-    $reuse_existing         = $self->{kafka}->{reuse_existing}  = $args{reuse_existing};
-    $kafka_base_dir         = $self->{kafka}->{base_dir}        = $args{kafka_dir};
-    $kafka_bin_dir          = $self->{kafka}->{bin_dir}         = catdir( $start_dir, 'bin' );
-    $kafka_config_dir       = $self->{kafka}->{config_dir}      = catdir( $start_dir, 'config' );
-    my $run_in_base_dir     = $self->is_run_in_base_dir;
-    if ( $run_in_base_dir ) {
-        $kafka_data_dir     = $self->{kafka}->{data_dir}        = '/tmp';
-    } else {
-        $kafka_data_dir     = $self->{kafka}->{data_dir}        = catdir( $start_dir, 'data' );
+    if( $args{properties} ) {
+        confess("properties hash expected") unless _HASH0( $args{properties} );
+        $self->{properties} = { %{ $args{properties} } };
+    }
+    else {
+        $self->{properties} = {};
     }
 
-    # verification of environment
-    confess( "File does not exist (kafka version is not 0.8 ?): $KAFKA_0_8_REF_FILE_MASK" )
-        unless $self->_is_kafka_0_8;
+    $self->{kafka}->{host} = $args{host} // $KAFKA_HOST;
+
+    $self->{kafka}->{partition} = $args{partition};
+
+    $self->{kafka}->{bin_dir} = catdir( $kafka_base_dir, 'bin' );
+    confess("Kafka bin directory not found: $self->{kafka}->{bin_dir}") unless -d $self->{kafka}->{bin_dir};
+
+    $self->{kafka}->{config_dir} = catdir( $kafka_base_dir, 'config' );
+    confess("Kafka config directory not found: $self->{kafka}->{config_dir}") unless -d $self->{kafka}->{config_dir};
+
+    my $kafka_data_dir = $self->{kafka}->{data_dir} = catdir( $start_dir, 'data' );
+
+    my $reuse_existing = $args{reuse_existing} // 0;
 
     # zookeeper
-    my ( $inifile, $cfg, $zookeeper_client_port, $replication_factor );
+    my ( $cfg, $zookeeper_client_port, $replication_factor );
 
     opendir( my $dh, $kafka_data_dir )
         or confess "cannot opendir $kafka_data_dir: $!";
     foreach my $file ( readdir( $dh ) ) {
-        next if $file !~ /^$KAFKA_LOGS_DIR_MASK/;
+        next unless $file =~ /^$KAFKA_LOGS_DIR_MASK/;
         ++$replication_factor;
-        if ( !$cfg && -e ( $inifile = catfile( $kafka_data_dir, $file, $kafka_properties_file ) ) ) {
-            if ( !( $cfg = Config::IniFiles->new(
+        unless( $cfg ) {
+            my $inifile = catfile( $kafka_data_dir, $file, $KAFKA_PROPERTIES_FILE );
+            if ( -e $inifile ) {
+                $cfg = Config::IniFiles->new(
                     -file       => $inifile,
                     -fallback   => $INI_SECTION,
-                ) ) ) {
-                $self->_ini_error( $inifile );
-            } else {
+                ) or $self->_ini_error( $inifile );
+
                 ( undef, $zookeeper_client_port ) = split( /:/, $cfg->val( $INI_SECTION, 'zookeeper.connect' ) );
-                if ( !check_port( { host => $ZOOKEEPER_HOST, port => $zookeeper_client_port } ) ) {
-                    if ( $reuse_existing || $run_in_base_dir ) {
+                if ( check_port( { host => $ZOOKEEPER_HOST, port => $zookeeper_client_port } ) ) {
+                    # port at which clients will be able to connect to Zookeeper server
+                    $self->{kafka}->{zookeeper_clientPort} = $zookeeper_client_port;
+                } else {
+                    if ( $reuse_existing ) {
                         # We expect that Zookeeper server must be running
                         confess( "Zookeeper server is not running on port $zookeeper_client_port" );
                     } else {
                         undef $zookeeper_client_port;   # zookeeper must be started
                     }
-                } else {
-                    # port at which clients will be able to connect to Zookeeper server
-                    $self->{kafka}->{zookeeper_clientPort} = $zookeeper_client_port;
                 }
             }
         }
     }
     closedir $dh;
 
-    confess 'Desired cluster factor does not correspond to the number existing data directories'
+    confess 'Desired cluster factor ($kafka_replication_factor) does not correspond to the number of existing data directories ($replication_factor)'
         if $replication_factor && $replication_factor != $kafka_replication_factor;
 
     unless ( $zookeeper_client_port ) {
@@ -330,22 +322,19 @@ sub new {
 
     if ( $reuse_existing ) {
         foreach my $inifile ( @ini_files ) {
-            if ( !( my $cfg = Config::IniFiles->new(
-                    -file       => $inifile,
-                    -fallback   => $INI_SECTION,
-                ) ) ) {
-                $self->_ini_error( $inifile );
-            }
-            else {
-                my $port            = $cfg->val( $INI_SECTION, 'port' );
-                my $server          = $self->{cluster}->{ $port } = {};
-                $server->{node_id}  = $cfg->val( $INI_SECTION, 'broker.id' );
-            }
+            my $cfg = Config::IniFiles->new(
+                -file       => $inifile,
+                -fallback   => $INI_SECTION,
+            ) or $self->_ini_error( $inifile );
+
+            my $port            = $cfg->val( $INI_SECTION, 'port' );
+            my $server          = $self->{cluster}->{ $port } = {};
+            $server->{node_id}  = $cfg->val( $INI_SECTION, 'broker.id' );
         }
     } else {
         my $port    = $START_PORT;
         my $node_id = 0;
-        for ( 1..$kafka_replication_factor ) {
+        for ( 1 .. $kafka_replication_factor ) {
             $port = empty_port( $port - 1 );
             my $server = $self->{cluster}->{ $port } = {};  # server in the cluster identify by its port
             $server->{node_id} = $node_id;
@@ -353,28 +342,9 @@ sub new {
             ++$port;
             ++$node_id;
         }
-    }
 
-    my $ini_file;
-    find(
-        {
-            wanted  => sub {
-                $ini_file = $File::Find::name if $_ eq $kafka_properties_file;
-            },
-            untaint => 1,
-        },
-        $kafka_config_dir,
-    );
-    if ( !( my $cfg = Config::IniFiles->new(
-            -file       => $ini_file,
-            -fallback   => $INI_SECTION,
-        ) ) ) {
-        $self->_ini_error( $ini_file );
-    } else {
-        $kafka_host = $cfg->val( $INI_SECTION, 'host.name' );
+        $self->start_all;
     }
-
-    $self->start if !$reuse_existing;
 
     ++$_used;
     return $self;
@@ -483,14 +453,26 @@ Zookeeper server does not get stopped, its data structures is not removed.
 sub init {
     my ( $self ) = @_;
 
-    $self->_verify_run_dir;
+    $self->stop_all;
 
-    $self->stop;
-    # WARNING: Deleting old Kafka server log directories
-    say format_message( '[%s] Removing the kafka log tree: %s', $self->_data_dir, scalar( localtime ) );
-    $self->_remove_log_tree;
+    my $cwd = _clear_cwd();
+    chdir _clear_tainted( $self->_data_dir );
+
+    $self->_remove_log_tree( $_ ) for map { /(\d+)/ } glob "$KAFKA_LOGS_DIR_MASK*";
+
+    chdir $cwd;
 
     return 1;
+}
+
+sub stop_all {
+    my $self = shift;
+    my $cwd = _clear_cwd();
+    chdir _clear_tainted( $self->_data_dir );
+
+    $self->stop( $_ ) for map { /(\d+)/ } glob 'kafka-*.pid';
+
+    chdir $cwd;
 }
 
 =head3 C<stop( $port )>
@@ -513,22 +495,25 @@ The C<$port> should be a number.
 sub stop {
     my ( $self, $port ) = @_;
 
-    unless ( $port ) {
-        my $cwd = _clear_cwd();
-        chdir _clear_tainted( $self->_data_dir );
-
-        $self->stop( $_ ) for map { /(\d+)/ } glob 'kafka-*.pid';
-
-        chdir $cwd;
-        return;
-    }
-
     $self->_verify_port( $port );
 
     my $pid_file = $self->_get_pid_file_name( $port );
-    $self->_stop_server( $pid_file, 'kafka', $port );
+    $self->_stop_server( $pid_file, 'kafka', $self->{kafka}->{host}, $port );
 
     return;
+}
+
+sub start_all {
+    my $self = shift;
+    $self->stop_all;
+    $self->_start_zookeeper unless $self->zookeeper_port;
+    $self->start( $_ ) for $self->servers;
+
+    if ( $self->{kafka}->{is_first_run} ) {
+        # Create a topic with proper replication factor
+        $self->_create_topic;
+        delete $self->{kafka}->{is_first_run};
+    }
 }
 
 =head3 C<start( $port )>
@@ -551,35 +536,23 @@ The C<$port> should be a number.
 sub start {
     my ( $self, $port ) = @_;
 
-    unless ( $port ) {
-        $self->stop;
-        $self->_start_zookeeper unless $self->zookeeper_port;
-        $self->start( $_ ) for $self->servers;
-
-        if ( $self->{kafka}->{is_first_run} ) {
-            # Create a topic with proper replication factor
-            $self->_create_topic;
-            delete $self->{kafka}->{is_first_run};
-        }
-
-        return;
-    }
-
     $self->_verify_port( $port );
 
     $self->stop( $port );
 
     $self->_create_kafka_log_dir( $port );
 
+    my $host = $self->{kafka}->{host};
     my $pid_file = $self->_get_pid_file_name( $port );
 
     $self->_start_server(
         'kafka',
-        $kafka_properties_file,
-        $START_KAFKA_ARG,
+        $KAFKA_PROPERTIES_FILE,
+        $START_KAFKA_CMD,
         $pid_file,
         $self->log_dir( $port ),
-        $port
+        $host,
+        $port,
     );
 
     # Try sending request to make sure that Kafka server is really working now
@@ -588,8 +561,8 @@ sub start {
         my $error;
         try {
             my $io = Kafka::IO->new(
-                host       => $kafka_host,
-                port       => $port,
+                host => $host,
+                port => $port,
             );
 
 # ***** A MetadataRequest example:
@@ -663,7 +636,7 @@ sub request {
         // confess( "The value of '\$bin_stream' should be a string" );
 
     my $io = Kafka::IO->new(
-        host       => $kafka_host,
+        host       => $self->{kafka}->{host},
         port       => $port,
     );
 
@@ -679,17 +652,6 @@ sub request {
     return $response;
 };
 
-=head3 C<is_run_in_base_dir>
-
-Returns true, if work is performed in the root of Kafka installation directory.
-
-=cut
-sub is_run_in_base_dir {
-    my ( $self ) = @_;
-
-    return $self->base_dir eq $start_dir;
-}
-
 =head3 C<close>
 
 Stops all production servers (including zookeeper server).
@@ -700,10 +662,11 @@ sub close {
     my ( $self ) = @_;
 
     $self->init;
-    unless ( $self->is_run_in_base_dir ) {
-        $self->_stop_zookeeper;
-        say format_message( '[%s] Removing zookeeper log tree: %s', scalar( localtime ), $self->_data_dir );
-        remove_tree( catdir( $self->_data_dir, 'zookeeper' ) );
+    $self->_stop_zookeeper;
+    my $dir = catdir( $self->_data_dir, 'zookeeper' );
+    if( -d $dir ) {
+        say format_message( '[%s] Removing zookeeper data: %s', scalar( localtime ), $dir );
+        remove_tree( $dir );
     }
 
     $_used = 0;
@@ -748,22 +711,13 @@ my %_ignore_names = (
 sub data_cleanup {
     my ( %args ) = @_;
 
-    # The argument is needed because multiple versions can be installed simultaneously
-    my $kafka_dir = $args{kafka_dir};
-    defined( _STRING( $kafka_dir ) )  # must match kafka dir of your local system
-        // confess( "The value of 'kafka_dir' should be a string" );
-
     my $t_dir = $args{t_dir};
     !defined( $t_dir ) || defined( _STRING( $t_dir ) )
         // confess( "The value of 't_dir' should be a string" );
 
     my $start_dir = $args{t_dir} // $Bin;
 
-    my $run_in_base_dir = $kafka_dir eq $start_dir;
-    my $kafka_data_dir = $run_in_base_dir
-        ? '/tmp'
-        : catdir( $start_dir, 'data' )
-    ;
+    my $kafka_data_dir = catdir( $start_dir, 'data' );
 
     my $removed = 0;
 
@@ -908,33 +862,11 @@ sub _ini_error {
     confess $error;
 }
 
-# Checks for proper Kafka version.
-sub _is_kafka_0_8 {
-    my ( $self ) = @_;
-
-    my $file_mask = catfile( $self->base_dir, $KAFKA_0_8_REF_FILE_MASK );
-    my $cwd = _clear_cwd();
-
-    chdir _clear_tainted( $self->_config_dir );
-    my $ref_file = ( glob $file_mask )[0];
-    chdir $cwd;
-
-    return -f $ref_file;
-}
-
 # Returns true, if argument is a valid port number.
 sub _verify_port {
     my ( $self, $port ) = @_;
 
     return( _NONNEGINT( $port ) // confess 'The argument must be a positive integer' );
-}
-
-# Terminates program if working in an invalid directory.
-sub _verify_run_dir {
-    my ( $self ) = @_;
-
-    confess 'Operation is not valid because running in base Kafka server directory - perform operation manually'
-        if $self->is_run_in_base_dir;
 }
 
 # Constructs and returns path to the pid-file (using specified port).
@@ -975,31 +907,20 @@ sub _read_pid_file {
 sub _remove_log_tree {
     my ( $self, $port ) = @_;
 
-    $self->_verify_run_dir;
-
-    unless ( $port ) {
-        my $cwd = _clear_cwd();
-        chdir _clear_tainted( $self->_data_dir );
-
-        $self->_remove_log_tree( $_ ) for map { /(\d+)/ } glob "$KAFKA_LOGS_DIR_MASK*";
-
-        chdir $cwd;
-        return;
+    $self->_verify_port( $port );
+    my $dir = $self->log_dir( $port );
+    if( -d $dir ) {
+        say format_message( '[%s] Removing kafka data: %s', scalar( localtime ), $dir );
+        remove_tree( $dir );
     }
 
-    $self->_verify_port( $port );
-
-    remove_tree( $self->log_dir( $port ) );
     remove_tree( $self->_metrics_dir( $port ) );
-
     return;
 }
 
 # Starts zookeeper server.
 sub _start_zookeeper {
     my ( $self ) = @_;
-
-    return if $self->is_run_in_base_dir;
 
     # the port for connecting to Zookeeper server
     my $zookeeper_client_port = empty_port( $START_PORT - 1 );
@@ -1012,31 +933,31 @@ sub _start_zookeeper {
     }
 
     my $property_file = catfile( $log_dir, $ZOOKEEPER_PROPERTIES_FILE );
-    if ( !-e $property_file ) {
+    unless( -e $property_file ) {
         my $src = catfile( $self->_config_dir, $ZOOKEEPER_PROPERTIES_FILE );
         copy( $src, $property_file )
             or confess "Copy failed '$src' -> '$property_file' : $!";
     }
-    my $pid_file = $self->_get_zookeeper_pid_file_name;
 
-    if ( !( my $cfg = Config::IniFiles->new(
-            -file       => $property_file,
-            -fallback   => $INI_SECTION,
-        ) ) ) {
-        $self->_ini_error( $property_file );
-    } else {
-        $cfg->setval( $INI_SECTION, 'clientPort'    => $zookeeper_client_port );
-        $cfg->setval( $INI_SECTION, 'dataDir'       => $log_dir );
-        $cfg->RewriteConfig( $property_file );
-    }
+    my $cfg = Config::IniFiles->new(
+        -file       => $property_file,
+        -fallback   => $INI_SECTION,
+    ) or $self->_ini_error( $property_file );
+
+    _set_cfg_val( $cfg, 'clientPort' => $zookeeper_client_port );
+    _set_cfg_val( $cfg, 'dataDir'    => $log_dir );
+    $cfg->RewriteConfig( $property_file );
+
+    my $pid_file = $self->_get_zookeeper_pid_file_name;
 
     $self->_start_server(
         'zookeeper',
         $ZOOKEEPER_PROPERTIES_FILE,
-        $START_ZOOKEEPER_ARG,
+        $START_ZOOKEEPER_CMD,
         $pid_file,
         $log_dir,
-        $zookeeper_client_port
+        $ZOOKEEPER_HOST,
+        $zookeeper_client_port,
     );
 
     $self->{kafka}->{zookeeper_clientPort} = $zookeeper_client_port;
@@ -1048,33 +969,42 @@ sub _start_zookeeper {
 sub _create_kafka_log_dir {
     my ( $self, $port ) = @_;
 
-    my $log_dir = $self->log_dir( $port );
+    my $host = $self->{kafka}->{host};
 
+    my $log_dir = $self->log_dir( $port );
     mkdir $log_dir
         or confess "Cannot create directory '$log_dir': $!";
+
     my $metrics_dir = $self->_metrics_dir( $port );
     mkdir $metrics_dir
         or confess "Cannot create directory '$metrics_dir': $!";
 
-    my $inifile = catfile( $log_dir, $kafka_properties_file );
-    if ( !-e $inifile ) {
-        my $src = catfile( $self->_config_dir, $kafka_properties_file );
+    my $inifile = catfile( $log_dir, $KAFKA_PROPERTIES_FILE );
+    unless ( -e $inifile ) {
+        my $src = catfile( $self->_config_dir, $KAFKA_PROPERTIES_FILE );
         copy( $src, $inifile )
             or confess "Copy failed '$src' -> '$inifile' : $!";
     }
-    if ( !( my $cfg = Config::IniFiles->new(
-            -file       => $inifile,
-            -fallback   => $INI_SECTION,
-        ) ) ) {
-        $self->_ini_error( $inifile );
-    } else {
-        $cfg->setval( $INI_SECTION, 'port'                  => $port );
-        $cfg->setval( $INI_SECTION, 'log.dir'               => $log_dir );
-        $cfg->setval( $INI_SECTION, 'kafka.csv.metrics.dir' => $metrics_dir );
-        $cfg->setval( $INI_SECTION, 'broker.id'             => $self->node_id( $port ) );
-        $cfg->setval( $INI_SECTION, 'zookeeper.connect'     => "$ZOOKEEPER_HOST:".$self->zookeeper_port );
-        $cfg->RewriteConfig( $inifile );
+
+    my $cfg = Config::IniFiles->new(
+        -file       => $inifile,
+        -fallback   => $INI_SECTION,
+    ) or $self->_ini_error( $inifile );
+
+    _set_cfg_val( $cfg, 'host.name'             => $host );
+    _set_cfg_val( $cfg, 'port'                  => $port );
+    _set_cfg_val( $cfg, 'listeners'             => undef ); # may conflict with host.name and port, so unset
+    _set_cfg_val( $cfg, 'log.dir'               => $log_dir );
+    _set_cfg_val( $cfg, 'log.dirs'              => undef ); # may conflict with log.dir, so unset
+    _set_cfg_val( $cfg, 'kafka.csv.metrics.dir' => $metrics_dir );
+    _set_cfg_val( $cfg, 'broker.id'             => $self->node_id( $port ) );
+    _set_cfg_val( $cfg, 'zookeeper.connect'     => $ZOOKEEPER_HOST . ':' . $self->zookeeper_port );
+
+    foreach my $p ( sort keys %{ $self->{properties} } ) {
+        _set_cfg_val( $cfg, $p => $self->{properties}->{ $p } );
     }
+
+    $cfg->RewriteConfig( $inifile );
 
     return;
 }
@@ -1087,15 +1017,10 @@ sub _create_kafka_log_dir {
 #   $log_dir        - Path to the data directory.
 #   $port           - Port that should be used to run server.
 sub _start_server {
-    my ( $self, $server_name, $property_file, $arg, $pid_file, $log_dir, $port ) = @_;
-
-    my $server_host = $server_name eq 'zookeeper' ? $ZOOKEEPER_HOST : $kafka_host;
+    my ( $self, $server_name, $property_file, $cmd, $pid_file, $log_dir, $host, $port ) = @_;
 
     my $cwd = _clear_cwd();
     chdir _clear_tainted( $log_dir );
-
-    $ENV{KAFKA_BASE_DIR} = $self->base_dir;
-    $ENV{KAFKA_OPTS} = "-Dlog4j.configuration=file:$RELATIVE_LOG4J_PROPERTY_FILE";
 
     my $proc_daemon = Proc::Daemon->new;
     my $pid = _clear_tainted( $proc_daemon->Init( {
@@ -1104,14 +1029,12 @@ sub _start_server {
         child_STDERR => '>>'.catfile( $log_dir, 'stderr.log' ),
     } ) );
 
-    my $server_start_cmd = catfile(             # we are in the $log_dir, the full directory name may contain spaces
-        '..',                                   # $data_dir
-        '..',                                   # $Bin
-        'bin',                                  # bin dir
-        $SERVER_START_CMD
+    my $server_start_cmd = catfile(
+        $self->_bin_dir,
+        $cmd,
     );
     $property_file = catfile( $log_dir, $property_file );
-    my $cmd_str = "$server_start_cmd $arg $property_file";
+    my $cmd_str = "$server_start_cmd $property_file";
     if ( $pid ) {
         say format_message( '[%s] Starting %s: port = %s, pid = %s', scalar( localtime ), $server_name, $port, $pid );
 
@@ -1145,29 +1068,24 @@ sub _start_server {
         $attempts = $MAX_START_ATTEMPT;
         while ( $attempts-- ) {
             # The simplified test as readiness for operation will be evaluated on Kafka server availability
-            last if check_port( { host => $server_host, port => $port } );
+            last if check_port( { host => $host, port => $port } );
             sleep 1;
         }
     } else {
         local $ENV{PATH} = $RESTRICTED_PATH;
-        exec( $server_start_cmd, $arg, $property_file )
+        exec( $server_start_cmd, $property_file )
             or confess "Cannot execute '$cmd_str': $!";
     }
 
-    delete $ENV{KAFKA_OPTS};
-    delete $ENV{KAFKA_BASE_DIR};
-
     chdir $cwd;
 
-    confess "Port $port is available after starting $server_name"
-        unless check_port( { host => $server_host, port => $port } );
+    confess "Port $host:$port is available after starting $server_name"
+        unless check_port( { host => $host, port => $port } );
 }
 
 # Shuts down zookeeper server.
 sub _stop_zookeeper {
     my ( $self ) = @_;
-
-    $self->_verify_run_dir;
 
     my $port = $self->zookeeper_port;
     my $pid_file = $self->_get_zookeeper_pid_file_name;
@@ -1175,7 +1093,7 @@ sub _stop_zookeeper {
     confess 'Trying to stop zookeeper server while it is not running'
         unless -e $pid_file;
 
-    $self->_stop_server( $pid_file, 'zookeeper', $port );
+    $self->_stop_server( $pid_file, 'zookeeper', $ZOOKEEPER_HOST, $port );
     delete $self->{kafka}->{zookeeper_clientPort};
 
     return;
@@ -1186,9 +1104,7 @@ sub _stop_zookeeper {
 #   $server_name    - Server name.
 #   $port           - Port used by the server.
 sub _stop_server {
-    my ( $self, $pid_file, $server_name, $port ) = @_;
-
-    my $server_host = $server_name eq 'zookeeper' ? $ZOOKEEPER_HOST : $kafka_host;
+    my ( $self, $pid_file, $server_name, $host, $port ) = @_;
 
     my $attempt = 0;
     while ( -e $pid_file ) {
@@ -1205,15 +1121,13 @@ sub _stop_server {
         unlink $pid_file;
     }
 
-    confess "Port $port is not available after stopping $server_name"
-        if check_port( { host => $server_host, port => $port } );
+    confess "Port $host:$port is not available after stopping $server_name"
+        if check_port( { host => $host, port => $port } );
 }
 
 # Creates a new topic with specified replication factor.
 sub _create_topic {
     my ( $self ) = @_;
-
-    $self->_verify_run_dir;
 
     my @servers = $self->servers;
     # choose server port that was launched first
@@ -1225,31 +1139,13 @@ sub _create_topic {
     my $cwd = _clear_cwd();
     chdir _clear_tainted( $self->base_dir );
 
-    my (
-        $KAFKA_TOPICS_CMD_FILE,
-        $KAFKA_TOPICS_CMD_CREATE_OPT,
-        $KAFKA_TOPICS_CMD_REPLICAS_OPT,
-        $KAFKA_TOPICS_CMD_PARTITIONS_OPT
-    );
-    $KAFKA_TOPICS_CMD_FILE = catfile( 'bin', 'kafka-create-topic.sh' );             # kafka 0.8.0
-    if ( -e $KAFKA_TOPICS_CMD_FILE ) {
-        $KAFKA_TOPICS_CMD_CREATE_OPT        = '',
-        $KAFKA_TOPICS_CMD_REPLICAS_OPT      = '--replica';
-        $KAFKA_TOPICS_CMD_PARTITIONS_OPT    = '--partition';
-    } else {
-        $KAFKA_TOPICS_CMD_FILE              = catfile( 'bin', 'kafka-topics.sh' );  # kafka 0.8.1
-        $KAFKA_TOPICS_CMD_CREATE_OPT        = '--create',
-        $KAFKA_TOPICS_CMD_REPLICAS_OPT      = '--replication-factor';
-        $KAFKA_TOPICS_CMD_PARTITIONS_OPT    = '--partitions';
-    }
-
     my @args = (
-        $KAFKA_TOPICS_CMD_FILE,
-        $KAFKA_TOPICS_CMD_CREATE_OPT,
-        '--zookeeper'                       => "$ZOOKEEPER_HOST:".$self->zookeeper_port,
-        $KAFKA_TOPICS_CMD_REPLICAS_OPT      => scalar( @servers ),
-        $KAFKA_TOPICS_CMD_PARTITIONS_OPT    => $partitions,
-        '--topic'                           => $DEFAULT_TOPIC,
+        catfile( 'bin', 'kafka-topics.sh' ),
+        '--create',
+        '--zookeeper'          => "$ZOOKEEPER_HOST:".$self->zookeeper_port,
+        '--replication-factor' => scalar( @servers ),
+        '--partitions'         => $partitions,
+        '--topic'              => $DEFAULT_TOPIC,
     );
 
     say format_message( "[%s] Creating topic '%s': replication factor = %s, partition = %s", scalar( localtime ), $DEFAULT_TOPIC, scalar( @servers ), $partitions );
@@ -1271,7 +1167,16 @@ sub _create_topic {
         if $exit_status;
 }
 
-#-- Closes and cleans up -------------------------------------------------------
+sub _set_cfg_val {
+    my( $cfg, $name, $value ) = @_;
+    if( defined $value ) {
+        unless( $cfg->setval( $INI_SECTION, $name, $value ) ) {
+            $cfg->newval(  $INI_SECTION, $name, $value );
+        }
+    } else {
+        $cfg->delval( $INI_SECTION, $name );
+    }
+}
 
 1;
 
@@ -1323,7 +1228,7 @@ L<https://github.com/TrackingSoft/Kafka>
 
 =head1 AUTHOR
 
-Sergey Gladkov, E<lt>sgladkov@trackingsoft.comE<gt>
+Sergey Gladkov
 
 =head1 CONTRIBUTORS
 
@@ -1337,7 +1242,7 @@ Vlad Marchenko
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2012-2016 by TrackingSoft LLC.
+Copyright (C) 2012-2017 by TrackingSoft LLC.
 
 This package is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself. See I<perlartistic> at

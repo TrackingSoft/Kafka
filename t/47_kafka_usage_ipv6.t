@@ -1,7 +1,5 @@
 #!/usr/bin/perl -w
 
-#-- Pragmas --------------------------------------------------------------------
-
 use 5.010;
 use strict;
 use warnings;
@@ -11,8 +9,6 @@ use lib qw(
     t/lib
     ../lib
 );
-
-# ENVIRONMENT ------------------------------------------------------------------
 
 use Test::More;
 
@@ -26,7 +22,7 @@ BEGIN {
     plan skip_all => "because Test::Exception required for testing" if $@;
 }
 
-#-- verify load the module
+
 
 BEGIN {
     eval 'use Test::TCP';           ## no critic
@@ -39,8 +35,6 @@ BEGIN {
 }
 
 plan 'no_plan';
-
-#-- load the modules -----------------------------------------------------------
 
 use Const::Fast;
 use Net::EmptyPort qw(
@@ -59,34 +53,29 @@ use Kafka::Connection;
 use Kafka::Consumer;
 use Kafka::Producer;
 
-#-- setting up facilities ------------------------------------------------------
+const my $IPV6_HOST => '::1';
 
-if ( eval { Socket::IPV6_V6ONLY } && can_bind( '::1' ) ) {
+SKIP: {
+    skip "'IPv6 not supported'" unless eval { Socket::IPV6_V6ONLY } && can_bind( $IPV6_HOST );
 
 ok 1, 'starting IPv6 test';
 
 my $CLUSTER = Kafka::Cluster->new(
-    kafka_dir               => $ENV{KAFKA_BASE_DIR},    # WARNING: must match the settings of your system
-    replication_factor      => 1,
-    kafka_properties_file   => 'server.properties.ipv6',
+    replication_factor => 1,
+    host               => $IPV6_HOST,
 );
-
-#-- Global data ----------------------------------------------------------------
+isa_ok( $CLUSTER, 'Kafka::Cluster' );
 
 #-- Connecting to the Kafka server port (for example for node_id = 0)
 my ( $PORT ) =  $CLUSTER->servers;
 
 my ( $connect, $producer, $consumer, $response, $offsets );
 
-#-- declarations ---------------------------------------------------------------
-
 const my $topic             => $Kafka::Cluster::DEFAULT_TOPIC;
 const my $partition         => 0;
 
-# INSTRUCTIONS -----------------------------------------------------------------
-
 $connect = Kafka::Connection->new(
-    host            => '::1',
+    host            => $IPV6_HOST,
     port            => $PORT,
     RETRY_BACKOFF   => $RETRY_BACKOFF * 2,
     dont_load_supported_api_versions => 1,
@@ -173,10 +162,7 @@ if ( !$messages ) {
 # Closes the connection
 $connect->close;
 
-# POSTCONDITIONS ---------------------------------------------------------------
-
 $CLUSTER->close;
 
-} else {
-    diag 'IPv6 not supported';
-}
+} # end of SKIP
+

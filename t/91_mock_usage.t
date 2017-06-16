@@ -1,7 +1,5 @@
 #!/usr/bin/perl -w
 
-#-- Pragmas --------------------------------------------------------------------
-
 use 5.010;
 use strict;
 use warnings;
@@ -12,11 +10,7 @@ use lib qw(
     ../lib
 );
 
-# ENVIRONMENT ------------------------------------------------------------------
-
 use Test::More;
-
-#-- verify load the module
 
 BEGIN {
     eval 'use Test::Exception';     ## no critic
@@ -29,8 +23,6 @@ BEGIN {
 }
 
 plan 'no_plan';
-
-#-- load the modules -----------------------------------------------------------
 
 use Const::Fast;
 #use Data::Dumper;
@@ -49,23 +41,14 @@ use Kafka::Producer;
 
 use Kafka::MockIO;
 
-#-- setting up facilities ------------------------------------------------------
-
-#-- declarations ---------------------------------------------------------------
-
 const my $topic             => 'mytopic';
 # Use Kafka::MockIO only with the following information:
 const my $partition         => $Kafka::MockIO::PARTITION;
 
-#-- Global data ----------------------------------------------------------------
-
-my ( $port, $connect, $producer, $consumer, $response, $offsets );
-
-# INSTRUCTIONS -----------------------------------------------------------------
+my ( $connect, $producer, $consumer, $response, $offsets );
 
 #-- Connecting to the Kafka mocked server port
-
-$port = $KAFKA_SERVER_PORT;
+my $port = $KAFKA_SERVER_PORT;
 
 Kafka::MockIO::override();
 
@@ -213,4 +196,3 @@ undef $consumer;
 ok( !defined( $producer ), 'the consumer object is an empty' );
 $connect->close;
 
-# POSTCONDITIONS ---------------------------------------------------------------
