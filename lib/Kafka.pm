@@ -9,7 +9,7 @@ Kafka - Apache Kafka interface for Perl.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka> package version 1.04 .
+This documentation refers to C<Kafka> package version 1.05 .
 
 =cut
 
@@ -21,7 +21,7 @@ use warnings;
 
 
 
-our $VERSION = '1.04';
+our $VERSION = '1.05';
 
 use Exporter qw(
     import
@@ -818,10 +818,10 @@ const our $ERROR_SEND_NO_ACK                    => -1002;
 
 =item C<ERROR_CANNOT_RECV>
 
--1.04 - Cannot receive
+-1.05 - Cannot receive
 
 =cut
-const our $ERROR_CANNOT_RECV                    => -1.04;
+const our $ERROR_CANNOT_RECV                    => -1.05;
 
 =item C<ERROR_CANNOT_BIND>
 

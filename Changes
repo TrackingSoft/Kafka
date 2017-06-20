@@ -1,5 +1,11 @@
 Revision history for Kafka package
 
+1.05 Tue June 20 2017
+
+    BUGFIXES:
+    - Fix message offsets for messages in compressed MessageSet (Damien Krotkine).
+    - Do not use $_ in IO::connect (Petr Plavjanik).
+
 1.04 Wed June 07 2017
 
     CHANGES:
