@@ -644,7 +644,7 @@ sub _connect {
     socket( my $connection, $self->{pf}, SOCK_STREAM, scalar getprotobyname( 'tcp' ) ) or die( "socket: $!\n" );
 
     # Set autoflushing.
-    $_ = select( $connection ); $| = 1; select $_;
+    my $file_handle = select( $connection ); $| = 1; select $file_handle;
 
     # Set FD_CLOEXEC.
     my $flags = fcntl( $connection, F_GETFL, 0 ) or die "fcntl: $!\n";
