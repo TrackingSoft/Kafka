@@ -1676,7 +1676,10 @@ sub _decode_fetch_response_template {
 
 # Decrypts MessageSet
 sub _decode_MessageSet_array {
-    my ( $response, $MessageSetSize, $i_ref, $MessageSet_array_ref) = @_;
+    my ( $response, $MessageSetSize, $i_ref, $MessageSet_array_ref, $_override_offset) = @_;
+    # $_override_offset should not be set manually, it's used when recursing,
+    # to decode internal compressed message, which have offsets starting at 0,
+    # 1, etc, and instead we need to set the external wrapping message offset.
 
     my $data = $response->{data};
     my $data_array_size = scalar @{ $data };
@@ -1685,8 +1688,12 @@ sub _decode_MessageSet_array {
     my ( $Message, $MessageSize, $Crc, $Key_length, $Value_length );
     while ( $MessageSetSize && $$i_ref < $data_array_size ) {
 
+        my $message_offset = _unpack64( $data->[ $$i_ref++ ] );
+        if (defined $_override_offset) {
+            $message_offset = $_override_offset;
+        }
         $Message = {
-            Offset                                        => _unpack64( $data->[ $$i_ref++ ] ), # Offset
+            Offset  => $message_offset, # Offset
         };
 
         $MessageSize                                                 =  $data->[ $$i_ref++ ];   # MessageSize
@@ -1753,6 +1760,7 @@ sub _decode_MessageSet_array {
                 $size,  # message set size
                 \$i,    # i_ref
                 $MessageSet_array_ref,
+                $message_offset
             );
         } else {
             push( @$MessageSet_array_ref, $Message );
