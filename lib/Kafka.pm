@@ -52,6 +52,7 @@ our @EXPORT_OK = qw(
     $ERROR_INVALID_MESSAGE_SIZE
     $ERROR_LEADER_NOT_AVAILABLE
     $ERROR_LEADER_NOT_FOUND
+    $ERROR_GROUP_COORDINATOR_NOT_FOUND
     $ERROR_LOAD_IN_PROGRESS_CODE
     $ERROR_GROUP_LOAD_IN_PROGRESS
     $ERROR_GROUP_LOAD_IN_PROGRESS_CODE
@@ -929,6 +930,13 @@ const our $ERROR_INCOMPATIBLE_HOST_IP_VERSION   => -1017;
 =cut
 const our $ERROR_NO_CONNECTION   => -1018;
 
+=item C<$ERROR_GROUP_COORDINATOR_NOT_FOUND>
+
+-1008 - Group Coordinator not found
+
+=cut
+const our $ERROR_GROUP_COORDINATOR_NOT_FOUND               => -1019;
+
 =back
 
 Contains the descriptions of possible error codes obtained via ERROR_CODE box
@@ -1325,6 +1333,7 @@ our %ERROR = (
     $ERROR_RESPONSEMESSAGE_NOT_RECEIVED             => q{'ResponseMessage' not received},
     $ERROR_INCOMPATIBLE_HOST_IP_VERSION             => q{'Incompatible host name and IP version'},
     $ERROR_NO_CONNECTION                            => q{'No connection'},
+    $ERROR_GROUP_COORDINATOR_NOT_FOUND              => q{'Group Coordinator Not Found'},
 
     #-- The Protocol Error Messages
     # https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-ErrorCodes

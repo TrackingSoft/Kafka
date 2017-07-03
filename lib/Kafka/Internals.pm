@@ -29,6 +29,7 @@ our @EXPORT_OK = qw(
     $APIKEY_FETCH
     $APIKEY_OFFSET
     $APIKEY_METADATA
+    $APIKEY_FINDCOORDINATOR
     $APIKEY_APIVERSIONS
     $APIKEY_OFFSETCOMMIT
     $APIKEY_OFFSETFETCH
@@ -135,6 +136,13 @@ The numeric code that the ApiKey in the request take for the C<OffsetFetchReques
 
 =cut
 const our $APIKEY_OFFSETFETCH                   => 9;
+
+=head3 C<$APIKEY_FINDCOORDINATOR>
+
+The numeric code that the C<ApiKey> in the request take for the C<FindCoordinator> request type.
+
+=cut
+const our $APIKEY_FINDCOORDINATOR               => 10;
 
 =head3 C<$APIKEY_APIVERSIONS>
 

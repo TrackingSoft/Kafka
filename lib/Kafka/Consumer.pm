@@ -729,6 +729,7 @@ sub commit_offsets {
         unless defined( $group ) && ( $group eq q{} || defined( _STRING( $group ) ) ) && !utf8::is_utf8( $group );
 
     my $request = {
+        __send_to__               => 'group_coordinator',
         ApiKey                    => $APIKEY_OFFSETCOMMIT,
         CorrelationId             => _get_CorrelationId(),
         ClientId                  => $self->{ClientId},
@@ -790,6 +791,7 @@ sub fetch_offsets {
         unless defined( $group ) && ( $group eq q{} || defined( _STRING( $group ) ) ) && !utf8::is_utf8( $group );
 
     my $request = {
+        __send_to__               => 'group_coordinator',
         ApiKey                    => $APIKEY_OFFSETFETCH,
         CorrelationId             => _get_CorrelationId(),
         ClientId                  => $self->{ClientId},
