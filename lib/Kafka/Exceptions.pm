@@ -64,10 +64,7 @@ use Kafka::Internals qw(
     format_message
 );
 
-if( Kafka::Internals::debug_level( __PACKAGE__ ) ) {
-    Kafka::Exception->Trace(1); # include stack traces
-}
-
+Kafka::Exception->Trace(1); # include stack traces
 
 
 =head1 SYNOPSIS
