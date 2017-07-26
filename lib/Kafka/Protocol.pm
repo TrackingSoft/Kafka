@@ -32,6 +32,8 @@ our @EXPORT_OK = qw(
     encode_produce_request
     encode_api_versions_request
     decode_api_versions_response
+    encode_find_coordinator_request
+    decode_find_coordinator_response
     encode_offsetcommit_request
     encode_offsetfetch_request
     _decode_MessageSet_template
@@ -87,6 +89,7 @@ use Kafka::Internals qw(
     $APIKEY_OFFSET
     $APIKEY_PRODUCE
     $APIKEY_APIVERSIONS
+    $APIKEY_FINDCOORDINATOR
     $APIKEY_OFFSETCOMMIT
     $APIKEY_OFFSETFETCH
     $PRODUCER_ANY_OFFSET
@@ -599,6 +602,123 @@ sub decode_api_versions_response {
     }
 
     return $ApiVersions_Response;
+}
+
+=head3 C<encode_find_coordinator_request( $FindCoordinator_Request )>
+
+Encodes the argument and returns a reference to the encoded binary string
+representing a Request buffer.
+
+This function takes the following arguments:
+
+=over 3
+
+=item C<$FindCoordinator_Request>
+
+C<$FindCoordinator_Request> is a reference to the hash representing the structure
+of the FINDCOORDINATOR Request. it contains CorrelationId, ClientId (can be empty
+string), CoordinatorKey and CoordinatorType (for version 1 of protocol)
+
+=back
+
+=cut
+
+$IMPLEMENTED_APIVERSIONS->{$APIKEY_FINDCOORDINATOR} = 1;
+sub encode_find_coordinator_request {
+    my ( $FindCoordinator_Request ) = @_;
+
+    my @data;
+    my $request = {
+                                                # template    => '...',
+                                                # len         => ...,
+        data        => \@data,
+    };
+
+    my $api_version = 
+      _encode_request_header( $request, $APIKEY_FINDCOORDINATOR, $FindCoordinator_Request );
+                                                                            # Size
+                                                                            # ApiKey
+                                                                            # ApiVersion
+                                                                            # CorrelationId
+                                                                            # ClientId
+
+    my $coordinator_key = $FindCoordinator_Request->{CoordinatorKey};
+    my $coordinator_type = $FindCoordinator_Request->{CoordinatorType};
+
+    $request->{template}    .= q{s>};              # string length
+    $request->{len}         += 2;
+    _encode_string( $request, $coordinator_key );  # CoordinatorKey (GroupId for version 0)
+    if ($api_version >= 1) {
+        # CoordinatorType (0 for groups)
+        $request->{template}    .= q{c>};
+        $request->{len}         += 1;
+        push( @{ $request->{data} }, $coordinator_type );
+    }
+
+    return pack( $request->{template}, $request->{len}, @data );
+}
+
+my $_decode_find_protocol_response_template = q{x[l]l>s>l>s>/al>};
+                                           # x[l]    # Size (skip)
+                                           # l>      # CorrelationId
+                                           # s>      # ErrorCode
+                                           #     l>                      # NodeId
+                                           #     s>/a                    # Host
+                                           #     l>                      # Port
+
+my $_decode_find_protocol_response_template_v1 = q{x[l]l>l>s>l>s>/al>};
+                                           # x[l]    # Size (skip)
+                                           # l>      # CorrelationId
+                                           # l>      # throttle_time_ms
+                                           # s>      # ErrorCode
+                                           # s>/a    # ErrorMessage
+                                           #     l>                      # NodeId
+                                           #     s>/a                    # Host
+                                           #     l>                      # Port
+
+=head3 C<decode_find_coordinator_response( $bin_stream_ref )>
+
+Decodes the argument and returns a reference to the hash representing
+the structure of the FINDCOORDINATOR Response.
+
+This function takes the following arguments:
+
+=over 3
+
+=item C<$bin_stream_ref>
+
+C<$bin_stream_ref> is a reference to the encoded Response buffer. The buffer
+must be a non-empty binary string.
+
+=back
+
+=cut
+
+sub decode_find_coordinator_response {
+    my ( $bin_stream_ref, $api_version ) = @_;
+
+   $api_version //= $DEFAULT_APIVERSION;
+    my $is_v1 = $api_version == 1;
+
+    my @data = unpack(   $is_v1 ? $_decode_find_protocol_response_template_v1
+                       :          $_decode_find_protocol_response_template, $$bin_stream_ref );
+
+    my $i = 0;
+    my $FindCoordinator_Response = {};
+
+    $FindCoordinator_Response->{CorrelationId}  =  $data[ $i++ ];
+    if ($is_v1) {
+        $FindCoordinator_Response->{ThrottleTimeMs}       =  $data[ $i++ ]; # only v1
+    }
+   $FindCoordinator_Response->{ErrorCode}       =  $data[ $i++ ];
+    if ($is_v1) {
+        $FindCoordinator_Response->{ErrorMessage}         =  $data[ $i++ ]; # only v1
+    }
+    $FindCoordinator_Response->{NodeId}         =  $data[ $i++ ];
+    $FindCoordinator_Response->{Host}           =  $data[ $i++ ];
+    $FindCoordinator_Response->{Port}           =  $data[ $i++ ];
+
+    return $FindCoordinator_Response;
 }
 
 # PRODUCE Request --------------------------------------------------------------
@@ -1333,7 +1453,7 @@ the structure of the OffsetCommit Request (examples see C<t/*_decode_encode.t>).
 =back
 
 =cut
-$IMPLEMENTED_APIVERSIONS->{$APIKEY_OFFSETCOMMIT} = 0;
+$IMPLEMENTED_APIVERSIONS->{$APIKEY_OFFSETCOMMIT} = 1;
 sub encode_offsetcommit_request {
     my ( $OffsetCommit_Request ) = @_;
 
@@ -1344,16 +1464,33 @@ sub encode_offsetcommit_request {
         data        => \@data,
     };
 
-    _encode_request_header( $request, $APIKEY_OFFSETCOMMIT, $OffsetCommit_Request );
+    my $api_version = _encode_request_header( $request, $APIKEY_OFFSETCOMMIT, $OffsetCommit_Request );
                                                                             # Size
                                                                             # ApiKey
                                                                             # ApiVersion
                                                                             # CorrelationId
                                                                             # ClientId
 
+    my $is_v1 = $api_version == 1;
+    my $is_v2 = $api_version == 2;
+    my $is_v3 = $api_version == 3;
+
     $request->{template}    .= q{s>};
     $request->{len}         += 2;
     _encode_string( $request, $OffsetCommit_Request->{GroupId} );           # GroupId
+
+    if ($is_v1) {
+        $request->{template}    .= q{l>};                                   # GroupGenerationId
+        $request->{len}         += 4;
+        ### WARNING TODO: we don't support consumer groups properly, so we set
+        ### generation id to -1 and member id null (see
+        ### https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol )
+        push( @data, -1 );
+
+        $request->{template}    .= q{s>};                                   # string length
+        $request->{len}         += 2;
+        _encode_string( $request, '' );                                     # MemberId
+    }
 
     my $topics_array = $OffsetCommit_Request->{topics};
     push( @data, scalar( @$topics_array ) );                                # topics array size
@@ -1377,6 +1514,13 @@ sub encode_offsetcommit_request {
             );
             $request->{template}    .= qq{l>${_int64_template}};
             $request->{len}         += 12;
+
+            if ($is_v1) {                                                   # timestamp
+                ### WARNING TODO: currently we hardcode "now"
+                push( @data, time() * 1000);
+                $request->{template}    .= qq{${_int64_template}};
+                $request->{len}         += 8;
+            }
 
             $request->{template}    .= q{s>};
             $request->{len}         += 2;

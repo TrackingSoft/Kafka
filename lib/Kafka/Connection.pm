@@ -88,6 +88,7 @@ use Kafka qw(
     $ERROR_CANNOT_RECV
     $ERROR_CANNOT_SEND
     $ERROR_LEADER_NOT_FOUND
+    $ERROR_GROUP_COORDINATOR_NOT_FOUND
     $ERROR_MISMATCH_ARGUMENT
     $ERROR_MISMATCH_CORRELATIONID
     $ERROR_NO_KNOWN_BROKERS
@@ -112,6 +113,7 @@ use Kafka::Internals qw(
     $APIKEY_METADATA
     $APIKEY_OFFSET
     $APIKEY_PRODUCE
+    $APIKEY_FINDCOORDINATOR
     $APIKEY_APIVERSIONS
     $APIKEY_OFFSETCOMMIT
     $APIKEY_OFFSETFETCH
@@ -130,6 +132,7 @@ use Kafka::Protocol qw(
     decode_offset_response
     decode_produce_response
     decode_api_versions_response
+    decode_find_coordinator_response
     decode_offsetcommit_response
     decode_offsetfetch_response
     encode_fetch_request
@@ -137,6 +140,7 @@ use Kafka::Protocol qw(
     encode_offset_request
     encode_produce_request
     encode_api_versions_request
+    encode_find_coordinator_request
     encode_offsetcommit_request
     encode_offsetfetch_request
 );
@@ -216,6 +220,10 @@ my %protocol = (
     "$APIKEY_APIVERSIONS"  => {
         decode                  => \&decode_api_versions_response,
         encode                  => \&encode_api_versions_request,
+    },
+    "$APIKEY_FINDCOORDINATOR"  => {
+        decode                  => \&decode_find_coordinator_response,
+        encode                  => \&encode_find_coordinator_request,
     },
     "$APIKEY_OFFSETCOMMIT"  => {
         decode                  => \&decode_offsetcommit_response,
@@ -472,6 +480,10 @@ sub new {
                                             # }
     $self->{_leaders} = {};                 # {
                                             #   NodeId  => host:port or [IPv6_host]:port,
+                                            #   ...,
+                                            # }
+    $self->{_group_coordinators} = {};      # {
+                                            #   GroupId  => host:port or [IPv6_host]:port,
                                             #   ...,
                                             # }
     $self->{_nonfatal_errors} = [];
@@ -797,6 +809,8 @@ sub receive_response_to_request {
 
     my $api_key = $request->{ApiKey};
 
+    my $host_to_send_to = $request->{__send_to__} // 'leader';
+
     # WARNING: The current version of the module limited to the following:
     # supports queries with only one combination of topic + partition (first and only).
 
@@ -833,20 +847,37 @@ sub receive_response_to_request {
         $ErrorCode = $ERROR_NO_ERROR;
         undef $io_error;
 
-        # hash metadata could be updated
-        my $leader = $self->{_metadata}->{ $topic_name }->{ $partition }->{Leader};
-        next ATTEMPT unless defined $leader;
+        my $server;
+        if ($host_to_send_to eq 'leader') {
+            # hash metadata could be updated
+            my $leader = $self->{_metadata}->{ $topic_name }->{ $partition }->{Leader};
+            next ATTEMPT unless defined $leader;
 
-        my $server = $self->{_leaders}->{ $leader };
-        unless ( $server ) {
-            $ErrorCode = $ERROR_LEADER_NOT_FOUND;
-            $self->_remember_nonfatal_error( $ErrorCode, $ERROR{ $ErrorCode }, $server, $topic_name, $partition );
-            next ATTEMPT;
+            $server = $self->{_leaders}->{ $leader };
+            unless ( $server ) {
+                $ErrorCode = $ERROR_LEADER_NOT_FOUND;
+                $self->_remember_nonfatal_error( $ErrorCode, $ERROR{ $ErrorCode }, $server, $topic_name, $partition );
+                next ATTEMPT;
+            }
+        } elsif ( $host_to_send_to eq 'group_coordinator') {
+            my $group_id = $request->{GroupId};
+            if ( !%{ $self->{_group_coordinators} } && defined $group_id) {
+                # first request
+                $self->_update_group_coordinators($group_id);
+            }
+            $server = $self->{_group_coordinators}->{$group_id};
+            unless ( $server ) {
+                $ErrorCode = $ERROR_GROUP_COORDINATOR_NOT_FOUND;
+                $self->_remember_nonfatal_error( $ErrorCode, $ERROR{ $ErrorCode }, $server, $topic_name, $partition );
+                next ATTEMPT;
+            }
+        } else {
+            die "__send_to__ must be either 'leader', 'group_coordinator', or void (will default to 'leader')";
         }
 
-        # Send a request to the leader
+        # Send a request to the server
         if ( $self->_connectIO( $server ) ) {
-            # we can connect to this leader, so let's detect the api versions
+            # we can connect to this server, so let's detect the api versions
             # it and use whatever it supports, except if the request forces us
             # to use an api version. Warning, the version might end up being
             # undef if detection against the Kafka server failed, or if
@@ -976,6 +1007,9 @@ sub receive_response_to_request {
             # FATAL error
             or $self->_error( $ErrorCode || $ERROR_CANNOT_GET_METADATA, format_message( "topic='%s', partition=%s", $topic_name, $partition ), request => $request )
         ;
+        if ( $host_to_send_to eq 'group_coordinator') {
+            $self->_update_group_coordinators($request->{GroupId})
+        }
     }
 
     # FATAL error
@@ -1188,6 +1222,62 @@ sub _get_interviewed_servers {
     }
 
     return( shuffle( @priority ), shuffle( @secondary ), shuffle( @rest ) );
+}
+
+# Refresh group_coordinators for given topic
+sub _update_group_coordinators {
+    my ($self, $group_id) = @_;
+
+    my $CorrelationId = _get_CorrelationId();
+    my $decoded_request = {
+        CorrelationId   => $CorrelationId,
+        ClientId        => q{},
+        CoordinatorKey  => $group_id,
+        CoordinatorType => 0, # type is group
+    };
+    say STDERR format_message( '[%s] group coordinators request: %s',
+            scalar( localtime ),
+            $decoded_request,
+        ) if $self->debug_level;
+    my $encoded_request = $protocol{ $APIKEY_FINDCOORDINATOR }->{encode}->( $decoded_request );
+
+    my $encoded_response_ref;
+    my @brokers = $self->_get_interviewed_servers;
+
+    # receive coordinator data
+    foreach my $broker ( @brokers ) {
+        last if  $self->_connectIO( $broker )
+            &&   $self->_sendIO( $broker, $encoded_request )
+            && ( $encoded_response_ref = $self->_receiveIO( $broker ) );
+    }
+
+    unless ( $encoded_response_ref ) {
+        # NOTE: it is possible to repeat the operation here
+        return;
+    }
+
+    my $decoded_response = $protocol{ $APIKEY_FINDCOORDINATOR }->{decode}->( $encoded_response_ref );
+    say STDERR format_message( '[%s] group coordinators: %s',
+            scalar( localtime ),
+            $decoded_response,
+        ) if $self->debug_level;
+    ( defined( $decoded_response->{CorrelationId} ) && $decoded_response->{CorrelationId} == $CorrelationId )
+        # FATAL error
+        or $self->_error( $ERROR_MISMATCH_CORRELATIONID );
+    $decoded_response->{ErrorCode}
+        and $self->_error( $decoded_response->{ErrorCode} );
+
+    my $IO_cache = $self->{_IO_cache};
+    my $server = $self->_build_server_name( @{ $decoded_response }{ 'Host', 'Port' } );
+        $IO_cache->{ $server } = {                      # can add new servers
+            IO      => $IO_cache->{ $server }->{IO},    # IO or undef
+            NodeId  => $decoded_response->{NodeId},
+            host    => $decoded_response->{Host},
+            port    => $decoded_response->{Port},
+        };
+    $self->{_group_coordinators}->{ $group_id } = $server;
+
+    return 1;
 }
 
 # Refresh metadata for given topic
