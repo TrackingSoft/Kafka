@@ -9,7 +9,7 @@ Kafka - Apache Kafka interface for Perl.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka> package version 1.05 .
+This documentation refers to C<Kafka> package version 1.06 .
 
 =cut
 
@@ -21,7 +21,7 @@ use warnings;
 
 
 
-our $VERSION = '1.05';
+our $VERSION = '1.06';
 
 use Exporter qw(
     import
@@ -819,10 +819,10 @@ const our $ERROR_SEND_NO_ACK                    => -1002;
 
 =item C<ERROR_CANNOT_RECV>
 
--1.05 - Cannot receive
+-1003 - Cannot receive
 
 =cut
-const our $ERROR_CANNOT_RECV                    => -1.05;
+const our $ERROR_CANNOT_RECV                    => -1003;
 
 =item C<ERROR_CANNOT_BIND>
 
@@ -932,7 +932,7 @@ const our $ERROR_NO_CONNECTION   => -1018;
 
 =item C<$ERROR_GROUP_COORDINATOR_NOT_FOUND>
 
--1008 - Group Coordinator not found
+-1019 - Group Coordinator not found
 
 =cut
 const our $ERROR_GROUP_COORDINATOR_NOT_FOUND               => -1019;

@@ -1,5 +1,22 @@
 Revision history for Kafka package
 
+1.06 Fri July 28 2017
+
+    Important fix for offset commit/fetch bug
+
+    In Kafka versions > 0.8.2 offset commits/fetch are stored on
+    Kafka itself, not zookeeper (that's version 1 of protocol
+    instead of version 0).
+
+    The code before that commit was claiming that it supported
+    version 0 for commiting offsets, and version 1 for fetching.
+    As a result, offsets were stored on zookeeper, but fetched
+    from Kafka, where they were never found.
+
+    This fix provides support for version 1 when storing and
+    fetching offsets. It required implementing the API call for
+    finding a group coordinator as well.
+
 1.05 Tue June 20 2017
 
     BUGFIXES:

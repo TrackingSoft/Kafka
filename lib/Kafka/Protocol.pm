@@ -6,7 +6,7 @@ Kafka::Protocol - Functions to process messages in the Apache Kafka protocol.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Protocol> version 1.05 .
+This documentation refers to C<Kafka::Protocol> version 1.06 .
 
 =cut
 
@@ -14,7 +14,7 @@ use 5.010;
 use strict;
 use warnings;
 
-our $VERSION = '1.05';
+our $VERSION = '1.06';
 
 use Exporter qw(
     import
@@ -634,7 +634,7 @@ sub encode_find_coordinator_request {
         data        => \@data,
     };
 
-    my $api_version = 
+    my $api_version =
       _encode_request_header( $request, $APIKEY_FINDCOORDINATOR, $FindCoordinator_Request );
                                                                             # Size
                                                                             # ApiKey
@@ -1472,8 +1472,6 @@ sub encode_offsetcommit_request {
                                                                             # ClientId
 
     my $is_v1 = $api_version == 1;
-    my $is_v2 = $api_version == 2;
-    my $is_v3 = $api_version == 3;
 
     $request->{template}    .= q{s>};
     $request->{len}         += 2;

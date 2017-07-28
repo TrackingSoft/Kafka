@@ -6,7 +6,7 @@ Kafka::Cluster - object interface to manage a test kafka cluster.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Cluster> version 1.05 .
+This documentation refers to C<Kafka::Cluster> version 1.06 .
 
 =cut
 
@@ -14,7 +14,7 @@ use 5.010;
 use strict;
 use warnings;
 
-our $VERSION = '1.05';
+our $VERSION = '1.06';
 
 use Exporter qw(
     import
