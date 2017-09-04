@@ -1047,12 +1047,30 @@ sub _start_server {
                 confess "Not running: $cmd_str";
             }
 
+
             # Find real pid using process table, because kafka uses sequence of bash
             # scripts calling each other which do not end with 'exec' and do not trap
             # signals. Proc::Daemon returns pid of the top-level script and killing it
             # won't work (no signals are trapped there) - actual java process keeps
             # running.
-            my $script_pid = _clear_tainted( $proc_daemon->get_pid( qr/.*java.+$server_name.+\Q$property_file\E.*/ ) );
+
+            # there are issues while trying to find pid of zookeeper process by command line,
+            # caused by limitations of older linux systems and long CLASSPATHS inside 
+            # command line of zookeeper process (command line in processtable is truncated on
+            # 4096 bytes and get_pid can't find the pid by process name)
+            # https://stackoverflow.com/questions/199130/how-do-i-increase-the-proc-pid-cmdline-4096-byte-limit
+            # so instead of system ways of getting that - use native 'java' way of listing processes -
+            # with jps executable
+
+            my @java_processes = `jps -lm`; # check: man jps for description
+            my $script_pid = 0;
+            foreach my $process ( @java_processes ){
+                if ( $process =~ /$server_name.+\Q$property_file\E.*/ ) {
+                    ( $script_pid ) = ( $process =~ /^(\d+)\s/);
+                    last;
+                }
+            }
+
             if ( !( my $real_pid = $proc_daemon->Status( $script_pid ) ) ) {
                 confess 'Could not find server pid' unless $attempts;
             } else {
