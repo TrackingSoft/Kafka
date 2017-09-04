@@ -291,13 +291,26 @@ C<$COMPRESSION_GZIP>,
 C<$COMPRESSION_SNAPPY>.
 The defaults that can be imported from the L<Kafka|Kafka> module.
 
+=item C<$timestamp>
+
+Optional.
+
+This is the timestamp of the C<$messages>. Unit is milliseconds since beginning of the epoch (midnight Jan 1, 1970 (UTC)).
+
+B<WARNING>: this method requires Kafka 0.10.0, and messages with timestamps.
+Check the configuration of the brokers or topic, specifically
+C<message.timestamp.type>, and set it either to C<LogAppentTime> to have Kafka
+automatically set messages timestamps based on the broker clock, or
+C<CreateTime>, in which case the client populating your topic has to set the
+timestamps when producing messages.
+
 Do not use C<$Kafka::SEND_MAX_ATTEMPTS> in C<Kafka::Producer-<gt>send> request to prevent duplicates.
 
 =back
 
 =cut
 sub send {
-    my ( $self, $topic, $partition, $messages, $keys, $compression_codec ) = @_;
+    my ( $self, $topic, $partition, $messages, $keys, $compression_codec, $timestamp ) = @_;
 
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'topic' )
         unless defined( $topic ) && ( $topic eq '' || defined( _STRING( $topic ) ) ) && !utf8::is_utf8( $topic );
@@ -360,9 +373,10 @@ sub send {
     my $key_index = 0;
     foreach my $message ( @$messages ) {
         push @$MessageSet, {
-            Offset  => $PRODUCER_ANY_OFFSET,
-            Key     => defined $common_key ? $common_key : ( $keys->[ $key_index ] // '' ),
-            Value   => $message,
+            Offset    => $PRODUCER_ANY_OFFSET,
+            Key       => defined $common_key ? $common_key : ( $keys->[ $key_index ] // '' ),
+            Value     => $message,
+            $timestamp ? ( Timestamp => $timestamp ) : (),
         };
         ++$key_index;
     }

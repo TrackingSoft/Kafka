@@ -439,7 +439,7 @@ Check the configuration of the brokers or topic, specifically
 C<message.timestamp.type>, and set it either to C<LogAppentTime> to have Kafka
 automatically set messages timestamps based on the broker clock, or
 C<CreateTime>, in which case the client populating your topic has to set the
-timestamps when producing messages. .
+timestamps when producing messages.
 
 C<offset_at_time()> takes the following arguments:
 

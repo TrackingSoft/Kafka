@@ -38,6 +38,7 @@ our @EXPORT_OK = qw(
     encode_offsetfetch_request
     _decode_MessageSet_template
     _decode_MessageSet_array
+    _encode_Message
     _encode_MessageSet_array
     _encode_string
     _pack64
@@ -1918,121 +1919,125 @@ sub _decode_MessageSet_array {
     return;
 }
 
-# Generates a template to encrypt MessageSet
+# Generates a template to encode single message within MessageSet
+sub _encode_Message {
+    my ($request, $Key, $Value, $Attributes, $Offset, $v1_format, $Timestamp) = @_;
+
+    # v1 format - supported since 0.10.0, introduces Timestamps
+    my $MagicByte = $v1_format ? 1 : 0;
+    $Timestamp  //= -1;
+    $Attributes //= $COMPRESSION_NONE; # According to Apache Kafka documentation:
+                                       # The lowest 2 bits contain the compression codec used for the message.
+                                       # The other bits should be set to 0.
+
+
+    my $key_length   = length( $Key   );
+    my $value_length = length( $Value );
+
+    my $message_body = pack(
+            q{cc}                                           # MagicByte
+                                                            # Attributes
+            .( $v1_format    ? q{a[8]}              : q{} ) # Timestamp - v1 only (when MagicByte > 0) (#$_int64_template)
+            .q{l>}                                          # Key length
+            .( $key_length   ? qq{a[$key_length]}   : q{} ) # Key
+            .q{l>}                                          # Value length
+            .( $value_length ? qq{a[$value_length]} : q{} ) # Value
+        ,
+        $MagicByte,
+        $Attributes,
+        $v1_format    ? ( _pack64( $Timestamp )  ) : (),
+        $key_length   ? ( $key_length,    $Key   ) : ( $NULL_BYTES_LENGTH ),
+        $value_length ? ( $value_length,  $Value ) : ( $NULL_BYTES_LENGTH ),
+    );
+
+    my $MessageBodySize = length($message_body);
+    my $MessageSize     = $MessageBodySize + 4;
+
+    my $data = $request->{data};
+    $request->{template}    .= $_MessageSet_template . qq{l>a[$MessageBodySize]}; # crc + message_body
+    $request->{len}         += $_MessageSet_length + $MessageSize;
+
+    push @$data, (_pack64( $Offset ), $MessageSize, crc32( $message_body ), $message_body );
+    return;
+}
+
+# Generates a template to encode MessageSet
 sub _encode_MessageSet_array {
     my ( $request, $MessageSet_array_ref, $compression_codec ) = @_;
 
-    my ( $MessageSize, $Key, $Value, $key_length, $value_length, $message_body, $message_set );
+    # not sure if it would be good to mix different formats in different messages in the same set
+    # so detect if we should use v1 format
+    my $use_v1_format;
+    foreach my $MessageSet ( @$MessageSet_array_ref ) {
+        if ( $MessageSet->{Timestamp} ) {
+            $use_v1_format = 1;
+            last;
+        }
+    }
 
     if ( $compression_codec ) {
+        my $subrequest = {
+            data     => [],
+            template => '',
+            len      => 0
+        };
+        my ( $Key, $Value );
+
         foreach my $MessageSet ( @$MessageSet_array_ref ) {
-            $key_length   = length( $Key    = $MessageSet->{Key} );
-            $value_length = length( $Value  = $MessageSet->{Value} );
+            _encode_Message( $subrequest,
+                             $Key = $MessageSet->{Key},
+                             $MessageSet->{Value},
+                             $COMPRESSION_NONE,
+                             $PRODUCER_ANY_OFFSET,
+                             $use_v1_format,
+                             $MessageSet->{Timestamp}
+                           );
+        }
 
-            $message_body = pack(
-                    q{ccl>}                                         # MagicByte
-                                                                    # Attributes
-                                                                    # Key length
-                    .( $key_length   ? qq{a[$key_length]}   : q{} ) # Key
-                    .q{l>}                                          # Value length
-                    .( $value_length ? qq{a[$value_length]} : q{} ) # Value
-                ,
-                0,
-                $COMPRESSION_NONE,  # According to Apache Kafka documentation:
-                                    # The lowest 2 bits contain the compression codec used for the message.
-                                    # The other bits should be set to 0.
-                $key_length     ? ( $key_length,    $Key )    : ( $NULL_BYTES_LENGTH ),
-                $value_length   ? ( $value_length,  $Value )  : ( $NULL_BYTES_LENGTH ),
-            );
+        $Value = pack($subrequest->{template}, @{$subrequest->{data}});
 
-            $message_set .= pack( qq(x[8]l>l>),     # 8 Offset ($PRODUCER_ANY_OFFSET)
-                length( $message_body ) + 4,        # [l] MessageSize ( $message_body + Crc )
-                crc32( $message_body )              # [l] Crc
-            ).$message_body;
+        # Compression
+        if ( $compression_codec == $COMPRESSION_GZIP ) {
+            $Value = gzip( $Value )
+                // _error( $ERROR_COMPRESSION, 'Unable to compress gzip data' );
+        } elsif ( $compression_codec == $COMPRESSION_SNAPPY ) {
+            $Value = Compress::Snappy::compress( $Value )
+                // _error( $ERROR_COMPRESSION, 'Unable to compress snappy data' );
+        } else {
+             _error( $ERROR_COMPRESSION, "Unknown compression codec $compression_codec" );
         }
 
         $MessageSet_array_ref = [
             {
                 Offset  => $PRODUCER_ANY_OFFSET,
                 Key     => $Key,
+                Value   => $Value
             }
         ];
 
-        # Compression
-        if ( $compression_codec == $COMPRESSION_GZIP ) {
-            $MessageSet_array_ref->[0]->{Value} = gzip( $message_set )
-                // _error( $ERROR_COMPRESSION, 'Unable to compress gzip data' );
-        } elsif ( $compression_codec == $COMPRESSION_SNAPPY ) {
-            $MessageSet_array_ref->[0]->{Value} = Compress::Snappy::compress( $message_set )
-                // _error( $ERROR_COMPRESSION, 'Unable to compress snappy data' );
-        } else {
-             _error( $ERROR_COMPRESSION, "Unknown compression codec $compression_codec" );
-        }
+    }
+
+    my $subrequest = {
+        data     => [],
+        template => '',
+        len      => 0
+    };
+
+    foreach my $MessageSet ( @$MessageSet_array_ref ) {
+        _encode_Message( $subrequest,
+                         $MessageSet->{Key},
+                         $MessageSet->{Value},
+                         $compression_codec // $COMPRESSION_NONE,
+                         $MessageSet->{Offset},
+                         $use_v1_format,
+                         $MessageSet->{Timestamp}
+                       );
     }
 
     my $data = $request->{data};
-    my $MessageSetSize = 0;
-    my %sizes;
-    foreach my $MessageSet ( @$MessageSet_array_ref ) {
-        $MessageSetSize +=
-              12                                                            # [q] Offset
-                                                                            # [l] MessageSize
-            + ( $sizes{ $MessageSet } =                                     # MessageSize
-                  10                                                        # [l] Crc
-                                                                            # [c] MagicByte
-                                                                            # [c] Attributes
-                                                                            # [l] Key length
-                + length( $MessageSet->{Key}    //= q{} )                   # Key
-                + 4                                                         # [l] Value length
-                + length( $MessageSet->{Value}  //= q{} )                   # Value
-            )   # MessageSize
-            ;
-    }
-    push( @$data, $MessageSetSize );
-    $request->{template}    .= q{l>};                                       # MessageSetSize
-    $request->{len}         += 4;
-
-    foreach my $MessageSet ( @$MessageSet_array_ref ) {
-        push( @$data,
-            _pack64( $MessageSet->{Offset} ),                               # Offset (It may be $PRODUCER_ANY_OFFSET)
-            ( $MessageSize = $sizes{ $MessageSet } ),                       # MessageSize
-        );
-        $request->{template}    .= $_MessageSet_template;
-        $request->{len}         += $_MessageSet_length;
-
-        $key_length   = length( $Key    = $MessageSet->{Key} );
-        $value_length = length( $Value  = $MessageSet->{Value} );
-
-        $message_body = pack(
-                q{ccl>}                                         # MagicByte
-                                                                # Attributes
-                                                                # Key length
-                .( $key_length   ? qq{a[$key_length]}   : q{} ) # Key
-                .q{l>}                                          # Value length
-                .( $value_length ? qq{a[$value_length]} : q{} ) # Value
-            ,
-            0,
-            $compression_codec // $COMPRESSION_NONE,    # According to Apache Kafka documentation:
-                                # The lowest 2 bits contain the compression codec used for the message.
-                                # The other bits should be set to 0.
-            $key_length     ? ( $key_length,    $Key )    : ( $NULL_BYTES_LENGTH ),
-            $value_length   ? ( $value_length,  $Value )  : ( $NULL_BYTES_LENGTH ),
-        );
-
-        push( @$data, crc32( $message_body ), $message_body );
-        # Message
-        $request->{template} .= q{l>a[}                                         # Crc
-            .( $MessageSize - 4 )   # 4 Crc
-            .qq{]};
-        # Message body:
-                                                                                # MagicByte
-                                                                                # Attributes
-                                                                                # Key length
-                                                                                # Key
-                                                                                # Value length
-                                                                                # Value
-        $request->{len} += $MessageSize;    # Message
-    }
+    $request->{template}     .= q{l>}   . $subrequest->{template};
+    $request->{len}          +=     4   + $subrequest->{len};
+    push @$data, ( $subrequest->{len}, @{ $subrequest->{data}     } );
 
     return;
 }

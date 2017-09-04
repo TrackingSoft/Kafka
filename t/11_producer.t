@@ -232,6 +232,33 @@ sub testing {
             ]
         );
         ok _HASH( $response ), 'response is received';
+
+        # Sending a single message with timestamp
+        $response = $producer->send(
+            $topic,
+            $partition,
+            'Single message',            # message
+            undef,
+            undef,
+            time()*100
+        );
+        ok _HASH( $response ), 'response is received';
+
+        # Sending a series of messages with timestamp
+        $response = $producer->send(
+            $topic,
+            $partition,
+            [                           # messages
+                'The first message',
+                'The second message',
+                'The third message',
+            ],
+            undef,
+            undef,
+            time()*100
+        );
+        ok _HASH( $response ), 'response is received';
+
     }
 
     #-- Response to errors in communication modules

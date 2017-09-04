@@ -280,6 +280,7 @@ BEGIN {
         encode_produce_request
         _decode_MessageSet_template
         _decode_MessageSet_array
+        _encode_Message
         _encode_MessageSet_array
         _encode_string
         _pack64
