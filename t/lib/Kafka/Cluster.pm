@@ -1052,15 +1052,18 @@ sub _start_server {
             # signals. Proc::Daemon returns pid of the top-level script and killing it
             # won't work (no signals are trapped there) - actual java process keeps
             # running.
-            my $script_pid = _clear_tainted( $proc_daemon->get_pid( qr/.*java.+$server_name.+\Q$property_file\E.*/ ) );
-            if ( !( my $real_pid = $proc_daemon->Status( $script_pid ) ) ) {
-                confess 'Could not find server pid' unless $attempts;
-            } else {
-                my $fh = IO::File->new( $pid_file, 'w' )
-                    or confess "Cannot write $pid_file: $!";
-                say $fh $real_pid;
-                $fh->close;
-                last;
+            my $java_pid = $proc_daemon->get_pid( qr/.*java.+$server_name.+\Q$property_file\E.*/ );
+            if( defined $java_pid && $java_pid ne '' ) {
+                my $script_pid = _clear_tainted( $java_pid );
+                if ( !( my $real_pid = $proc_daemon->Status( $script_pid ) ) ) {
+                    confess 'Could not find server pid' unless $attempts;
+                } else {
+                    my $fh = IO::File->new( $pid_file, 'w' )
+                        or confess "Cannot write $pid_file: $!";
+                    say $fh $real_pid;
+                    $fh->close;
+                    last;
+                }
             }
         }
 
