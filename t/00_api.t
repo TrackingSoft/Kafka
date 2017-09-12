@@ -90,6 +90,7 @@ BEGIN {
         $COMPRESSION_GZIP
         $COMPRESSION_NONE
         $COMPRESSION_SNAPPY
+        $COMPRESSION_LZ4
         $DEFAULT_MAX_BYTES
         $DEFAULT_MAX_NUMBER_OF_OFFSETS
         $DEFAULT_MAX_WAIT_TIME
@@ -280,6 +281,7 @@ BEGIN {
         encode_produce_request
         _decode_MessageSet_template
         _decode_MessageSet_array
+        _encode_Message
         _encode_MessageSet_array
         _encode_string
         _pack64

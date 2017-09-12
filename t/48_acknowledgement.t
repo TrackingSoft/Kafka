@@ -121,7 +121,7 @@ sub sending {
         } else {
             ++$not_stored_without_error;
             diag( sprintf( "\n%s WARN: data not stored without error! Sending %d, expected %d but got %d stored records. Timeout %.5f",
-                    localtime.'',
+                    localtime().'',
                     $TOTAL_SENDINGS,
                     $prev_success_sendings + 1,
                     $stored,
@@ -139,7 +139,7 @@ sub sending {
         diag( sprintf( "\r[%d/%d] %s: stored %d, not stored without error %d, timeout %.5f\r",
                 $send_with_NO_ACK_errors,
                 $SEND_NO_ACK_REPEATS,
-                localtime.'',
+                localtime().'',
                 $success_sendings,
                 $not_stored_without_error,
                 $prev_timeout,
@@ -263,7 +263,7 @@ sub get_new_objects {
 #-- Connecting to the Kafka server port (for example for node_id = 0)
 ( $port ) =  $cluster->servers;
 
-diag 'Started at '.localtime."\n";
+diag 'Started at '.localtime()."\n";
 my $stored_messages;
 my $work_timeout = $TIMEOUT;
 my $max_error_timeout = 0;
@@ -283,7 +283,7 @@ while ( $send_with_NO_ACK_errors < $SEND_NO_ACK_REPEATS ) {
         $work_timeout = $TIMEOUT;   # return to normal timeout
     }
 }
-diag "\nFinished at ".localtime;
+diag "\nFinished at ".localtime();
 
 ok $success_sendings, 'messages stored';
 is $TOTAL_SENDINGS,

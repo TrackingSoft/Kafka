@@ -33,6 +33,7 @@ our @EXPORT_OK = qw(
     $COMPRESSION_GZIP
     $COMPRESSION_NONE
     $COMPRESSION_SNAPPY
+    $COMPRESSION_LZ4
     $DEFAULT_MAX_BYTES
     $DEFAULT_MAX_NUMBER_OF_OFFSETS
     $DEFAULT_MAX_WAIT_TIME
@@ -763,7 +764,7 @@ const our $IP_V6                                => 6;
 
 According to Apache Kafka documentation:
 
-Kafka currently supports two compression codecs with the following codec numbers:
+Kafka currently supports three compression codecs with the following codec numbers:
 
 =over
 
@@ -787,6 +788,14 @@ Snappy = 2
 
 =cut
 const our $COMPRESSION_SNAPPY           => 2;
+
+=item C<$COMPRESSION_LZ4>
+
+LZ4 = 3
+(That module supports only Kafka 0.10 or higher, as initial implementation of LZ4 in Kafka did not follow the standard LZ4 framing specification).
+
+=cut
+const our $COMPRESSION_LZ4              => 3;
 
 =back
 
@@ -1508,6 +1517,7 @@ you have the following packages installed before you install
 Kafka:
 
     Compress::Snappy
+    Compress::LZ4Frame
     Const::Fast
     Data::Compare
     Data::HexDump::Range

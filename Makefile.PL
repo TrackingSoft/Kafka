@@ -23,6 +23,7 @@ my %config = (
     PREREQ_PM           => {            # more to the list $Module::CoreList::version{5.010}
         'Carp'                      => '1.08',
         'Compress::Snappy'          => '0.23',
+        'Compress::LZ4Frame'        => '0.012',
         'Const::Fast'               => '0.014',
         'Data::Compare'             => '1.24',
         'Data::HexDump::Range'      => 0,

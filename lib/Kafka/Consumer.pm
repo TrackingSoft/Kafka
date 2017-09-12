@@ -246,6 +246,14 @@ Optional, int32 signed integer, default = C<$DEFAULT_MAX_NUMBER_OF_OFFSETS> (100
 C<$DEFAULT_MAX_NUMBER_OF_OFFSETS>
 is the default that can be imported from the L<Kafka|Kafka> module.
 
+=item C<ApiVersion =E<gt> 0>
+
+Optional. Default ApiVersion for consumer requests.
+Set it to 2, if you are planning to use $COMPRESSION_LZ4,
+otherwise client will not be able to unpack servers response.
+Initial implementation of LZ4 in Kafka did not follow the
+standard LZ4 framing specification.
+
 =back
 
 =cut
@@ -259,6 +267,7 @@ sub new {
         MinBytes            => $MIN_BYTES_RESPOND_IMMEDIATELY,
         MaxBytes            => $DEFAULT_MAX_BYTES,
         MaxNumberOfOffsets  => $DEFAULT_MAX_NUMBER_OF_OFFSETS,
+        ApiVersion          => 0,
     }, $class;
 
     exists $p{$_} and $self->{$_} = $p{$_} foreach keys %$self;
@@ -342,7 +351,7 @@ sub fetch {
 
     my $request = {
         ApiKey                              => $APIKEY_FETCH,
-        ApiVersion                          => $api_version,
+        ApiVersion                          => $api_version // $self->{ApiVersion},
         CorrelationId                       => _get_CorrelationId(),
         ClientId                            => $self->{ClientId},
         MaxWaitTime                         => int( $self->{MaxWaitTime} * 1000 ),
@@ -439,7 +448,7 @@ Check the configuration of the brokers or topic, specifically
 C<message.timestamp.type>, and set it either to C<LogAppentTime> to have Kafka
 automatically set messages timestamps based on the broker clock, or
 C<CreateTime>, in which case the client populating your topic has to set the
-timestamps when producing messages. .
+timestamps when producing messages.
 
 C<offset_at_time()> takes the following arguments:
 

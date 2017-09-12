@@ -29,6 +29,7 @@ use Params::Util qw(
     _NONNEGINT
     _NUMBER
     _STRING
+    _POSINT
 );
 use Scalar::Util qw(
     blessed
@@ -42,6 +43,7 @@ use Kafka qw(
     $COMPRESSION_GZIP
     $COMPRESSION_NONE
     $COMPRESSION_SNAPPY
+    $COMPRESSION_LZ4
     $ERROR_CANNOT_GET_METADATA
     $ERROR_MISMATCH_ARGUMENT
     $REQUEST_TIMEOUT
@@ -143,6 +145,7 @@ my %known_compression_codecs = map { $_ => 1 } (
     $COMPRESSION_NONE,
     $COMPRESSION_GZIP,
     $COMPRESSION_SNAPPY,
+    $COMPRESSION_LZ4,
 );
 
 #-- constructor ----------------------------------------------------------------
@@ -288,8 +291,23 @@ if the compression is desirable.
 Supported codecs:
 C<$COMPRESSION_NONE>,
 C<$COMPRESSION_GZIP>,
-C<$COMPRESSION_SNAPPY>.
+C<$COMPRESSION_SNAPPY>,
+C<$COMPRESSION_LZ4>.
 The defaults that can be imported from the L<Kafka|Kafka> module.
+
+=item C<$timestamps>
+
+Optional.
+
+This is the timestamps of the C<$messages>.
+
+This argument should be either a single number (common timestamp for all messages),
+or an array of integers with length matching messages array.
+
+Unit is milliseconds since beginning of the epoch (midnight Jan 1, 1970 (UTC)).
+
+B<WARNING>: timestamps supported since Kafka 0.10.0.
+
 
 Do not use C<$Kafka::SEND_MAX_ATTEMPTS> in C<Kafka::Producer-<gt>send> request to prevent duplicates.
 
@@ -297,7 +315,7 @@ Do not use C<$Kafka::SEND_MAX_ATTEMPTS> in C<Kafka::Producer-<gt>send> request t
 
 =cut
 sub send {
-    my ( $self, $topic, $partition, $messages, $keys, $compression_codec ) = @_;
+    my ( $self, $topic, $partition, $messages, $keys, $compression_codec, $timestamps ) = @_;
 
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'topic' )
         unless defined( $topic ) && ( $topic eq '' || defined( _STRING( $topic ) ) ) && !utf8::is_utf8( $topic );
@@ -306,9 +324,11 @@ sub send {
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'messages' )
         unless defined( _STRING( $messages ) ) || _ARRAY( $messages );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'keys' )
-        unless ( !defined $keys || defined( _STRING( $keys ) ) || _ARRAY( $keys ) );
+        unless ( !defined( $keys ) || defined( _STRING( $keys ) ) || _ARRAY( $keys ) );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'compression_codec' )
         unless ( !defined( $compression_codec ) || $known_compression_codecs{ $compression_codec } );
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'timestamps' )
+        unless ( !defined( $timestamps ) || defined( _POSINT( $timestamps ) ) || _ARRAY( $timestamps ) );
 
     $messages = [ $messages ] unless ref( $messages );
     foreach my $message ( @$messages ) {
@@ -337,6 +357,26 @@ sub send {
         $common_key = '';
     }
 
+    my ($common_ts, $use_ts);
+
+    if( _ARRAY( $timestamps ) ) {
+        # ensure that timestamps array maytches messages array
+        $self->_error( $ERROR_MISMATCH_ARGUMENT, 'timestamps' )
+            unless scalar( @$timestamps ) == scalar( @$messages );
+
+        foreach my $ts ( @$timestamps ) {
+            $self->_error( $ERROR_MISMATCH_ARGUMENT, format_message( 'timestamp = %s', $ts ) )
+                unless !defined( $ts ) || defined( _POSINT( $ts ) );
+        }
+        $use_ts = 1;
+    }
+    elsif( defined $timestamps ) {
+        $self->_error( $ERROR_MISMATCH_ARGUMENT, format_message( 'timestamp = %s', $timestamps ) )
+            unless defined( _POSINT( $timestamps ));
+        $common_ts = $timestamps;
+        $use_ts = 1;
+    }
+
     my $MessageSet = [];
     my $request = {
         ApiKey                              => $APIKEY_PRODUCE,
@@ -356,13 +396,17 @@ sub send {
             },
         ],
     };
+    if ( ( defined $compression_codec and $compression_codec == $COMPRESSION_LZ4 ) or defined $timestamps ) {
+        $request->{ApiVersion} = 2;
+    }
 
     my $key_index = 0;
     foreach my $message ( @$messages ) {
         push @$MessageSet, {
-            Offset  => $PRODUCER_ANY_OFFSET,
-            Key     => defined $common_key ? $common_key : ( $keys->[ $key_index ] // '' ),
-            Value   => $message,
+            Offset    => $PRODUCER_ANY_OFFSET,
+            Key       => defined $common_key ? $common_key : ( $keys->[ $key_index ] // '' ),
+            Value     => $message,
+            $use_ts ? ( Timestamp => defined $common_ts  ? $common_ts  : $timestamps->[$key_index] ) : (),
         };
         ++$key_index;
     }
