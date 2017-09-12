@@ -36,6 +36,7 @@ use Kafka qw(
     $COMPRESSION_GZIP
     $COMPRESSION_NONE
     $COMPRESSION_SNAPPY
+    $COMPRESSION_LZ4
     $ERROR_MISMATCH_ARGUMENT
     $NOT_SEND_ANY_RESPONSE
     $REQUEST_TIMEOUT
@@ -196,7 +197,7 @@ sub testing {
         foreach grep { !( _ARRAY0( $_ ) && @$_ == 1 ) } @not_empty_string;
 
     send_ERROR_MISMATCH_ARGUMENT( $topic, $partition, 'Some value', 'Some key', $_ )
-        foreach ( @not_isint, $COMPRESSION_NONE - 1, $COMPRESSION_SNAPPY + 1 );
+        foreach ( @not_isint, $COMPRESSION_NONE - 1, $COMPRESSION_LZ4 + 1 );
     # Valid values for $compression_codec checked in the test *_consumer.t
 
     #-- ProduceRequest
@@ -233,31 +234,49 @@ sub testing {
         );
         ok _HASH( $response ), 'response is received';
 
-        # Sending a single message with timestamp
-        $response = $producer->send(
-            $topic,
-            $partition,
-            'Single message',            # message
-            undef,
-            undef,
-            time()*100
-        );
-        ok _HASH( $response ), 'response is received';
+        # TODO: MockIO supports only v0, for timestamps v2 is used
+        if ( $kafka_base_dir ) {
+            # Sending a single message with timestamp
+            $response = $producer->send(
+                $topic,
+                $partition,
+                'Single message',            # message
+                undef,
+                undef,
+                time()*1000
+            );
+            ok _HASH( $response ), 'response is received';
 
-        # Sending a series of messages with timestamp
-        $response = $producer->send(
-            $topic,
-            $partition,
-            [                           # messages
-                'The first message',
-                'The second message',
-                'The third message',
-            ],
-            undef,
-            undef,
-            time()*100
-        );
-        ok _HASH( $response ), 'response is received';
+            # Sending a series of messages with timestamp
+            $response = $producer->send(
+                $topic,
+                $partition,
+                [                           # messages
+                    'The first message',
+                    'The second message',
+                    'The third message',
+                ],
+                undef,
+                undef,
+                time()*1000
+            );
+            ok _HASH( $response ), 'response is received';
+
+            # Sending a series of messages with series of timestamps
+            $response = $producer->send(
+                $topic,
+                $partition,
+                [                           # messages
+                    'The first message',
+                    'The second message',
+                    'The third message',
+                ],
+                undef,
+                undef,
+                [time()*1000 - 3, time()*1000 - 2, time()*1000 - 1]
+            );
+            ok _HASH( $response ), 'response is received';
+        }
 
     }
 

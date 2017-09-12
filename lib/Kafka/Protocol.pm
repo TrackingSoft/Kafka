@@ -53,7 +53,8 @@ our @EXPORT_OK = qw(
     $_int64_template
 );
 
-use Compress::Snappy;
+use Compress::Snappy ();
+use Compress::LZ4Frame ();
 use Const::Fast;
 use Gzip::Faster qw( gzip gunzip );
 use Params::Util qw(
@@ -74,6 +75,7 @@ use Kafka qw(
     $COMPRESSION_GZIP
     $COMPRESSION_NONE
     $COMPRESSION_SNAPPY
+    $COMPRESSION_LZ4
     $DEFAULT_MAX_WAIT_TIME
     %ERROR
     $ERROR_COMPRESSION
@@ -96,7 +98,6 @@ use Kafka::Internals qw(
     $PRODUCER_ANY_OFFSET
     format_message
 );
-
 
 =head1 SYNOPSIS
 
@@ -748,7 +749,10 @@ if the compression is desirable.
 Supported codecs:
 L<$COMPRESSION_NONE|Kafka/$COMPRESSION_NONE>,
 L<$COMPRESSION_GZIP|Kafka/$COMPRESSION_GZIP>,
-L<$COMPRESSION_SNAPPY|Kafka/$COMPRESSION_SNAPPY>.
+L<$COMPRESSION_SNAPPY|Kafka/$COMPRESSION_SNAPPY>,
+L<$COMPRESSION_LZ4|Kafka/$COMPRESSION_LZ4>.
+
+NOTE: $COMPRESSION_LZ4 requires Kafka 0.10 or higher, as initial implementation of LZ4 in Kafka did not follow the standard LZ4 framing specification.
 
 =back
 
@@ -1883,6 +1887,15 @@ sub _decode_MessageSet_array {
 
                 $decompressed = Compress::Snappy::decompress( $Message->{Value} )
                     // _error( $ERROR_COMPRESSION, 'Unable to decompress snappy compressed data' );
+            } elsif ( $compression_codec == $COMPRESSION_LZ4 ) {
+                # https://cwiki.apache.org/confluence/display/KAFKA/KIP-57+-+Interoperable+LZ4+Framing
+                # New 0.10 clients (proposed behavior) - produce and consume v1 messages w/ correct LZ4F checksum
+                if ( Compress::LZ4Frame::looks_like_lz4frame( $Message->{Value} ) ) {
+                    $decompressed = Compress::LZ4Frame::decompress( $Message->{Value} ) // _error( $ERROR_COMPRESSION, 'Unable to decompress LZ4 compressed data' );
+                } else {
+                    _error( $ERROR_COMPRESSION, 'Unable to decompress LZ4 compressed data. Frame is not valid' );
+                }
+
             } else {
                 _error( $ERROR_COMPRESSION, "Unknown compression codec $compression_codec" );
             }
@@ -2003,6 +2016,11 @@ sub _encode_MessageSet_array {
         } elsif ( $compression_codec == $COMPRESSION_SNAPPY ) {
             $Value = Compress::Snappy::compress( $Value )
                 // _error( $ERROR_COMPRESSION, 'Unable to compress snappy data' );
+        } elsif ( $compression_codec == $COMPRESSION_LZ4 ) {
+            # https://cwiki.apache.org/confluence/display/KAFKA/KIP-57+-+Interoperable+LZ4+Framing
+            # New 0.10 clients (proposed behavior) - produce and consume v1 messages w/ correct LZ4F checksum
+            $Value = Compress::LZ4Frame::compress_checksum( $Value )
+                // _error( $ERROR_COMPRESSION, 'Unable to compress LZ4 data' );
         } else {
              _error( $ERROR_COMPRESSION, "Unknown compression codec $compression_codec" );
         }

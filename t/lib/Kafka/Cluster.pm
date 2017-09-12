@@ -1057,7 +1057,7 @@ sub _start_server {
             my $java_pid = $proc_daemon->get_pid( qr/.*java.+$server_name.+\Q$property_file\E.*/ );
 
             if( not $java_pid ) {
-                # sometimes there it's not possible to find pid of java process by looking 
+                # sometimes it's not possible to find pid of java process by looking
                 # for particular argument in the commandline of the process table. 
                 # it happens when classpaths inside command line of java-process 
                 # are too long, and commandline in processtable gets truncated 

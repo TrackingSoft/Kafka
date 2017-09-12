@@ -30,6 +30,7 @@ use Kafka qw(
     $COMPRESSION_GZIP
     $COMPRESSION_NONE
     $COMPRESSION_SNAPPY
+    $COMPRESSION_LZ4
     $RECEIVE_EARLIEST_OFFSET
     $WAIT_WRITTEN_TO_LOCAL_LOG
 );
@@ -420,6 +421,9 @@ $encoded_with_error = pack( 'H*', $encoded_with_error_str );
 throws_ok {
     decode_produce_request( \$encoded_with_error );
 } 'Kafka::Exception::Protocol', 'error thrown';
+
+##### TODO: LZ4
+
 
 #-- FetchRequest ---------------------------------------------------------------
 

@@ -29,6 +29,7 @@ use Kafka qw(
     $COMPRESSION_GZIP
     $COMPRESSION_NONE
     $COMPRESSION_SNAPPY
+    $COMPRESSION_LZ4
     $DEFAULT_MAX_BYTES
     $DEFAULT_MAX_NUMBER_OF_OFFSETS
     $RECEIVE_LATEST_OFFSETS
@@ -71,6 +72,7 @@ my $producer = Kafka::Producer->new(
 
 my $consumer = Kafka::Consumer->new(
     Connection  => $connect,
+    ApiVersion  => 2,
 );
 
 my $messages_to_send;
@@ -80,6 +82,7 @@ my @compession_codecs = (
     [ $COMPRESSION_NONE,    'NONE' ],
     [ $COMPRESSION_GZIP,    'GZIP' ],
     [ $COMPRESSION_SNAPPY,  'SNAPPY' ],
+    [ $COMPRESSION_LZ4,     'LZ4' ],
 );
 
 foreach my $codec ( @compession_codecs )

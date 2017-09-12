@@ -35,6 +35,7 @@ use Kafka qw(
     $COMPRESSION_GZIP
     $COMPRESSION_NONE
     $COMPRESSION_SNAPPY
+    $COMPRESSION_LZ4
     $DEFAULT_MAX_BYTES
     $DEFAULT_MAX_NUMBER_OF_OFFSETS
     $DEFAULT_MAX_WAIT_TIME
@@ -256,11 +257,13 @@ sub testing {
         Connection      => $connect,
     );
 
-    foreach my $compression_codec (
-            $COMPRESSION_GZIP,
-            $COMPRESSION_NONE,
-            $COMPRESSION_SNAPPY,
-        )
+    my @codecs = ($COMPRESSION_GZIP, $COMPRESSION_NONE, $COMPRESSION_SNAPPY );
+
+    # TODO: $COMPRESSION_LZ4 uses api v2 which is not supported in MockIO
+    # so testing that only with real server
+    push @codecs, $COMPRESSION_LZ4 if $kafka_base_dir;
+
+    foreach my $compression_codec (@codecs)
     {
         # Sending a series of messages
         $producer->send(
@@ -283,6 +286,7 @@ sub testing {
 
     $consumer = Kafka::Consumer->new(
         Connection  => $connect,
+        $kafka_base_dir ? ( ApiVersion => 2 ) : (), # TODO: $COMPRESSION_LZ4 uses api v2 which is not supported in MockIO
     );
     isa_ok( $consumer, 'Kafka::Consumer' );
 

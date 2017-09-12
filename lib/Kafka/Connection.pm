@@ -799,7 +799,11 @@ if the compression is desirable.
 Supported codecs:
 L<$COMPRESSION_NONE|Kafka/$COMPRESSION_NONE>,
 L<$COMPRESSION_GZIP|Kafka/$COMPRESSION_GZIP>,
-L<$COMPRESSION_SNAPPY|Kafka/$COMPRESSION_SNAPPY>.
+L<$COMPRESSION_SNAPPY|Kafka/$COMPRESSION_SNAPPY>,
+L<$COMPRESSION_LZ4|Kafka/$COMPRESSION_LZ4>.
+
+NOTE: $COMPRESSION_LZ4 requires Kafka 0.10 or higher, as initial implementation of LZ4 in Kafka did not follow the standard LZ4 framing specification.
+
 
 =back
 
