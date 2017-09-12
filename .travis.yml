@@ -6,11 +6,11 @@ perl:
 jdk:
     - oraclejdk8
 
-addons:
-    apt:
-        packages:
-            - oracle-java8-installer
-            - oracle-java8-set-default
+#addons:
+#    apt:
+#        packages:
+#            - oracle-java8-installer
+#            - oracle-java8-set-default
 
 env:
     global:
@@ -23,7 +23,6 @@ cache:
         - perl_modules
 
 before_install:
-    - source /etc/profile.d/jdk.sh
     - ./install_kafka.sh
     - cpanm local::lib
     - eval "$(perl -Mlocal::lib=${PWD}/perl_modules)"

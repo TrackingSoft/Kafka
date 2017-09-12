@@ -1054,31 +1054,37 @@ sub _start_server {
             # won't work (no signals are trapped there) - actual java process keeps
             # running.
 
-            # there are issues while trying to find pid of zookeeper process by command line,
-            # caused by limitations of older linux systems and long CLASSPATHS inside 
-            # command line of zookeeper process (command line in processtable is truncated on
-            # 4096 bytes and get_pid can't find the pid by process name)
-            # https://stackoverflow.com/questions/199130/how-do-i-increase-the-proc-pid-cmdline-4096-byte-limit
-            # so instead of system ways of getting that - use native 'java' way of listing processes -
-            # with jps executable
+            my $java_pid = $proc_daemon->get_pid( qr/.*java.+$server_name.+\Q$property_file\E.*/ );
 
-            my @java_processes = `jps -lm`; # check: man jps for description
-            my $script_pid = 0;
-            foreach my $process ( @java_processes ){
-                if ( $process =~ /$server_name.+\Q$property_file\E.*/ ) {
-                    ( $script_pid ) = ( $process =~ /^(\d+)\s/);
-                    last;
+            if( not $java_pid ) {
+                # sometimes there it's not possible to find pid of java process by looking 
+                # for particular argument in the commandline of the process table. 
+                # it happens when classpaths inside command line of java-process 
+                # are too long, and commandline in processtable gets truncated 
+                # after 4096 chars (and actual agruments gets truncated).
+                # As a fallback - we also try to use native 'java' way of listing processes -
+                # with jps executable
+                # See: https://stackoverflow.com/questions/199130/how-do-i-increase-the-proc-pid-cmdline-4096-byte-limit
+
+                my @java_processes = `jps -lm`; # check: man jps for description
+                foreach my $process ( @java_processes ){
+                    if ( $process =~ /$server_name.+\Q$property_file\E.*/ ) {
+                        ( $java_pid ) = ( $process =~ /^(\d+)\s/);
+                        last;
+                    }
                 }
             }
-
-            if ( !( my $real_pid = $proc_daemon->Status( $script_pid ) ) ) {
-                confess 'Could not find server pid' unless $attempts;
-            } else {
-                my $fh = IO::File->new( $pid_file, 'w' )
-                    or confess "Cannot write $pid_file: $!";
-                say $fh $real_pid;
-                $fh->close;
-                last;
+            if( defined $java_pid && $java_pid ne '' ) {
+                my $script_pid = _clear_tainted( $java_pid );
+                if ( !( my $real_pid = $proc_daemon->Status( $script_pid ) ) ) {
+                    confess 'Could not find server pid' unless $attempts;
+                } else {
+                    my $fh = IO::File->new( $pid_file, 'w' )
+                        or confess "Cannot write $pid_file: $!";
+                    say $fh $real_pid;
+                    $fh->close;
+                    last;
+                }
             }
         }
 
