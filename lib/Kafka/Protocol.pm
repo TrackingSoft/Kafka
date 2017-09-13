@@ -97,6 +97,7 @@ use Kafka::Internals qw(
     $APIKEY_OFFSETFETCH
     $PRODUCER_ANY_OFFSET
     format_message
+    debug_level
 );
 
 =head1 SYNOPSIS
@@ -1821,6 +1822,76 @@ sub _decode_fetch_response_template {
     return;
 }
 
+sub decompress_data {
+    my ( $data, $compression_codec ) = @_;
+    say STDERR format_message( '[%s] decompress_data request, compression_codec: %s, data: %s',
+        scalar( localtime ),
+        $compression_codec,
+        unpack( 'H*', $data ),
+    ) if Kafka::Protocol->debug_level // 0 >= 2;
+
+    my $decompressed;
+    if ( $compression_codec == $COMPRESSION_GZIP ) {
+        try {
+            $decompressed = gunzip( $data );
+        } catch {
+            _error( $ERROR_COMPRESSION, format_message( 'gunzip failed: %s', $_ ) );
+        };
+    } elsif ( $compression_codec == $COMPRESSION_SNAPPY ) {
+        my ( $header, $x_version, $x_compatversion, undef ) = unpack( q{a[8]L>L>L>}, $data );   # undef - $x_length
+
+        # Special thanks to Colin Blower
+        if ( $header eq "\x82SNAPPY\x00" ) {
+            # Found a xerial header.... nonstandard snappy compression header, remove the header
+            if ( $x_compatversion == 1 && $x_version == 1 ) {
+                $data = substr( $data, 20 );    # 20 = q{a[8]L>L>L>}
+            } else {
+                #warn("V $x_version and comp $x_compatversion");
+                _error( $ERROR_COMPRESSION, format_message( 'Snappy compression with incompatible xerial header version found (x_version = %s, x_compatversion = %s)', $x_version, $x_compatversion ) );
+            }
+        }
+
+        $decompressed = Compress::Snappy::decompress( $data )
+            // _error( $ERROR_COMPRESSION, 'Unable to decompress snappy compressed data' );
+    } elsif ( $compression_codec == $COMPRESSION_LZ4 ) {
+        # https://cwiki.apache.org/confluence/display/KAFKA/KIP-57+-+Interoperable+LZ4+Framing
+        # New 0.10 clients (proposed behavior) - produce and consume v1 messages w/ correct LZ4F checksum
+        if ( Compress::LZ4Frame::looks_like_lz4frame( $data ) ) {
+            $decompressed = Compress::LZ4Frame::decompress( $data ) // _error( $ERROR_COMPRESSION, 'Unable to decompress LZ4 compressed data' );
+        } else {
+            _error( $ERROR_COMPRESSION, 'Unable to decompress LZ4 compressed data. Frame is not valid' );
+        }
+
+    } else {
+        _error( $ERROR_COMPRESSION, "Unknown compression codec $compression_codec" );
+    }
+    _error( $ERROR_COMPRESSION, 'Decompression produced empty result' ) unless defined $decompressed;
+    return $decompressed;
+}
+
+sub compress_data {
+    my ( $data, $compression_codec ) = @_;
+    my $compressed;
+
+    # Compression
+    if ( $compression_codec == $COMPRESSION_GZIP ) {
+        $compressed = gzip( $data )
+            // _error( $ERROR_COMPRESSION, 'Unable to compress gzip data' );
+    } elsif ( $compression_codec == $COMPRESSION_SNAPPY ) {
+        $compressed = Compress::Snappy::compress( $data )
+            // _error( $ERROR_COMPRESSION, 'Unable to compress snappy data' );
+    } elsif ( $compression_codec == $COMPRESSION_LZ4 ) {
+        # https://cwiki.apache.org/confluence/display/KAFKA/KIP-57+-+Interoperable+LZ4+Framing
+        # New 0.10 clients (proposed behavior) - produce and consume v1 messages w/ correct LZ4F checksum
+        $compressed = Compress::LZ4Frame::compress_checksum( $data )
+            // _error( $ERROR_COMPRESSION, 'Unable to compress LZ4 data' );
+    } else {
+         _error( $ERROR_COMPRESSION, "Unknown compression codec $compression_codec" );
+    }
+    return $compressed;
+}
+
+
 # Decrypts MessageSet
 sub _decode_MessageSet_array {
     my ( $response, $MessageSetSize, $i_ref, $MessageSet_array_ref, $_override_offset) = @_;
@@ -1864,42 +1935,7 @@ sub _decode_MessageSet_array {
         $Message->{Value} = $Value_length == $NULL_BYTES_LENGTH ? q{} : $data->[ $$i_ref++ ];   # Value
 
         if ( my $compression_codec = $Message->{Attributes} & $COMPRESSION_CODEC_MASK ) {
-            my $decompressed;
-            if ( $compression_codec == $COMPRESSION_GZIP ) {
-                try {
-                    $decompressed = gunzip( $Message->{Value} );
-                } catch {
-                    _error( $ERROR_COMPRESSION, format_message( 'gunzip failed: %s', $_ ) );
-                };
-            } elsif ( $compression_codec == $COMPRESSION_SNAPPY ) {
-                my ( $header, $x_version, $x_compatversion, undef ) = unpack( q{a[8]L>L>L>}, $Message->{Value} );   # undef - $x_length
-
-                # Special thanks to Colin Blower
-                if ( $header eq "\x82SNAPPY\x00" ) {
-                    # Found a xerial header.... nonstandard snappy compression header, remove the header
-                    if ( $x_compatversion == 1 && $x_version == 1 ) {
-                        $Message->{Value} = substr( $Message->{Value}, 20 );    # 20 = q{a[8]L>L>L>}
-                    } else {
-                        #warn("V $x_version and comp $x_compatversion");
-                        _error( $ERROR_COMPRESSION, format_message( 'Snappy compression with incompatible xerial header version found (x_version = %s, x_compatversion = %s)', $x_version, $x_compatversion ) );
-                    }
-                }
-
-                $decompressed = Compress::Snappy::decompress( $Message->{Value} )
-                    // _error( $ERROR_COMPRESSION, 'Unable to decompress snappy compressed data' );
-            } elsif ( $compression_codec == $COMPRESSION_LZ4 ) {
-                # https://cwiki.apache.org/confluence/display/KAFKA/KIP-57+-+Interoperable+LZ4+Framing
-                # New 0.10 clients (proposed behavior) - produce and consume v1 messages w/ correct LZ4F checksum
-                if ( Compress::LZ4Frame::looks_like_lz4frame( $Message->{Value} ) ) {
-                    $decompressed = Compress::LZ4Frame::decompress( $Message->{Value} ) // _error( $ERROR_COMPRESSION, 'Unable to decompress LZ4 compressed data' );
-                } else {
-                    _error( $ERROR_COMPRESSION, 'Unable to decompress LZ4 compressed data. Frame is not valid' );
-                }
-
-            } else {
-                _error( $ERROR_COMPRESSION, "Unknown compression codec $compression_codec" );
-            }
-            _error( $ERROR_COMPRESSION, 'Decompression produced empty result' ) unless defined $decompressed;
+            my $decompressed = decompress_data($Message->{Value}, $compression_codec);
             my @data;
             my $Value_length = length $decompressed;
             my $resp = {
@@ -2009,27 +2045,11 @@ sub _encode_MessageSet_array {
 
         $Value = pack($subrequest->{template}, @{$subrequest->{data}});
 
-        # Compression
-        if ( $compression_codec == $COMPRESSION_GZIP ) {
-            $Value = gzip( $Value )
-                // _error( $ERROR_COMPRESSION, 'Unable to compress gzip data' );
-        } elsif ( $compression_codec == $COMPRESSION_SNAPPY ) {
-            $Value = Compress::Snappy::compress( $Value )
-                // _error( $ERROR_COMPRESSION, 'Unable to compress snappy data' );
-        } elsif ( $compression_codec == $COMPRESSION_LZ4 ) {
-            # https://cwiki.apache.org/confluence/display/KAFKA/KIP-57+-+Interoperable+LZ4+Framing
-            # New 0.10 clients (proposed behavior) - produce and consume v1 messages w/ correct LZ4F checksum
-            $Value = Compress::LZ4Frame::compress_checksum( $Value )
-                // _error( $ERROR_COMPRESSION, 'Unable to compress LZ4 data' );
-        } else {
-             _error( $ERROR_COMPRESSION, "Unknown compression codec $compression_codec" );
-        }
-
         $MessageSet_array_ref = [
             {
                 Offset  => $PRODUCER_ANY_OFFSET,
                 Key     => $Key,
-                Value   => $Value
+                Value   => compress_data($Value, $compression_codec),
             }
         ];
 

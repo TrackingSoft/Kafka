@@ -250,7 +250,6 @@ sub debug_level {
             *{ "Kafka::${module_name}::DEBUG" } = \$level; ## no critic
         }
     }
-
     $_debug_levels{ $class } = \${ "${class}::DEBUG" }; ## no critic
 
     return ${ $_debug_levels{ $class } };
