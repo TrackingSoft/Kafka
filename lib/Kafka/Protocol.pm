@@ -1822,13 +1822,63 @@ sub _decode_fetch_response_template {
     return;
 }
 
+# kafka uses a snappy-java compressor, with it's own headers and frame formats
+my $XERIAL_SNAPPY_MAGIC_HEADER = "\x82SNAPPY\x00";
+my $XERIAL_SNAPPY_BLOCK_SIZE   = 0x8000; # 32Kb
+my $XERIAL_SNAPPY_FILE_VERSION = 1;
+
+# https://github.com/xerial/snappy-java
+# https://github.com/kubo/snzip/blob/master/snappy-java-format.c
+sub snappy_xerial_decompress {
+    my ( $data ) = @_;
+    my $uncompressed;
+    my $raw_format_suspected = 1;
+    if ( length($data) > 16 ) {
+        my ( $header, $x_version, $x_compatversion) = unpack( q{a[8]L>L>}, $data );
+        if ( $header eq $XERIAL_SNAPPY_MAGIC_HEADER ) {
+            $raw_format_suspected = 0;
+            _error( $ERROR_COMPRESSION, 'snappy: bad compatversion in snappy xerial header' ) unless $x_compatversion == $XERIAL_SNAPPY_FILE_VERSION;
+            _error( $ERROR_COMPRESSION, 'snappy: bad version in snappy xerial header' ) unless $x_version == $XERIAL_SNAPPY_FILE_VERSION;
+            $data = substr( $data, 16 );
+            while ( length($data) > 0 ) {
+                $uncompressed //= '';
+                _error( $ERROR_COMPRESSION, 'snappy: bad frame length header' ) if length($data) < 4;
+                my $compressed_frame_length = unpack( q{L>}, $data );
+                $data = substr( $data, 4 );
+                _error( $ERROR_COMPRESSION, 'snappy: partial frame ' ) if length($data) < $compressed_frame_length;
+                my $compressed_frame = substr( $data, 0, $compressed_frame_length,  '');
+                my $uncompressed_frame = Compress::Snappy::decompress( $compressed_frame );
+                _error( $ERROR_COMPRESSION, 'snappy: can\'t uncompress frame ' ) if not defined $uncompressed_frame;
+                $uncompressed .=  $uncompressed_frame;
+            }
+        }
+    }
+    if ( $raw_format_suspected ) {
+        $uncompressed = Compress::Snappy::decompress( $data );
+    }
+    return $uncompressed;
+}
+
+sub snappy_xerial_compress {
+    my ( $data ) = @_;
+    my $compressed_data;
+    while ( length($data) ) {
+         my $block = substr $data, 0, $XERIAL_SNAPPY_BLOCK_SIZE, '';
+         my $compressed_block = Compress::Snappy::compress( $block );
+         _error( $ERROR_COMPRESSION, 'snappy: can\'t compress frame!' ) if not defined $compressed_block;
+         $compressed_data //= pack( q{a[8]L>L>}, $XERIAL_SNAPPY_MAGIC_HEADER, $XERIAL_SNAPPY_FILE_VERSION, $XERIAL_SNAPPY_FILE_VERSION );
+         $compressed_data .= pack( q{L>}, length($compressed_block) ) . $compressed_block;
+    }
+    return $compressed_data;
+}
+
 sub decompress_data {
     my ( $data, $compression_codec ) = @_;
     say STDERR format_message( '[%s] decompress_data request, compression_codec: %s, data: %s',
         scalar( localtime ),
         $compression_codec,
         unpack( 'H*', $data ),
-    ) if Kafka::Protocol->debug_level // 0 >= 2;
+    ) if Kafka::Protocol->debug_level // 0 >= 3;
 
     my $decompressed;
     if ( $compression_codec == $COMPRESSION_GZIP ) {
@@ -1838,20 +1888,7 @@ sub decompress_data {
             _error( $ERROR_COMPRESSION, format_message( 'gunzip failed: %s', $_ ) );
         };
     } elsif ( $compression_codec == $COMPRESSION_SNAPPY ) {
-        my ( $header, $x_version, $x_compatversion, undef ) = unpack( q{a[8]L>L>L>}, $data );   # undef - $x_length
-
-        # Special thanks to Colin Blower
-        if ( $header eq "\x82SNAPPY\x00" ) {
-            # Found a xerial header.... nonstandard snappy compression header, remove the header
-            if ( $x_compatversion == 1 && $x_version == 1 ) {
-                $data = substr( $data, 20 );    # 20 = q{a[8]L>L>L>}
-            } else {
-                #warn("V $x_version and comp $x_compatversion");
-                _error( $ERROR_COMPRESSION, format_message( 'Snappy compression with incompatible xerial header version found (x_version = %s, x_compatversion = %s)', $x_version, $x_compatversion ) );
-            }
-        }
-
-        $decompressed = Compress::Snappy::decompress( $data )
+        $decompressed = snappy_xerial_decompress( $data )
             // _error( $ERROR_COMPRESSION, 'Unable to decompress snappy compressed data' );
     } elsif ( $compression_codec == $COMPRESSION_LZ4 ) {
         # https://cwiki.apache.org/confluence/display/KAFKA/KIP-57+-+Interoperable+LZ4+Framing
@@ -1878,7 +1915,7 @@ sub compress_data {
         $compressed = gzip( $data )
             // _error( $ERROR_COMPRESSION, 'Unable to compress gzip data' );
     } elsif ( $compression_codec == $COMPRESSION_SNAPPY ) {
-        $compressed = Compress::Snappy::compress( $data )
+        $compressed = snappy_xerial_compress( $data )
             // _error( $ERROR_COMPRESSION, 'Unable to compress snappy data' );
     } elsif ( $compression_codec == $COMPRESSION_LZ4 ) {
         # https://cwiki.apache.org/confluence/display/KAFKA/KIP-57+-+Interoperable+LZ4+Framing
