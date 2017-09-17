@@ -246,14 +246,6 @@ Optional, int32 signed integer, default = C<$DEFAULT_MAX_NUMBER_OF_OFFSETS> (100
 C<$DEFAULT_MAX_NUMBER_OF_OFFSETS>
 is the default that can be imported from the L<Kafka|Kafka> module.
 
-=item C<ApiVersion =E<gt> 0>
-
-Optional. Default ApiVersion for consumer requests.
-Set it to 2, if you are planning to use $COMPRESSION_LZ4,
-otherwise client will not be able to unpack servers response.
-Initial implementation of LZ4 in Kafka did not follow the
-standard LZ4 framing specification.
-
 =back
 
 =cut
@@ -267,7 +259,7 @@ sub new {
         MinBytes            => $MIN_BYTES_RESPOND_IMMEDIATELY,
         MaxBytes            => $DEFAULT_MAX_BYTES,
         MaxNumberOfOffsets  => $DEFAULT_MAX_NUMBER_OF_OFFSETS,
-        ApiVersion          => 0,
+        ApiVersion          => undef, # undef - allows consumer to choose newest supported
     }, $class;
 
     exists $p{$_} and $self->{$_} = $p{$_} foreach keys %$self;
