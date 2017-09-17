@@ -6,7 +6,7 @@ Kafka::Cluster - object interface to manage a test kafka cluster.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Cluster> version 1.06 .
+This documentation refers to C<Kafka::Cluster> version 1.07 .
 
 =cut
 
@@ -14,7 +14,7 @@ use 5.010;
 use strict;
 use warnings;
 
-our $VERSION = '1.06';
+our $VERSION = '1.07';
 
 use Exporter qw(
     import
@@ -1058,9 +1058,9 @@ sub _start_server {
 
             if( not $java_pid ) {
                 # sometimes it's not possible to find pid of java process by looking
-                # for particular argument in the commandline of the process table. 
-                # it happens when classpaths inside command line of java-process 
-                # are too long, and commandline in processtable gets truncated 
+                # for particular argument in the commandline of the process table.
+                # it happens when classpaths inside command line of java-process
+                # are too long, and commandline in processtable gets truncated
                 # after 4096 chars (and actual agruments gets truncated).
                 # As a fallback - we also try to use native 'java' way of listing processes -
                 # with jps executable

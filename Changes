@@ -1,5 +1,16 @@
 Revision history for Kafka package
 
+1.07 Sun September 17 2017
+
+    Added support for v1 Messages at Producer side, which allows
+    to produce messages with CreateTime timestamp. 
+
+    Added support for LZ4 compression.
+
+    BUGFIXES:
+    - Fix Snappy compression to be compatible with xerial's
+      snappy-java multiframes.
+
 1.06 Fri July 28 2017
 
     Important fix for offset commit/fetch bug

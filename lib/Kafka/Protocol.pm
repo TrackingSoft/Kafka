@@ -6,7 +6,7 @@ Kafka::Protocol - Functions to process messages in the Apache Kafka protocol.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Protocol> version 1.06 .
+This documentation refers to C<Kafka::Protocol> version 1.07 .
 
 =cut
 
@@ -14,7 +14,7 @@ use 5.010;
 use strict;
 use warnings;
 
-our $VERSION = '1.06';
+our $VERSION = '1.07';
 
 use Exporter qw(
     import
@@ -1829,7 +1829,7 @@ my $XERIAL_SNAPPY_FILE_VERSION = 1;
 
 # https://github.com/xerial/snappy-java
 # https://github.com/kubo/snzip/blob/master/snappy-java-format.c
-sub snappy_xerial_decompress {
+sub _snappy_xerial_decompress {
     my ( $data ) = @_;
     my $uncompressed;
     my $raw_format_suspected = 1;
@@ -1859,7 +1859,7 @@ sub snappy_xerial_decompress {
     return $uncompressed;
 }
 
-sub snappy_xerial_compress {
+sub _snappy_xerial_compress {
     my ( $data ) = @_;
     my $compressed_data;
     while ( length($data) ) {
@@ -1872,7 +1872,7 @@ sub snappy_xerial_compress {
     return $compressed_data;
 }
 
-sub decompress_data {
+sub _decompress_data {
     my ( $data, $compression_codec ) = @_;
     say STDERR format_message( '[%s] decompress_data request, compression_codec: %s, data: %s',
         scalar( localtime ),
@@ -1888,7 +1888,7 @@ sub decompress_data {
             _error( $ERROR_COMPRESSION, format_message( 'gunzip failed: %s', $_ ) );
         };
     } elsif ( $compression_codec == $COMPRESSION_SNAPPY ) {
-        $decompressed = snappy_xerial_decompress( $data )
+        $decompressed = _snappy_xerial_decompress( $data )
             // _error( $ERROR_COMPRESSION, 'Unable to decompress snappy compressed data' );
     } elsif ( $compression_codec == $COMPRESSION_LZ4 ) {
         # https://cwiki.apache.org/confluence/display/KAFKA/KIP-57+-+Interoperable+LZ4+Framing
@@ -1906,7 +1906,7 @@ sub decompress_data {
     return $decompressed;
 }
 
-sub compress_data {
+sub _compress_data {
     my ( $data, $compression_codec ) = @_;
     my $compressed;
 
@@ -1915,7 +1915,7 @@ sub compress_data {
         $compressed = gzip( $data )
             // _error( $ERROR_COMPRESSION, 'Unable to compress gzip data' );
     } elsif ( $compression_codec == $COMPRESSION_SNAPPY ) {
-        $compressed = snappy_xerial_compress( $data )
+        $compressed = _snappy_xerial_compress( $data )
             // _error( $ERROR_COMPRESSION, 'Unable to compress snappy data' );
     } elsif ( $compression_codec == $COMPRESSION_LZ4 ) {
         # https://cwiki.apache.org/confluence/display/KAFKA/KIP-57+-+Interoperable+LZ4+Framing
@@ -1972,7 +1972,7 @@ sub _decode_MessageSet_array {
         $Message->{Value} = $Value_length == $NULL_BYTES_LENGTH ? q{} : $data->[ $$i_ref++ ];   # Value
 
         if ( my $compression_codec = $Message->{Attributes} & $COMPRESSION_CODEC_MASK ) {
-            my $decompressed = decompress_data($Message->{Value}, $compression_codec);
+            my $decompressed = _decompress_data($Message->{Value}, $compression_codec);
             my @data;
             my $Value_length = length $decompressed;
             my $resp = {
@@ -2086,7 +2086,7 @@ sub _encode_MessageSet_array {
             {
                 Offset  => $PRODUCER_ANY_OFFSET,
                 Key     => $Key,
-                Value   => compress_data($Value, $compression_codec),
+                Value   => _compress_data($Value, $compression_codec),
             }
         ];
 
