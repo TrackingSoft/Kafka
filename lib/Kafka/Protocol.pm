@@ -24,18 +24,20 @@ our @EXPORT_OK = qw(
     decode_metadata_response
     decode_offset_response
     decode_produce_response
+    decode_api_versions_response
+    decode_find_coordinator_response
     decode_offsetcommit_response
     decode_offsetfetch_response
+    decode_saslhandshake_response
     encode_fetch_request
     encode_metadata_request
     encode_offset_request
     encode_produce_request
     encode_api_versions_request
-    decode_api_versions_response
     encode_find_coordinator_request
-    decode_find_coordinator_response
     encode_offsetcommit_request
     encode_offsetfetch_request
+    encode_saslhandshake_request
     _decode_MessageSet_template
     _decode_MessageSet_array
     _encode_Message
@@ -95,6 +97,7 @@ use Kafka::Internals qw(
     $APIKEY_FINDCOORDINATOR
     $APIKEY_OFFSETCOMMIT
     $APIKEY_OFFSETFETCH
+    $APIKEY_SASLHANDSHAKE
     $PRODUCER_ANY_OFFSET
     format_message
     debug_level
@@ -1733,6 +1736,100 @@ sub decode_offsetfetch_response {
         push( @$topics_array, $topic);
     }
     return $OffsetFetch_Response;
+}
+
+# SaslHandshake Request -------------------------------------------------------------
+
+=head3 C<encode_saslhandshake_request( $SaslHandshake_Request )>
+
+Encodes the argument and returns a reference to the encoded binary string
+representing a Request buffer.
+
+This function takes the following arguments:
+
+=over 3
+
+=item C<$SaslHandshake_Request>
+
+C<$SaslHandshake_Request> is a reference to the hash representing
+the structure of the SaslHandshake Request.
+
+=back
+
+=cut
+$IMPLEMENTED_APIVERSIONS->{$APIKEY_SASLHANDSHAKE} = 0;
+sub encode_saslhandshake_request {
+    my ( $SaslHandshake_Request ) = @_;
+
+    my @data;
+    my $request = {
+                                                # template    => '...',
+                                                # len         => ...,
+        data        => \@data,
+    };
+
+    _encode_request_header( $request, $APIKEY_SASLHANDSHAKE, $SaslHandshake_Request );
+                                                                            # Size
+                                                                            # ApiKey
+                                                                            # ApiVersion
+                                                                            # CorrelationId
+                                                                            # ClientId
+
+
+    $request->{template}    .= q{s>};                                       # string length
+    $request->{len}         += 2;
+    _encode_string( $request, $SaslHandshake_Request->{Mechanism} );                # SASL Mechanism
+
+    return pack( $request->{template}, $request->{len}, @data );
+}
+
+# SASLHANDSHAKE Response --------------------------------------------------------------
+
+my $_decode_saslhandshake_response_template = q{x[l]l>s>l>X[l]l>/(s>/a)};
+                                           # x[l]    # Size (skip)
+                                           # l>      # CorrelationId
+                                           # s>      # ErrorCode
+                                           # l>      # ApiVersions array size
+                                           # X[l]
+                                           # l>/(    # Enabled Mechanisms
+                                           #     s>/a   # Mechanism
+                                           # )
+
+=head3 C<decode_saslhandshake_response( $bin_stream_ref )>
+
+Decodes the argument and returns a reference to the hash representing
+the structure of the SaslHandshake Response.
+
+This function takes the following arguments:
+
+=over 3
+
+=item C<$bin_stream_ref>
+
+C<$bin_stream_ref> is a reference to the encoded Response buffer. The buffer
+must be a non-empty binary string.
+
+=back
+
+=cut
+sub decode_saslhandshake_response {
+    my ( $bin_stream_ref ) = @_;
+
+    my @data = unpack( $_decode_saslhandshake_response_template, $$bin_stream_ref );
+
+    my $i = 0;
+    my $SaslHandshake_Response = {};
+
+    $SaslHandshake_Response->{CorrelationId}                      =  $data[ $i++ ];   # CorrelationId
+    $SaslHandshake_Response->{ErrorCode}                          =  $data[ $i++ ];   # ErrorCode
+
+    my $Mechanisms_array = $SaslHandshake_Response->{Mechanisms}  =  [];
+    my $Mechanisms_array_size                                     =  $data[ $i++ ];   # ApiVersions array size
+    while ( $Mechanisms_array_size-- ) {
+        push( @$Mechanisms_array, $data[ $i++ ] ); # Mechanism
+    }
+
+    return $SaslHandshake_Response;
 }
 
 #-- private functions ----------------------------------------------------------
