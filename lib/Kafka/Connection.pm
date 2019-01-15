@@ -117,6 +117,7 @@ use Kafka::Internals qw(
     $APIKEY_APIVERSIONS
     $APIKEY_OFFSETCOMMIT
     $APIKEY_OFFSETFETCH
+    $APIKEY_SASLHANDSHAKE
     $MAX_CORRELATIONID
     $MAX_INT32
     debug_level
@@ -124,6 +125,7 @@ use Kafka::Internals qw(
     format_message
 );
 use Kafka::IO;
+use Kafka::IO::Async;
 use Kafka::Protocol qw(
     $BAD_OFFSET
     $IMPLEMENTED_APIVERSIONS
@@ -135,6 +137,7 @@ use Kafka::Protocol qw(
     decode_find_coordinator_response
     decode_offsetcommit_response
     decode_offsetfetch_response
+    decode_saslhandshake_response
     encode_fetch_request
     encode_metadata_request
     encode_offset_request
@@ -143,6 +146,7 @@ use Kafka::Protocol qw(
     encode_find_coordinator_request
     encode_offsetcommit_request
     encode_offsetfetch_request
+    encode_saslhandshake_request
 );
 
 =head1 SYNOPSIS
@@ -232,6 +236,10 @@ my %protocol = (
     "$APIKEY_OFFSETFETCH"  => {
         decode                  => \&decode_offsetfetch_response,
         encode                  => \&encode_offsetfetch_request,
+    },
+    "$APIKEY_SASLHANDSHAKE"  => {
+        decode                  => \&decode_saslhandshake_response,
+        encode                  => \&encode_saslhandshake_request,
     },
 );
 
@@ -434,6 +442,7 @@ sub new {
         port                    => $KAFKA_SERVER_PORT,
         broker_list             => [],
         timeout                 => $REQUEST_TIMEOUT,
+        async                   => 0,
         ip_version              => undef,
         SEND_MAX_ATTEMPTS       => $SEND_MAX_ATTEMPTS,
         RETRY_BACKOFF           => $RETRY_BACKOFF,
@@ -654,6 +663,54 @@ sub _get_supported_api_versions {
 
     my $api_versions = $decoded_response->{ApiVersions};
     return $api_versions;
+}
+
+=head3 C<sasl_auth_plain( Username =E<gt> $username, Password =E<gt> $password )>
+
+C<$username> and C<$password> are the username and password for
+SASL PLAINTEXT authentication respectively.
+
+=cut
+sub sasl_auth_plain {
+    my ($self, %p) = @_;
+    my ($username, $password) = ($p{Username}, $p{Password});
+
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'Username' )
+        unless defined( $username ) && defined( _STRING( $username ) )  && !utf8::is_utf8( $password );
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'Password' )
+        unless defined( $password ) && defined( _STRING( $password ) )  && !utf8::is_utf8( $password );
+
+    my $decoded_request = {
+        CorrelationId   => Kafka::Internals->_get_CorrelationId(),
+        ClientId        => q{},
+        ApiVersion => 0,
+        Mechanism  => 'PLAIN',
+    };
+
+    my $encoded_request = $protocol{ $APIKEY_SASLHANDSHAKE }->{encode}->( $decoded_request );
+
+    my @brokers = $self->_get_interviewed_servers;
+    my $broker = $brokers[0];
+
+    return unless $self->_connectIO( $broker ) &&
+        $self->_sendIO( $broker, $encoded_request ) &&
+        ( my $encoded_response_ref = $self->_receiveIO( $broker ) );
+
+    my $decoded_response = $protocol{ $APIKEY_SASLHANDSHAKE }->{decode}->( $encoded_response_ref );
+
+    my $msg = $username . "\0" . $username . "\0" . $password;
+
+    my $encoded_sasl_req = pack( 'l>a'.length($msg), length($msg), $msg );
+
+    $self->_sendIO( $broker, $encoded_sasl_req );
+
+    my ($server_data, $io) = $self->_server_data_IO($broker);
+    my $encoded_sasl_resp_len_ref = $io->receive( 4 ); # receive resp msg size (actually is 0)
+
+    my $sasl_resp_len = unpack 'l>', $$encoded_sasl_resp_len_ref;
+    my $encoded_sasl_resp_ref = $io->receive( $sasl_resp_len ) if $sasl_resp_len;
+
+    return 1;
 }
 
 =head3 C<get_metadata( $topic )>
@@ -1476,8 +1533,9 @@ sub _connectIO {
     ;
     unless( $server_data->{IO} ) {
         my $error;
+        my $io_class = $self->{async} ? 'Kafka::IO::Async' : 'Kafka::IO';
         try {
-            $server_data->{IO} = Kafka::IO->new(
+            $server_data->{IO} = $io_class->new(
                 host        => $server_data->{host},
                 port        => $server_data->{port},
                 timeout     => $self->{timeout},
