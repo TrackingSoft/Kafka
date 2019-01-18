@@ -178,7 +178,7 @@ sub testing {
     new_ERROR_MISMATCH_ARGUMENT( 'Connection', @not_right_object );
     new_ERROR_MISMATCH_ARGUMENT( 'ClientId', @not_empty_string );
     new_ERROR_MISMATCH_ARGUMENT( 'RequiredAcks', @not_isint );
-    new_ERROR_MISMATCH_ARGUMENT( 'Timeout', @not_number );
+    new_ERROR_MISMATCH_ARGUMENT( 'Timeout', grep { defined $_ } @not_number ); # undef is allowed and replaced with connection timeout or $REQUEST_TIMEOUT
 
     #-- send
     send_ERROR_MISMATCH_ARGUMENT( $_, $partition, 'Some value', 'Some key' )
