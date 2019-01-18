@@ -250,7 +250,7 @@ is the default that can be imported from the L<Kafka|Kafka> module.
 
 =cut
 sub new {
-    my ( $class, %p ) = @_;
+    my ( $class, %params ) = @_;
 
     my $self = bless {
         Connection          => undef,
@@ -262,9 +262,16 @@ sub new {
         ApiVersion          => undef, # undef - allows consumer to choose newest supported
     }, $class;
 
-    exists $p{$_} and $self->{$_} = $p{$_} foreach keys %$self;
+    foreach my $p ( keys %params ) {
+        if( exists $self->{ $p } ) {
+            $self->{ $p } = $params{ $p };
+        }
+        else {
+            $self->_error( $ERROR_MISMATCH_ARGUMENT, $p );
+        }
+    }
 
-    $self->{ClientId}       //= 'consumer';
+    $self->{ClientId} //= 'consumer';
 
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'Connection' )
         unless _INSTANCE( $self->{Connection}, 'Kafka::Connection' );

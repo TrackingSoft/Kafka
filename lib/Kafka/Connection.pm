@@ -426,14 +426,19 @@ if you're connecting to 0.9.
 =back
 
 =cut
+
+my %Param_mapping = (
+    'timeout' => 'Timeout',
+);
+
 sub new {
-    my ( $class, %p ) = @_;
+    my ( $class, %params ) = @_;
 
     my $self = bless {
         host                    => q{},
         port                    => $KAFKA_SERVER_PORT,
         broker_list             => [],
-        timeout                 => $REQUEST_TIMEOUT,
+        Timeout                 => $REQUEST_TIMEOUT,
         ip_version              => undef,
         SEND_MAX_ATTEMPTS       => $SEND_MAX_ATTEMPTS,
         RETRY_BACKOFF           => $RETRY_BACKOFF,
@@ -442,14 +447,22 @@ sub new {
         dont_load_supported_api_versions => 0,
     }, $class;
 
-    exists $p{$_} and $self->{$_} = $p{$_} foreach keys %$self;
+    foreach my $p ( keys %params ) {
+        my $attr = $Param_mapping{ $p } // $p;
+        if( exists $self->{ $attr } ) {
+            $self->{ $attr } = $params{ $p };
+        }
+        else {
+            $self->_error( $ERROR_MISMATCH_ARGUMENT, $p );
+        }
+    }
 
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'host' )
         unless defined( $self->{host} ) && ( $self->{host} eq q{} || defined( _STRING( $self->{host} ) ) ) && !utf8::is_utf8( $self->{host} );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'port' )
         unless _POSINT( $self->{port} );
-    $self->_error( $ERROR_MISMATCH_ARGUMENT, format_message( 'timeout (%s)', $self->{timeout} ) )
-        unless !defined( $self->{timeout} ) || ( defined _NUMBER( $self->{timeout} ) && int( 1000 * $self->{timeout} ) >= 1 && int( $self->{timeout} * 1000 ) <= $MAX_INT32 );
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, format_message( 'Timeout (%s)', $self->{Timeout} ) )
+        unless !defined( $self->{Timeout} ) || ( defined _NUMBER( $self->{Timeout} ) && int( 1000 * $self->{Timeout} ) >= 1 && int( $self->{Timeout} * 1000 ) <= $MAX_INT32 );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'broker_list' )
         unless _ARRAY0( $self->{broker_list} );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'SEND_MAX_ATTEMPTS' )
@@ -1480,7 +1493,7 @@ sub _connectIO {
             $server_data->{IO} = Kafka::IO->new(
                 host        => $server_data->{host},
                 port        => $server_data->{port},
-                timeout     => $self->{timeout},
+                timeout     => $self->{Timeout},
                 ip_version  => $self->{ip_version},
             );
             $server_data->{error} = undef;

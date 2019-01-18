@@ -205,23 +205,33 @@ L<Kafka|Kafka> module.
 
 =cut
 sub new {
-    my ( $class, %p ) = @_;
+    my ( $class, %params ) = @_;
 
     my $self = bless {
         Connection      => undef,
         ClientId        => undef,
         RequiredAcks    => $WAIT_WRITTEN_TO_LOCAL_LOG,
-        Timeout         => $REQUEST_TIMEOUT,
+        Timeout         => undef,
     }, $class;
 
-    exists $p{$_} and $self->{$_} = $p{$_} foreach keys %$self;
+    foreach my $p ( keys %params ) {
+        if( exists $self->{ $p } ) {
+            $self->{ $p } = $params{ $p };
+        }
+        else {
+            $self->_error( $ERROR_MISMATCH_ARGUMENT, $p );
+        }
+    }
 
-    $self->{ClientId}       //= 'producer';
+    $self->{ClientId} //= 'producer';
 
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'Connection' )
         unless _INSTANCE( $self->{Connection}, 'Kafka::Connection' );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'ClientId' )
         unless ( $self->{ClientId} eq '' || defined( _STRING( $self->{ClientId} ) ) ) && !utf8::is_utf8( $self->{ClientId} );
+
+    # Use connection timeout if not provided explicitly
+    $self->{Timeout} //= $self->{Connection}->{Timeout} //= $REQUEST_TIMEOUT;
     $self->_error( $ERROR_MISMATCH_ARGUMENT, format_message( 'Timeout (%s)', $self->{Timeout} ) )
         unless defined _NUMBER( $self->{Timeout} ) && int( $self->{Timeout} * 1000 ) >= 1 && int( $self->{Timeout} * 1000 ) <= $MAX_INT32;
 
