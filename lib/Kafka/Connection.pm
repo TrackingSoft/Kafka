@@ -90,6 +90,7 @@ use Kafka qw(
     $ERROR_LEADER_NOT_FOUND
     $ERROR_GROUP_COORDINATOR_NOT_FOUND
     $ERROR_MISMATCH_ARGUMENT
+    $ERROR_NOT_BINARY_STRING
     $ERROR_MISMATCH_CORRELATIONID
     $ERROR_NO_KNOWN_BROKERS
     $ERROR_RESPONSEMESSAGE_NOT_RECEIVED
@@ -458,7 +459,9 @@ sub new {
     }
 
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'host' )
-        unless defined( $self->{host} ) && ( $self->{host} eq q{} || defined( _STRING( $self->{host} ) ) ) && !utf8::is_utf8( $self->{host} );
+        unless defined( $self->{host} ) && ( $self->{host} eq q{} || defined( _STRING( $self->{host} ) ) );
+    $self->_error( $ERROR_NOT_BINARY_STRING, 'host' )
+        if utf8::is_utf8( $self->{host} );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'port' )
         unless _POSINT( $self->{port} );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, format_message( 'Timeout (%s)', $self->{Timeout} ) )
@@ -701,7 +704,9 @@ sub get_metadata {
     my ( $self, $topic ) = @_;
 
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'topic' )
-        unless !defined( $topic ) || ( ( $topic eq q{} || defined( _STRING( $topic ) ) ) && !utf8::is_utf8( $topic ) );
+        unless !defined( $topic ) || ( $topic eq '' || defined( _STRING( $topic ) ) );
+    $self->_error( $ERROR_NOT_BINARY_STRING, 'topic' )
+        if utf8::is_utf8( $topic );
 
     $self->_update_metadata( $topic )
         # FATAL error
@@ -1061,7 +1066,9 @@ sub exists_topic_partition {
     my ( $self, $topic, $partition ) = @_;
 
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'topic' )
-        unless defined( $topic ) && ( $topic eq q{} || defined( _STRING( $topic ) ) ) && !utf8::is_utf8( $topic );
+        unless defined( $topic ) && ( $topic eq q{} || defined( _STRING( $topic ) ) );
+    $self->_error( $ERROR_NOT_BINARY_STRING, 'topic' )
+        if utf8::is_utf8( $topic );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'partition' )
         unless defined( $partition ) && isint( $partition ) && $partition >= 0;
 

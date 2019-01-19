@@ -905,7 +905,7 @@ const our $ERROR_PARTITION_DOES_NOT_MATCH       => -1013;
 
 =item C<$ERROR_NOT_BINARY_STRING>
 
--1014 - Not binary string
+-1014 - Unicode data is not allowed
 
 =cut
 const our $ERROR_NOT_BINARY_STRING              => -1014;
@@ -1337,7 +1337,7 @@ our %ERROR = (
     $ERROR_REQUEST_OR_RESPONSE                      => q{Bad request or response element},
     $ERROR_TOPIC_DOES_NOT_MATCH                     => q{Topic does not match the requested},
     $ERROR_PARTITION_DOES_NOT_MATCH                 => q{Partition does not match the requested},
-    $ERROR_NOT_BINARY_STRING                        => q{Not binary string},
+    $ERROR_NOT_BINARY_STRING                        => q{Unicode data is not allowed},
     $ERROR_COMPRESSION                              => q{Compression error},
     $ERROR_RESPONSEMESSAGE_NOT_RECEIVED             => q{'ResponseMessage' not received},
     $ERROR_INCOMPATIBLE_HOST_IP_VERSION             => q{'Incompatible host name and IP version'},

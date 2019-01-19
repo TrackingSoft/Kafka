@@ -37,6 +37,7 @@ use Kafka qw(
     $ERROR_CANNOT_GET_METADATA
     $ERROR_METADATA_ATTRIBUTES
     $ERROR_MISMATCH_ARGUMENT
+    $ERROR_NOT_BINARY_STRING
     $ERROR_PARTITION_DOES_NOT_MATCH
     $ERROR_TOPIC_DOES_NOT_MATCH
     $MESSAGE_SIZE_OVERHEAD
@@ -276,7 +277,9 @@ sub new {
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'Connection' )
         unless _INSTANCE( $self->{Connection}, 'Kafka::Connection' );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'ClientId' )
-        unless ( $self->{ClientId} eq q{} || defined( _STRING( $self->{ClientId} ) ) ) && !utf8::is_utf8( $self->{ClientId} );
+        unless ( $self->{ClientId} eq q{} || defined( _STRING( $self->{ClientId} ) ) );
+    $self->_error( $ERROR_NOT_BINARY_STRING, 'ClientId' ) 
+        if utf8::is_utf8( $self->{ClientId} );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, format_message( 'MaxWaitTime (%s)', $self->{MaxWaitTime} ) )
         unless defined( $self->{MaxWaitTime} ) && defined _NUMBER( $self->{MaxWaitTime} ) && int( $self->{MaxWaitTime} * 1000 ) >= 1 && int( $self->{MaxWaitTime} * 1000 ) <= $MAX_INT32;
     $self->_error( $ERROR_MISMATCH_ARGUMENT, format_message( 'MinBytes (%s)', $self->{MinBytes} ) )
@@ -340,7 +343,9 @@ sub fetch {
     # Special argument: $_return_all - return redundant messages sent out of a compressed package posts
 
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'topic' )
-        unless defined( $topic ) && ( $topic eq q{} || defined( _STRING( $topic ) ) ) && !utf8::is_utf8( $topic );
+        unless defined( $topic ) && ( $topic eq q{} || defined( _STRING( $topic ) ) );
+    $self->_error( $ERROR_NOT_BINARY_STRING, 'topic' )
+        if utf8::is_utf8( $topic );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'partition' )
         unless defined( $partition ) && isint( $partition ) && $partition >= 0;
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'offset' )
@@ -637,7 +642,9 @@ sub _query_offsets {
     my ( $self, $topic, $partition, $time, $max_number, $api_version ) = @_;
 
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'topic' )
-        unless defined( $topic) && ( $topic eq q{} || defined( _STRING( $topic ) ) ) && !utf8::is_utf8( $topic );
+        unless defined( $topic) && ( $topic eq q{} || defined( _STRING( $topic ) ) );
+    $self->_error( $ERROR_NOT_BINARY_STRING, 'topic' )
+        if utf8::is_utf8( $topic );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'partition' )
         unless defined( $partition ) && isint( $partition ) && $partition >= 0;
 
@@ -728,13 +735,17 @@ sub commit_offsets {
 
 
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'topic' )
-        unless defined( $topic ) && ( $topic eq q{} || defined( _STRING( $topic ) ) ) && !utf8::is_utf8( $topic );
+        unless defined( $topic ) && ( $topic eq q{} || defined( _STRING( $topic ) ) );
+    $self->_error( $ERROR_NOT_BINARY_STRING, 'topic' )
+        if utf8::is_utf8( $topic );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'partition' )
         unless defined( $partition ) && isint( $partition ) && $partition >= 0;
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'offset' )
         unless defined( $offset ) && ( ( _isbig( $offset ) && $offset >= 0 ) || defined( _NONNEGINT( $offset ) ) );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'group' )
-        unless defined( $group ) && ( $group eq q{} || defined( _STRING( $group ) ) ) && !utf8::is_utf8( $group );
+        unless defined( $group ) && ( $group eq q{} || defined( _STRING( $group ) ) );
+    $self->_error( $ERROR_NOT_BINARY_STRING, 'group' )
+        if utf8::is_utf8( $group );
 
     my $request = {
         __send_to__               => 'group_coordinator',
@@ -792,11 +803,15 @@ sub fetch_offsets {
 
 
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'topic' )
-        unless defined( $topic ) && ( $topic eq q{} || defined( _STRING( $topic ) ) ) && !utf8::is_utf8( $topic );
+        unless defined( $topic ) && ( $topic eq q{} || defined( _STRING( $topic ) ) );
+    $self->_error( $ERROR_NOT_BINARY_STRING, 'topic' )
+        if utf8::is_utf8( $topic );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'partition' )
         unless defined( $partition ) && isint( $partition ) && $partition >= 0;
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'group' )
-        unless defined( $group ) && ( $group eq q{} || defined( _STRING( $group ) ) ) && !utf8::is_utf8( $group );
+        unless defined( $group ) && ( $group eq q{} || defined( _STRING( $group ) ) );
+    $self->_error( $ERROR_NOT_BINARY_STRING, 'group' )
+        if utf8::is_utf8( $group );
 
     my $request = {
         __send_to__               => 'group_coordinator',
