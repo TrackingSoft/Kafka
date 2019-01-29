@@ -354,7 +354,7 @@ sub try_receive {
 
     $socket->on_read(sub {
         my ($h, $data) = @_;
-        $message = substr $h->rbuf, 0, $length, '';
+        $message = substr $h->{rbuf}, 0, $length, '';
         $h->on_read();
         $h->on_eof();
         $cv->send;
