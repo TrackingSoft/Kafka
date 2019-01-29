@@ -293,6 +293,7 @@ sub receive {
     my $error;
     my $cv = AnyEvent->condvar;
 
+    $socket->rtimeout_reset;
     $socket->rtimeout($timeout);
     $socket->on_rtimeout(sub {
         my ($h) = @_;
@@ -308,6 +309,54 @@ sub receive {
     $socket->push_read(chunk => $length, sub {
         my ($h, $data) = @_;
         $message = $data;
+        $cv->send;
+    });
+
+    $cv->recv;
+    $socket->rtimeout(0);
+    die $error if $error;
+
+    return \$message;
+}
+
+sub try_receive {
+    my ( $self, $length, $timeout ) = @_;
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, '->receive' )
+        unless $length > 0
+    ;
+    $timeout = $self->{timeout} // $REQUEST_TIMEOUT unless defined $timeout;
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, '->receive' )
+        unless $timeout > 0
+    ;
+    my $socket = $self->{socket};
+    $self->_error( $ERROR_NO_CONNECTION, 'Attempt to work with a closed socket' ) if !$socket or $socket->destroyed;
+
+    my $message = '';
+    my $error;
+    my $cv = AnyEvent->condvar;
+
+    $socket->rtimeout($timeout);
+    $socket->on_rtimeout(sub {
+        my ($h) = @_;
+        $self->close;
+        $error = format_message( "Kafka::IO::Async(%s)->receive: ERROR='%s' (timeout=%s)",
+            $self->{host},
+            'Read timeout fired',
+            $timeout,
+        );
+        $cv->send;
+    });
+
+    $socket->on_eof(sub {
+        $message = undef;
+        $cv->send;
+    });
+
+    $socket->on_read(sub {
+        my ($h, $data) = @_;
+        $message = substr $h->rbuf, 0, $length, '';
+        $h->on_read();
+        $h->on_eof();
         $cv->send;
     });
 
@@ -378,10 +427,6 @@ sub _connect {
                     $fatal,
                 )
             );
-        },
-        on_eof => sub {
-            my ($h) = @_;
-            $self->close;
         },
     );
 

@@ -518,6 +518,8 @@ sub receive {
     return \$message;
 }
 
+*try_receive = \&receive;
+
 =head3 C<close>
 
 Closes connection to Kafka server.

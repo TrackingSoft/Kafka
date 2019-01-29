@@ -449,6 +449,8 @@ sub new {
         AutoCreateTopicsEnable  => 0,
         MaxLoggedErrors         => 100,
         dont_load_supported_api_versions => 0,
+        sasl_username           => undef,
+        sasl_password           => undef,
     }, $class;
 
     exists $p{$_} and $self->{$_} = $p{$_} foreach keys %$self;
@@ -705,7 +707,8 @@ sub sasl_auth_plain {
     $self->_sendIO( $broker, $encoded_sasl_req );
 
     my ($server_data, $io) = $self->_server_data_IO($broker);
-    my $encoded_sasl_resp_len_ref = $io->receive( 4 ); # receive resp msg size (actually is 0)
+    my $encoded_sasl_resp_len_ref = $io->try_receive( 4 ); # receive resp msg size (actually is 0)
+    return 0 unless $$encoded_sasl_resp_len_ref;
 
     my $sasl_resp_len = unpack 'l>', $$encoded_sasl_resp_len_ref;
     my $encoded_sasl_resp_ref = $io->receive( $sasl_resp_len ) if $sasl_resp_len;
@@ -1549,6 +1552,12 @@ sub _connectIO {
         if( defined $error ) {
             $self->_on_io_error( $server_data, $error );
             return;
+        }
+        if ( defined $self->{sasl_username} && defined $self->{sasl_password} ) {
+            unless ( $self->sasl_auth_plain(Username => $self->{sasl_username}, Password => $self->{sasl_password}) ) {
+                $self->_on_io_error( $server_data, 'Auth failed' );
+                return;
+            }
         }
     }
 
