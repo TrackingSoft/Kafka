@@ -428,6 +428,10 @@ sub _connect {
                 )
             );
         },
+        on_drain => sub {
+            my ($h) = @_;
+            $h->wtimeout(0);
+        }
     );
 
     $cv->recv;
