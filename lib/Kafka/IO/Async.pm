@@ -306,6 +306,17 @@ sub receive {
         $cv->send;
     });
 
+    $socket->on_error(sub {
+        my ($h, $fatal, $message) = @_;
+        $self->close if $fatal;
+        $error = format_message( "Kafka::IO::Async(%s)->handle: ERROR='%s' FATAL=%s",
+            $self->{host},
+            $message,
+            $fatal,
+        );
+        $cv->send;
+    });
+
     $socket->push_read(chunk => $length, sub {
         my ($h, $data) = @_;
         $message = $data;

@@ -752,7 +752,7 @@ sub get_metadata {
 
     $self->_update_metadata( $topic )
         # FATAL error
-        or $self->_error( $ERROR_CANNOT_GET_METADATA, format_message( "topic='%s'", $topic ) );
+        or $self->_error( $ERROR_CANNOT_GET_METADATA, $topic ? format_message( "topic='%s'", $topic ) : '' );
 
     my $clone;
     if ( defined $topic ) {
@@ -1547,6 +1547,7 @@ sub _connectIO {
             $server_data->{error} = undef;
         } catch {
             $error = $_;
+            warn +(split /\n/, $error)[0] . "\n";
         };
 
         if( defined $error ) {
