@@ -667,14 +667,15 @@ sub _get_supported_api_versions {
     return $api_versions;
 }
 
-=head3 C<sasl_auth_plain( Username =E<gt> $username, Password =E<gt> $password )>
+=head3 C<sasl_auth_plain( $broker, Username =E<gt> $username, Password =E<gt> $password )>
 
+Auth on C<$broker>. Connection must be established in advance.
 C<$username> and C<$password> are the username and password for
 SASL PLAINTEXT authentication respectively.
 
 =cut
 sub sasl_auth_plain {
-    my ($self, %p) = @_;
+    my ($self, $broker, %p) = @_;
     my ($username, $password) = ($p{Username}, $p{Password});
 
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'Username' )
@@ -691,11 +692,7 @@ sub sasl_auth_plain {
 
     my $encoded_request = $protocol{ $APIKEY_SASLHANDSHAKE }->{encode}->( $decoded_request );
 
-    my @brokers = $self->_get_interviewed_servers;
-    my $broker = $brokers[0];
-
-    return unless $self->_connectIO( $broker ) &&
-        $self->_sendIO( $broker, $encoded_request ) &&
+    return unless $self->_sendIO( $broker, $encoded_request ) &&
         ( my $encoded_response_ref = $self->_receiveIO( $broker ) );
 
     my $decoded_response = $protocol{ $APIKEY_SASLHANDSHAKE }->{decode}->( $encoded_response_ref );
@@ -1555,7 +1552,7 @@ sub _connectIO {
             return;
         }
         if ( defined $self->{sasl_username} && defined $self->{sasl_password} ) {
-            unless ( $self->sasl_auth_plain(Username => $self->{sasl_username}, Password => $self->{sasl_password}) ) {
+            unless ( $self->sasl_auth_plain($server, Username => $self->{sasl_username}, Password => $self->{sasl_password}) ) {
                 $self->_on_io_error( $server_data, 'Auth failed' );
                 return;
             }
