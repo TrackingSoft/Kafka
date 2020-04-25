@@ -49,6 +49,7 @@ use Kafka::Internals qw(
     $APIKEY_FETCH
     $APIKEY_OFFSET
     $APIKEY_METADATA
+    $APIKEY_SASLHANDSHAKE
     $MAX_SOCKET_REQUEST_BYTES
 );
 use Kafka::IO;
@@ -57,10 +58,15 @@ use Kafka::MockProtocol qw(
     decode_metadata_request
     decode_offset_request
     decode_produce_request
+    decode_saslhandshake_request
     encode_fetch_response
     encode_metadata_response
     encode_offset_response
     encode_produce_response
+    encode_saslhandshake_response
+);
+use Kafka::Protocol qw(
+    encode_saslhandshake_request
 );
 
 
@@ -266,6 +272,15 @@ my $decoded_metadata_response = {
     ],
 };
 
+=rem
+my $decoded_saslhandshake_request = {
+    CorrelationId => $CorrelationId,
+    ClientId      => q{},
+    ApiVersion    => 0,
+    Mechanism     => 'SCRAM-SHA-512',
+};
+my $normal_encoded_saslhandshake_request = encode_saslhandshake_request( $decoded_saslhandshake_request );
+=cut
 #-- public functions -----------------------------------------------------------
 
 =head2 FUNCTIONS
@@ -435,6 +450,48 @@ The following methods are defined for the C<Kafka::MockIO> class:
 Method emulation (C<Kafka::IO::send>).
 
 =cut
+use Authen::SCRAM::Server;
+use Encode qw/encode_utf8/;
+use MIME::Base64 qw/decode_base64/;
+use PBKDF2::Tiny qw/derive digest_fcn hmac/;
+
+my %CRED_INPUTS = (
+    test_user  => [ 'QSXCR+Q6sek8bf92', 'test_password', 4096 ],
+);
+
+my %CRED;
+my $SASL_SCRAM_STEP = 0;
+
+sub get_cred {
+    my $user = shift;
+    return @{ $CRED{$user} || [] };
+}
+
+sub _hmac {
+    my ( $sha, $sha_block, $key, $data ) = @_;
+    $key = $sha->($key) if length($key) > $sha_block;
+    return hmac( $data, $key, $sha, $sha_block );
+}
+
+my $scram_server;
+sub install_cred {
+    my ($type) = @_;
+    $scram_server = Authen::SCRAM::Server->new(
+        digest => $type,
+        credential_cb => \&get_cred,
+    );
+    my ( $sha, $sha_block ) = digest_fcn($type);
+    for my $user ( keys %CRED_INPUTS ) {
+        my ( $salt, $pw, $i ) = @{ $CRED_INPUTS{$user} };
+        $salt = decode_base64($salt);
+        my $salted_password = derive($type, encode_utf8($pw), $salt, $i );
+        my $client_key = _hmac( $sha, $sha_block, $salted_password, "Client Key" );
+        my $stored_key = $sha->($client_key);
+        my $server_key = _hmac( $sha, $sha_block, $salted_password, "Server Key" );
+        $CRED{$user} = [ $salt, $stored_key, $server_key, $i ];
+    }
+}
+
 sub send {
     my ( $self, $message ) = @_;
 
@@ -445,16 +502,27 @@ sub send {
         and Kafka::IO::_error( $self, $ERROR_NOT_BINARY_STRING, $description );
     ( my $len = length( $message .= q{} ) ) <= $MAX_SOCKET_REQUEST_BYTES
         or Kafka::IO::_error( $self, $ERROR_MISMATCH_ARGUMENT, $description );
-
     Kafka::IO::_debug_msg( $self, $message, 'Request to', 'green' )
         if Kafka::IO->debug_level == 1;
-
     if ( exists $_special_cases{ $message } ) {
         $encoded_response = $_special_cases{ $message };
         return length( $message );
     }
 
     undef $encoded_response;
+    if ($SASL_SCRAM_STEP == 1) {
+        my ($first_client_message_len, $first_client_message) = unpack "l>a*", $message;
+        my $first_server_message = encode_utf8($scram_server->first_msg($first_client_message));
+        $encoded_response = pack "l>a*", length($first_server_message), $first_server_message;
+        $SASL_SCRAM_STEP = 2;
+        return length($message);
+    } elsif ($SASL_SCRAM_STEP == 2) {
+        my ($final_client_message_len, $final_client_message) = unpack "l>a*", $message;
+        my $final_server_message = $scram_server->final_msg($final_client_message);
+        $encoded_response = pack "l>a*", length($final_server_message), $final_server_message;
+        $SASL_SCRAM_STEP = 0;
+        return length($message);
+    }
 
     $ApiKey = unpack( q{
         x[l]                # Size
@@ -462,7 +530,6 @@ sub send {
     }, $message );
 
     # Set up the response
-
     if ( $ApiKey == $APIKEY_PRODUCE ) {
         my $decoded_produce_request = decode_produce_request( \$message )
             or Kafka::IO::_error( $self, $ERROR_MISMATCH_ARGUMENT, $description );
@@ -596,6 +663,25 @@ sub send {
 
         $encoded_response = encode_metadata_response( $decoded_metadata_response )
             or Kafka::IO::_error( $self, $ERROR_MISMATCH_ARGUMENT, $description );
+    }
+    elsif ($ApiKey == $APIKEY_SASLHANDSHAKE){
+        my $decoded_saslhandshake_request = decode_saslhandshake_request(\$message);
+        my $decoded_saslhandshake_response = {
+            'CorrelationId' => 0,
+            'Mechanisms' => [
+                'PLAIN',
+                'SCRAM-SHA-512'
+            ],
+            'ErrorCode' => 0
+        };
+        $decoded_saslhandshake_response->{CorrelationId} = $decoded_saslhandshake_request->{CorrelationId};
+        if ($decoded_saslhandshake_request->{Mechanism} =~ /^SCRAM-(.*)/) {
+            $SASL_SCRAM_STEP = 1;
+            install_cred($1);
+        } else {
+            $decoded_saslhandshake_response->{ErrorCode} = 33; #UNSUPPORTED_SASL_MECHANISM
+        }
+        $encoded_response = encode_saslhandshake_response( $decoded_saslhandshake_response );
     }
     else {
         Kafka::IO::_error( $self, $ERROR_MISMATCH_ARGUMENT, "Unsupported API key in MockIO::send: $ApiKey" );

@@ -25,6 +25,8 @@ our @EXPORT = qw(
     %RETRY_ON_ERRORS
 );
 
+use Authen::SCRAM::Client;
+use Encode qw/encode/;
 use Data::Validate::Domain qw(
     is_hostname
 );
@@ -451,6 +453,7 @@ sub new {
         dont_load_supported_api_versions => 0,
         sasl_username           => undef,
         sasl_password           => undef,
+        sasl_mechanizm          => undef,
     }, $class;
 
     exists $p{$_} and $self->{$_} = $p{$_} foreach keys %$self;
@@ -667,27 +670,27 @@ sub _get_supported_api_versions {
     return $api_versions;
 }
 
-=head3 C<sasl_auth_plain( $broker, Username =E<gt> $username, Password =E<gt> $password )>
+=head3 C<sasl_auth( $broker, Username =E<gt> $username, Password =E<gt> $password )>
 
 Auth on C<$broker>. Connection must be established in advance.
 C<$username> and C<$password> are the username and password for
-SASL PLAINTEXT authentication respectively.
+SASL PLAINTEXT/SCRAM authentication respectively.
 
 =cut
-sub sasl_auth_plain {
+sub sasl_auth {
     my ($self, $broker, %p) = @_;
-    my ($username, $password) = ($p{Username}, $p{Password});
-
+    my ($username, $password, $mechanizm) = ($p{Username}, $p{Password}, $p{Mechanizm});
+    $mechanizm ||= 'PLAIN';
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'Username' )
-        unless defined( $username ) && defined( _STRING( $username ) )  && !utf8::is_utf8( $password );
+        unless defined( $username ) && defined( _STRING( $username ) )  && !utf8::is_utf8( $username );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'Password' )
         unless defined( $password ) && defined( _STRING( $password ) )  && !utf8::is_utf8( $password );
 
     my $decoded_request = {
-        CorrelationId   => Kafka::Internals->_get_CorrelationId(),
-        ClientId        => q{},
-        ApiVersion => 0,
-        Mechanism  => 'PLAIN',
+        CorrelationId => Kafka::Internals->_get_CorrelationId(),
+        ClientId      => q{},
+        ApiVersion    => 0,
+        Mechanism     => $mechanizm,
     };
 
     my $encoded_request = $protocol{ $APIKEY_SASLHANDSHAKE }->{encode}->( $decoded_request );
@@ -695,22 +698,45 @@ sub sasl_auth_plain {
     return unless $self->_sendIO( $broker, $encoded_request ) &&
         ( my $encoded_response_ref = $self->_receiveIO( $broker ) );
 
-    my $decoded_response = $protocol{ $APIKEY_SASLHANDSHAKE }->{decode}->( $encoded_response_ref );
+    if ($mechanizm =~ /SCRAM-(.*)$/) {
+        my $digest = $1;
+        my $client = Authen::SCRAM::Client->new(
+            digest => $digest,
+            username => $username,
+            password => $password,
+        );
+        my $first_msg = encode("utf-8", $client->first_msg());
+        my $client_first = pack "l>a*", length($first_msg), $first_msg;
+        return unless $self->_sendIO( $broker, $client_first);
 
-    my $msg = $username . "\0" . $username . "\0" . $password;
+        $encoded_response_ref = $self->_receiveIO( $broker );
+        return unless $encoded_response_ref;
+        my ($sasl_first_resp_len, $server_first) = unpack "l>a*", $$encoded_response_ref;
+        my $final_msg = encode("utf-8", $client->final_msg( $server_first ));
+        my $client_final = pack "l>a*", length($final_msg), $final_msg;
+        return unless $self->_sendIO( $broker, $client_final );
+        $encoded_response_ref = $self->_receiveIO( $broker );
+        return unless $encoded_response_ref;
+        my ($sasl_final_resp_len, $server_final) = unpack "l>a*", $$encoded_response_ref;
+        return $client->validate( $server_final );
+    } elsif ($mechanizm eq 'PLAIN') {
+        my $msg = $username . "\0" . $username . "\0" . $password;
 
-    my $encoded_sasl_req = pack( 'l>a'.length($msg), length($msg), $msg );
+        my $encoded_sasl_req = pack( 'l>a'.length($msg), length($msg), $msg );
 
-    $self->_sendIO( $broker, $encoded_sasl_req );
+        $self->_sendIO( $broker, $encoded_sasl_req );
 
-    my ($server_data, $io) = $self->_server_data_IO($broker);
-    my $encoded_sasl_resp_len_ref = $io->try_receive( 4 ); # receive resp msg size (actually is 0)
-    return 0 unless $$encoded_sasl_resp_len_ref;
+        my ($server_data, $io) = $self->_server_data_IO($broker);
+        my $encoded_sasl_resp_len_ref = $io->try_receive( 4 ); # receive resp msg size (actually is 0)
+        return 0 unless $$encoded_sasl_resp_len_ref;
 
-    my $sasl_resp_len = unpack 'l>', $$encoded_sasl_resp_len_ref;
-    my $encoded_sasl_resp_ref = $io->receive( $sasl_resp_len ) if $sasl_resp_len;
-
-    return 1;
+        my $sasl_resp_len = unpack 'l>', $$encoded_sasl_resp_len_ref;
+        return 1 unless $sasl_resp_len;
+        $io->receive( $sasl_resp_len );
+        return 1;
+    } else {
+        die "Unsupported mechanizm $mechanizm";
+    }
 }
 
 =head3 C<get_metadata( $topic )>
@@ -746,7 +772,6 @@ sub get_metadata {
 
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'topic' )
         unless !defined( $topic ) || ( ( $topic eq q{} || defined( _STRING( $topic ) ) ) && !utf8::is_utf8( $topic ) );
-
     $self->_update_metadata( $topic )
         # FATAL error
         or $self->_error( $ERROR_CANNOT_GET_METADATA, $topic ? format_message( "topic='%s'", $topic ) : '' );
@@ -1552,7 +1577,7 @@ sub _connectIO {
             return;
         }
         if ( defined $self->{sasl_username} && defined $self->{sasl_password} ) {
-            unless ( $self->sasl_auth_plain($server, Username => $self->{sasl_username}, Password => $self->{sasl_password}) ) {
+            unless ( $self->sasl_auth($server, Username => $self->{sasl_username}, Password => $self->{sasl_password}, Mechanizm => $self->{sasl_mechanizm}) ) {
                 $self->_on_io_error( $server_data, 'Auth failed' );
                 return;
             }

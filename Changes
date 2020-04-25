@@ -1,5 +1,8 @@
 Revision history for Kafka package
 
+{{$NEXT}}
+    Add support SASL authentication support
+
 1.07 Sun September 17 2017
 
     Added support for v1 Messages at Producer side, which allows
