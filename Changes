@@ -1,6 +1,8 @@
 Revision history for Kafka package
 
 {{$NEXT}}
+
+v1.07.9  2020-04-27 00:45:14 MSK
     - Remove Makefile.PL (Dist::Zilla static_install)
 
 v1.7.8  2020-04-26 23:29:08 MSK

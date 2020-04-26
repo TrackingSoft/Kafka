@@ -21,7 +21,7 @@ use warnings;
 
 our $DEBUG = 0;
 
-our $VERSION = 'v1.7.8';
+our $VERSION = 'v1.07.9';
 
 use Carp;
 use Config;
