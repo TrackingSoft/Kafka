@@ -787,14 +787,10 @@ sub get_metadata {
     my ( $self, $topic ) = @_;
 
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'topic' )
-<<<<<<< HEAD
-        unless !defined( $topic ) || ( ( $topic eq q{} || defined( _STRING( $topic ) ) ) && !utf8::is_utf8( $topic ) );
-=======
         unless !defined( $topic ) || ( $topic eq '' || defined( _STRING( $topic ) ) );
     $self->_error( $ERROR_NOT_BINARY_STRING, 'topic' )
         if utf8::is_utf8( $topic );
 
->>>>>>> forked/master
     $self->_update_metadata( $topic )
         # FATAL error
         or $self->_error( $ERROR_CANNOT_GET_METADATA, $topic ? format_message( "topic='%s'", $topic ) : '' );
