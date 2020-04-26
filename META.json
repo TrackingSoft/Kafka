@@ -127,7 +127,7 @@
          "web" : "https://github.com/TrackingSoft/Kafka"
       }
    },
-   "version" : "1.07.7",
+   "version" : "v1.07.7",
    "x_contributors" : [
       "Aleksandr Matveev <a.matveev@corp.mail.ru>",
       "Aleksandr <timon@timon.net.nz>",

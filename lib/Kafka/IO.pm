@@ -514,6 +514,17 @@ sub receive {
     return \$message;
 }
 
+=head3 C<< receive( $length <, $timeout> ) >>
+Receives a message up to C<$length> size from Kafka.
+
+C<$length> argument must be a positive number.
+
+Use optional C<$timeout> argument to override default timeout for this call only.
+
+Returns a reference to the received message.
+
+=cut
+
 *try_receive = \&receive;
 
 =head3 C<close>
