@@ -512,7 +512,7 @@ Possible error codes (corresponds to descriptions in `%ERROR`):
 
 - `$ERROR_NOT_BINARY_STRING`
 
-    \-1014 - Not binary string
+    \-1014 - Unicode data is not allowed
 
 - `$ERROR_COMPRESSION`
 
