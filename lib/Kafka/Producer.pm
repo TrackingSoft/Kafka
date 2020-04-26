@@ -17,7 +17,7 @@ use strict;
 use warnings;
 
 
-our $VERSION = 'v1.07.7';
+our $VERSION = 'v1.7.8';
 
 
 use Carp;

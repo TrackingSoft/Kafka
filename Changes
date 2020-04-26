@@ -2,6 +2,11 @@ Revision history for Kafka package
 
 {{$NEXT}}
 
+v1.7.8  2020-04-26 23:29:08 MSK
+    Migrate to milla
+    Pull code from TrackingSoft repo
+    Fix tests
+
 v1.07.7  2020-04-26 23:01:50 MSK
     Add support SASL authentication support
 

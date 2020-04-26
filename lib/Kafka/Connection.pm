@@ -16,7 +16,7 @@ use warnings;
 
 our $DEBUG = 0;
 
-our $VERSION = 'v1.07.7';
+our $VERSION = 'v1.7.8';
 
 use Exporter qw(
     import
