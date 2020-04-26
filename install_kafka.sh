@@ -3,11 +3,13 @@ set -eux
 
 MIRROR=http://mirrors.ibiblio.org/apache/kafka
 
-VERSION=${1:-1.0.0}
+VERSION=${1:-0.10.2.2}
 
 if [[ $VERSION == "1.0.0" ]]; then
     DIST="kafka_2.11-${VERSION}.tgz"
-elif [[ $VERSION == "0.10.2.1" ]]; then
+elif [[ $VERSION == "0.11.0.2" ]]; then
+    DIST="kafka_2.11-${VERSION}.tgz"
+elif [[ $VERSION == "0.10.2.2" ]]; then
     DIST="kafka_2.12-${VERSION}.tgz"
 elif [[ $VERSION == "0.9.0.1" ]]; then
     DIST="kafka_2.11-${VERSION}.tgz"

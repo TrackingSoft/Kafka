@@ -44,6 +44,7 @@ use Kafka qw(
     $COMPRESSION_LZ4
     $ERROR_CANNOT_GET_METADATA
     $ERROR_MISMATCH_ARGUMENT
+    $ERROR_NOT_BINARY_STRING
     $REQUEST_TIMEOUT
     $NOT_SEND_ANY_RESPONSE
     $WAIT_WRITTEN_TO_LOCAL_LOG
@@ -203,23 +204,35 @@ L<Kafka|Kafka> module.
 
 =cut
 sub new {
-    my ( $class, %p ) = @_;
+    my ( $class, %params ) = @_;
 
     my $self = bless {
         Connection      => undef,
         ClientId        => undef,
         RequiredAcks    => $WAIT_WRITTEN_TO_LOCAL_LOG,
-        Timeout         => $REQUEST_TIMEOUT,
+        Timeout         => undef,
     }, $class;
 
-    exists $p{$_} and $self->{$_} = $p{$_} foreach keys %$self;
+    foreach my $p ( keys %params ) {
+        if( exists $self->{ $p } ) {
+            $self->{ $p } = $params{ $p };
+        }
+        else {
+            $self->_error( $ERROR_MISMATCH_ARGUMENT, $p );
+        }
+    }
 
-    $self->{ClientId}       //= 'producer';
+    $self->{ClientId} //= 'producer';
 
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'Connection' )
         unless _INSTANCE( $self->{Connection}, 'Kafka::Connection' );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'ClientId' )
-        unless ( $self->{ClientId} eq '' || defined( _STRING( $self->{ClientId} ) ) ) && !utf8::is_utf8( $self->{ClientId} );
+        unless ( $self->{ClientId} eq '' || defined( _STRING( $self->{ClientId} ) ) );
+    $self->_error( $ERROR_NOT_BINARY_STRING, 'ClientId' )
+        if utf8::is_utf8( $self->{ClientId} );
+
+    # Use connection timeout if not provided explicitly
+    $self->{Timeout} //= $self->{Connection}->{Timeout} //= $REQUEST_TIMEOUT;
     $self->_error( $ERROR_MISMATCH_ARGUMENT, format_message( 'Timeout (%s)', $self->{Timeout} ) )
         unless defined _NUMBER( $self->{Timeout} ) && int( $self->{Timeout} * 1000 ) >= 1 && int( $self->{Timeout} * 1000 ) <= $MAX_INT32;
 
@@ -316,7 +329,9 @@ sub send {
     my ( $self, $topic, $partition, $messages, $keys, $compression_codec, $timestamps ) = @_;
 
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'topic' )
-        unless defined( $topic ) && ( $topic eq '' || defined( _STRING( $topic ) ) ) && !utf8::is_utf8( $topic );
+        unless defined( $topic ) && ( $topic eq '' || defined( _STRING( $topic ) ) );
+    $self->_error( $ERROR_NOT_BINARY_STRING, 'topic' )
+        if utf8::is_utf8( $topic );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'partition' )
         unless defined( $partition ) && isint( $partition ) && $partition >= 0;
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'messages' )
@@ -331,7 +346,9 @@ sub send {
     $messages = [ $messages ] unless ref( $messages );
     foreach my $message ( @$messages ) {
         $self->_error( $ERROR_MISMATCH_ARGUMENT, format_message( 'message = %s', $message ) )
-            unless defined( $message ) && ( $message eq '' || ( defined( _STRING( $message ) ) && !utf8::is_utf8( $message ) ) );
+            unless defined( $message ) && ( $message eq '' || defined( _STRING( $message ) ) );
+        $self->_error( $ERROR_NOT_BINARY_STRING, format_message( 'message = %s', $message ) )
+            if utf8::is_utf8( $message );
     }
 
     my $common_key;
@@ -343,12 +360,16 @@ sub send {
 
         foreach my $key ( @$keys ) {
             $self->_error( $ERROR_MISMATCH_ARGUMENT, format_message( 'key = %s', $key ) )
-                unless !defined( $key ) || $key eq '' || ( defined( _STRING( $key ) ) && !utf8::is_utf8( $key ) );
+                unless !defined( $key ) || $key eq '' || ( defined( _STRING( $key ) ) );
+            $self->_error( $ERROR_NOT_BINARY_STRING, format_message( 'key = %s', $key ) )
+                if utf8::is_utf8( $key );
         }
     }
     elsif( defined $keys ) {
         $self->_error( $ERROR_MISMATCH_ARGUMENT, format_message( 'key = %s', $keys ) )
-            unless $keys eq '' || ( defined( _STRING( $keys ) ) && !utf8::is_utf8( $keys ) );
+            unless $keys eq '' || defined( _STRING( $keys ) );
+        $self->_error( $ERROR_NOT_BINARY_STRING, format_message( 'key = %s', $keys ) )
+            if utf8::is_utf8( $keys );
         $common_key = $keys;
     }
     else {
