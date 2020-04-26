@@ -19,7 +19,7 @@ use warnings;
 
 use bigint; # this allows integers of practially any size at the cost of significant performance drop
 
-our $VERSION = '1.07';
+our $VERSION = 'v1.07.7';
 
 use Exporter qw(
     import

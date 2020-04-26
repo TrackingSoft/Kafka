@@ -20,7 +20,7 @@ use warnings;
 
 our $DEBUG = 0;
 
-our $VERSION = '1.07';
+our $VERSION = 'v1.07.7';
 
 use Exporter qw(
     import

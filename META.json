@@ -26,13 +26,15 @@
    "prereqs" : {
       "configure" : {
          "requires" : {
-            "Module::Build::Tiny" : "0.034"
+            "Module::Build::Tiny" : "0.034",
+            "perl" : "5.010"
          }
       },
       "develop" : {
          "requires" : {
             "Dist::Milla" : "v1.0.20",
             "Test::EOL" : "0",
+            "Test::MinimumVersion" : "0",
             "Test::More" : "0.88",
             "Test::Perl::Critic" : "0",
             "Test::Pod" : "1.41",
@@ -62,7 +64,8 @@
             "String::CRC32" : "1.5",
             "Sys::SigAction" : "0.21",
             "Time::HiRes" : "1.9711",
-            "Try::Tiny" : "0.21"
+            "Try::Tiny" : "0.21",
+            "perl" : "5.010"
          }
       },
       "test" : {
@@ -114,8 +117,55 @@
             "Test::Vars" : "0",
             "Test::Version" : "0",
             "Time::HiRes" : "1.9711",
-            "Try::Tiny" : "0.21"
+            "Try::Tiny" : "0.21",
+            "perl" : "5.010"
          }
+      }
+   },
+   "provides" : {
+      "Kafka" : {
+         "file" : "lib/Kafka.pm",
+         "version" : "v1.7.7"
+      },
+      "Kafka::Connection" : {
+         "file" : "lib/Kafka/Connection.pm",
+         "version" : "v1.7.7"
+      },
+      "Kafka::Consumer" : {
+         "file" : "lib/Kafka/Consumer.pm",
+         "version" : "v1.7.7"
+      },
+      "Kafka::Exceptions" : {
+         "file" : "lib/Kafka/Exceptions.pm",
+         "version" : "v1.7.7"
+      },
+      "Kafka::IO" : {
+         "file" : "lib/Kafka/IO.pm",
+         "version" : "v1.7.7"
+      },
+      "Kafka::IO::Async" : {
+         "file" : "lib/Kafka/IO/Async.pm",
+         "version" : "v1.7.7"
+      },
+      "Kafka::Int64" : {
+         "file" : "lib/Kafka/Int64.pm",
+         "version" : "v1.7.7"
+      },
+      "Kafka::Internals" : {
+         "file" : "lib/Kafka/Internals.pm",
+         "version" : "v1.7.7"
+      },
+      "Kafka::Message" : {
+         "file" : "lib/Kafka/Message.pm",
+         "version" : "v1.7.7"
+      },
+      "Kafka::Producer" : {
+         "file" : "lib/Kafka/Producer.pm",
+         "version" : "v1.7.7"
+      },
+      "Kafka::Protocol" : {
+         "file" : "lib/Kafka/Protocol.pm",
+         "version" : "v1.7.7"
       }
    },
    "release_status" : "stable",

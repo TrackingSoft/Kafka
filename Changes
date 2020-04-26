@@ -1,6 +1,8 @@
 Revision history for Kafka package
 
 {{$NEXT}}
+
+v1.07.7  2020-04-26 23:01:50 MSK
     Add support SASL authentication support
 
 1.07 Sun September 17 2017

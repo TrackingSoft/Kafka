@@ -21,7 +21,7 @@ use warnings;
 
 
 
-our $VERSION = '1.07';
+our $VERSION = 'v1.07.7';
 
 use Exporter qw(
     import
