@@ -278,7 +278,7 @@ sub new {
         unless _INSTANCE( $self->{Connection}, 'Kafka::Connection' );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'ClientId' )
         unless ( $self->{ClientId} eq q{} || defined( _STRING( $self->{ClientId} ) ) );
-    $self->_error( $ERROR_NOT_BINARY_STRING, 'ClientId' ) 
+    $self->_error( $ERROR_NOT_BINARY_STRING, 'ClientId' )
         if utf8::is_utf8( $self->{ClientId} );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, format_message( 'MaxWaitTime (%s)', $self->{MaxWaitTime} ) )
         unless defined( $self->{MaxWaitTime} ) && defined _NUMBER( $self->{MaxWaitTime} ) && int( $self->{MaxWaitTime} * 1000 ) >= 1 && int( $self->{MaxWaitTime} * 1000 ) <= $MAX_INT32;
@@ -977,3 +977,4 @@ without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
 PARTICULAR PURPOSE.
 
 =cut
+
