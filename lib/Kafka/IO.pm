@@ -514,7 +514,7 @@ sub receive {
     return \$message;
 }
 
-=head3 C<< receive( $length <, $timeout> ) >>
+=head3 C<< try_receive( $length <, $timeout> ) >>
 Receives a message up to C<$length> size from Kafka.
 
 C<$length> argument must be a positive number.
