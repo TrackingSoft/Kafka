@@ -171,13 +171,13 @@
    "release_status" : "stable",
    "resources" : {
       "bugtracker" : {
-         "web" : "https://github.com/TrackingSoft/Kafka/issues"
+         "web" : "https://github.com/my-mail-ru/Kafka/issues"
       },
-      "homepage" : "https://github.com/TrackingSoft/Kafka",
+      "homepage" : "https://github.com/my-mail-ru/Kafka",
       "repository" : {
          "type" : "git",
-         "url" : "https://github.com/TrackingSoft/Kafka.git",
-         "web" : "https://github.com/TrackingSoft/Kafka"
+         "url" : "https://github.com/my-mail-ru/Kafka.git",
+         "web" : "https://github.com/my-mail-ru/Kafka"
       }
    },
    "version" : "v1.07.7",
