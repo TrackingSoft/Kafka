@@ -329,6 +329,17 @@ sub receive {
     return \$message;
 }
 
+=head3 C<< try_receive( $length <, $timeout> ) >>
+Receives a message up to C<$length> size from Kafka.
+
+C<$length> argument must be a positive number.
+
+Use optional C<$timeout> argument to override default timeout for this call only.
+
+Returns a reference to the received message.
+
+=cut
+
 sub try_receive {
     my ( $self, $length, $timeout ) = @_;
     $self->_error( $ERROR_MISMATCH_ARGUMENT, '->receive' )
