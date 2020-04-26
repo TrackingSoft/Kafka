@@ -47,6 +47,7 @@ plan skip_all => 'because Test::PureASCII required for testing' if $@;
 
 all_perl_files_are_pure_ascii(
     {},
+    grep {defined $_}
     $modules_dir,
     $t_dir,
     $author_dir,

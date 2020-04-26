@@ -19,8 +19,6 @@ use warnings;
 
 use bigint; # this allows integers of practially any size at the cost of significant performance drop
 
-
-
 our $VERSION = '1.07';
 
 use Exporter qw(

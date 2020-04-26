@@ -21,8 +21,7 @@ use warnings;
 
 our $DEBUG = 0;
 
-our $VERSION = '1.0';
-
+our $VERSION = '1.07';
 
 use Carp;
 use Config;
@@ -243,12 +242,12 @@ sub send {
     ;
 
     my $socket = $self->{socket};
-    $self->_error( $ERROR_NO_CONNECTION, 'Attempt to work with a closed socket' ) if !$socket or $socket->destroyed;
+    $self->_error( $ERROR_NO_CONNECTION, 'Attempt to work with a closed socket' ) if !$socket || $socket->destroyed;
 
     $socket->wtimeout_reset;
     $socket->wtimeout($timeout);
     $socket->on_wtimeout(sub {
-        my ($h) = @_;
+        #my ($h) = @_;
         $self->close;
         $self->_error(
             $ERROR_CANNOT_SEND,
@@ -287,7 +286,7 @@ sub receive {
         unless $timeout > 0
     ;
     my $socket = $self->{socket};
-    $self->_error( $ERROR_NO_CONNECTION, 'Attempt to work with a closed socket' ) if !$socket or $socket->destroyed;
+    $self->_error( $ERROR_NO_CONNECTION, 'Attempt to work with a closed socket' ) if !$socket || $socket->destroyed;
 
     my $message = '';
     my $error;
@@ -296,7 +295,7 @@ sub receive {
     $socket->rtimeout_reset;
     $socket->rtimeout($timeout);
     $socket->on_rtimeout(sub {
-        my ($h) = @_;
+        #my ($h) = @_;
         $self->close;
         $error = format_message( "Kafka::IO::Async(%s)->receive: ERROR='%s' (timeout=%s)",
             $self->{host},
@@ -340,7 +339,7 @@ sub try_receive {
         unless $timeout > 0
     ;
     my $socket = $self->{socket};
-    $self->_error( $ERROR_NO_CONNECTION, 'Attempt to work with a closed socket' ) if !$socket or $socket->destroyed;
+    $self->_error( $ERROR_NO_CONNECTION, 'Attempt to work with a closed socket' ) if !$socket || $socket->destroyed;
 
     my $message = '';
     my $error;
@@ -348,7 +347,7 @@ sub try_receive {
 
     $socket->rtimeout($timeout);
     $socket->on_rtimeout(sub {
-        my ($h) = @_;
+        #my ($h) = @_;
         $self->close;
         $error = format_message( "Kafka::IO::Async(%s)->receive: ERROR='%s' (timeout=%s)",
             $self->{host},
@@ -364,7 +363,8 @@ sub try_receive {
     });
 
     $socket->on_read(sub {
-        my ($h, $data) = @_;
+        #my ($h, $data) = @_;
+        my ($h) = @_;
         $message = substr $h->{rbuf}, 0, $length, '';
         $h->on_read();
         $h->on_eof();
@@ -419,7 +419,7 @@ sub _connect {
         connect => [$name, $port],
         ($timeout ? (on_prepare => sub { $timeout } ) : ()),
         on_connect => sub {
-            my ($h, $host, $port, $retry) = @_;
+            #my ($h, $host, $port, $retry) = @_;
             $cv->send;
         },
         on_connect_error => sub {

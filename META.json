@@ -32,7 +32,11 @@
       "develop" : {
          "requires" : {
             "Dist::Milla" : "v1.0.20",
-            "Test::Pod" : "1.41"
+            "Test::EOL" : "0",
+            "Test::More" : "0.88",
+            "Test::Perl::Critic" : "0",
+            "Test::Pod" : "1.41",
+            "Test::Version" : "1"
          }
       },
       "runtime" : {
@@ -90,12 +94,19 @@
             "Sys::SigAction" : "0.21",
             "Test::Deep" : "0.119",
             "Test::Dist::VersionSync" : "0",
+            "Test::EOL" : "0",
             "Test::Exception" : "0.32",
             "Test::Fixme" : "0",
+            "Test::MinimumVersion" : "0",
+            "Test::Mojibake" : "0",
             "Test::More" : "0.72",
             "Test::NoTabs" : "0",
             "Test::NoWarnings" : "1.04",
             "Test::Perl::Critic" : "0",
+            "Test::PureASCII" : "0",
+            "Test::Spelling" : "0",
+            "Test::Strict" : "0",
+            "Test::Synopsis" : "0",
             "Test::TCP" : "2.08",
             "Test::Vars" : "0",
             "Test::Version" : "0",
@@ -107,16 +118,16 @@
    "release_status" : "stable",
    "resources" : {
       "bugtracker" : {
-         "web" : "https://github.com/my-mail-ru/Kafka/issues"
+         "web" : "https://github.com/TrackingSoft/Kafka/issues"
       },
-      "homepage" : "https://github.com/my-mail-ru/Kafka",
+      "homepage" : "https://github.com/TrackingSoft/Kafka",
       "repository" : {
          "type" : "git",
-         "url" : "https://github.com/my-mail-ru/Kafka.git",
-         "web" : "https://github.com/my-mail-ru/Kafka"
+         "url" : "https://github.com/TrackingSoft/Kafka.git",
+         "web" : "https://github.com/TrackingSoft/Kafka"
       }
    },
-   "version" : "1.07",
+   "version" : "1.07.7",
    "x_contributors" : [
       "Aleksandr Matveev <a.matveev@corp.mail.ru>",
       "Aleksandr <timon@timon.net.nz>",
@@ -129,6 +140,7 @@
       "Dan Book <grinnz@grinnz.com>",
       "David Schmidt <mail@davidschmidt.at>",
       "filimonov <filimonov.mikhail@gmail.com>",
+      "Nikolay Shulyakovskiy <n.shulyakovskiy@corp.mail.ru>",
       "Petr Plavjanik <petr.plavjanik@gooddata.com>",
       "Sergey Gladkov <sgladkov@trackingsoft.com>",
       "Sergiy Zuban <s.zuban@gmail.com>",

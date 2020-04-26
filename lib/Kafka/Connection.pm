@@ -1569,7 +1569,6 @@ sub _connectIO {
             $server_data->{error} = undef;
         } catch {
             $error = $_;
-            warn +(split /\n/, $error)[0] . "\n";
         };
 
         if( defined $error ) {
