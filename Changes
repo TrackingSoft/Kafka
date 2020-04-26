@@ -1,6 +1,7 @@
 Revision history for Kafka package
 
 {{$NEXT}}
+    - Remove Makefile.PL (Dist::Zilla static_install)
 
 v1.7.8  2020-04-26 23:29:08 MSK
     Migrate to milla
