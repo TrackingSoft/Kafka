@@ -1,6 +1,8 @@
 Revision history for Kafka package
 
 {{$NEXT}}
+
+v1.700.9  2020-04-27 12:07:39 MSK
     - Normalise module version
 
 v1.07.9  2020-04-27 00:45:14 MSK
