@@ -1,7 +1,7 @@
 #!/bin/bash
 set -eux
 
-MIRROR=http://mirrors.ibiblio.org/apache/kafka
+MIRROR=https://archive.apache.org/dist/kafka/
 
 VERSION=${1:-0.10.2.2}
 
