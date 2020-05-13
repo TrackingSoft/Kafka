@@ -5,7 +5,7 @@ package Kafka;
 
 =head1 NAME
 
-Kafka - Apache Kafka interface for Perl.
+Kafka - Apache Kafka low-level synchronous API, which does not use Zookeeper.
 
 =head1 VERSION
 
@@ -21,7 +21,7 @@ use warnings;
 
 
 
-our $VERSION = '1.07';
+our $VERSION = 'v1.700.9';
 
 use Exporter qw(
     import

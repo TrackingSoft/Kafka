@@ -16,9 +16,7 @@ use 5.010;
 use strict;
 use warnings;
 
-
-
-our $VERSION = '1.07';
+our $VERSION = 'v1.700.9';
 
 use Exporter qw(
     import
@@ -33,6 +31,7 @@ our @EXPORT_OK = qw(
     $APIKEY_APIVERSIONS
     $APIKEY_OFFSETCOMMIT
     $APIKEY_OFFSETFETCH
+    $APIKEY_SASLHANDSHAKE
     $DEFAULT_RAISE_ERROR
     $MAX_CORRELATIONID
     $MAX_INT16
@@ -143,6 +142,13 @@ The numeric code that the C<ApiKey> in the request take for the C<FindCoordinato
 
 =cut
 const our $APIKEY_FINDCOORDINATOR               => 10;
+
+=head3 C<$APIKEY_SASLHANDSHAKE>
+
+The numeric code that the C<ApiKey> in the request take for the C<SaslHandshake> request type.
+
+=cut
+const our $APIKEY_SASLHANDSHAKE                 => 17;
 
 =head3 C<$APIKEY_APIVERSIONS>
 

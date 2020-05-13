@@ -3,37 +3,47 @@
    "author" : [
       "Sergey Gladkov"
    ],
-   "dynamic_config" : 1,
-   "generated_by" : "ExtUtils::MakeMaker version 7.24, CPAN::Meta::Converter version 2.150010",
+   "dynamic_config" : 0,
+   "generated_by" : "Dist::Milla version v1.0.20, Dist::Zilla version 6.014, CPAN::Meta::Converter version 2.150010",
    "license" : [
       "perl_5"
    ],
    "meta-spec" : {
       "url" : "http://search.cpan.org/perldoc?CPAN::Meta::Spec",
-      "version" : "2"
+      "version" : 2
    },
    "name" : "Kafka",
    "no_index" : {
       "directory" : [
-         "t",
+         "eg",
+         "examples",
          "inc",
-         "xt",
-         "tools"
+         "share",
+         "t",
+         "xt"
       ]
    },
    "prereqs" : {
-      "build" : {
-         "requires" : {
-            "ExtUtils::MakeMaker" : "0"
-         }
-      },
       "configure" : {
          "requires" : {
-            "ExtUtils::MakeMaker" : "0"
+            "Module::Build::Tiny" : "0.034",
+            "perl" : "5.010"
+         }
+      },
+      "develop" : {
+         "requires" : {
+            "Dist::Milla" : "v1.0.20",
+            "Test::EOL" : "0",
+            "Test::MinimumVersion" : "0",
+            "Test::More" : "0.88",
+            "Test::Perl::Critic" : "0",
+            "Test::Pod" : "1.41",
+            "Test::Version" : "1"
          }
       },
       "runtime" : {
          "requires" : {
+            "Authen::SCRAM" : "0",
             "Carp" : "1.08",
             "Compress::LZ4Frame" : "0.012001",
             "Compress::Snappy" : "0.23",
@@ -86,55 +96,76 @@
             "Sub::Install" : "0.927",
             "Sys::SigAction" : "0.21",
             "Test::Deep" : "0.119",
+            "Test::Dist::VersionSync" : "0",
+            "Test::Distribution" : "0",
+            "Test::EOL" : "0",
             "Test::Exception" : "0.32",
+            "Test::Fixme" : "0",
+            "Test::Kwalitee" : "0",
+            "Test::Kwalitee::Extra" : "0",
+            "Test::MinimumVersion" : "0",
+            "Test::Mojibake" : "0",
             "Test::More" : "0.72",
+            "Test::NoTabs" : "0",
             "Test::NoWarnings" : "1.04",
+            "Test::Perl::Critic" : "0",
+            "Test::PureASCII" : "0",
+            "Test::Spelling" : "0",
+            "Test::Strict" : "0",
+            "Test::Synopsis" : "0",
             "Test::TCP" : "2.08",
+            "Test::Vars" : "0",
+            "Test::Version" : "0",
             "Time::HiRes" : "1.9711",
-            "Try::Tiny" : "0.21"
+            "Try::Tiny" : "0.21",
+            "perl" : "5.010"
          }
       }
    },
    "provides" : {
       "Kafka" : {
          "file" : "lib/Kafka.pm",
-         "version" : "1.07"
+         "version" : "v1.700.9"
       },
       "Kafka::Connection" : {
          "file" : "lib/Kafka/Connection.pm",
-         "version" : "1.07"
+         "version" : "v1.700.9"
       },
       "Kafka::Consumer" : {
          "file" : "lib/Kafka/Consumer.pm",
-         "version" : "1.07"
+         "version" : "v1.700.9"
       },
       "Kafka::Exceptions" : {
          "file" : "lib/Kafka/Exceptions.pm",
-         "version" : "1.07"
+         "version" : "v1.700.9"
       },
       "Kafka::IO" : {
          "file" : "lib/Kafka/IO.pm",
-         "version" : "1.07"
+         "version" : "v1.700.9"
+      },
+      "Kafka::IO::Async" : {
+         "file" : "lib/Kafka/IO/Async.pm",
+         "version" : "v1.700.9"
       },
       "Kafka::Int64" : {
          "file" : "lib/Kafka/Int64.pm",
-         "version" : "1.07"
+         "version" : "v1.700.9"
       },
       "Kafka::Internals" : {
          "file" : "lib/Kafka/Internals.pm",
-         "version" : "1.07"
+         "version" : "v1.700.9"
       },
       "Kafka::Message" : {
          "file" : "lib/Kafka/Message.pm",
-         "version" : "1.07"
+         "version" : "v1.700.9"
       },
       "Kafka::Producer" : {
          "file" : "lib/Kafka/Producer.pm",
-         "version" : "1.07"
+         "version" : "v1.700.9"
       },
       "Kafka::Protocol" : {
          "file" : "lib/Kafka/Protocol.pm",
-         "version" : "1.07"
+         "version" : "v1.700.9"
       }
    },
    "release_status" : "stable",
@@ -145,10 +176,28 @@
       "homepage" : "https://github.com/TrackingSoft/Kafka",
       "repository" : {
          "type" : "git",
-         "url" : "git://github.com/TrackingSoft/Kafka.git",
-         "web" : "http://github.com/TrackingSoft/Kafka"
+         "url" : "https://github.com/TrackingSoft/Kafka.git",
+         "web" : "https://github.com/TrackingSoft/Kafka"
       }
    },
-   "version" : "1.07",
-   "x_serialization_backend" : "JSON::PP version 2.27400"
+   "version" : "v1.700.9",
+   "x_contributors" : [
+      "Aleksandr Matveev",
+      "Alexander Kazakov",
+      "Alex Solovey",
+      "Damien Krotkine",
+      "Dan Book",
+      "David Schmidt",
+      "Filimonov",
+      "Nikolay Shulyakovskiy",
+      "Petr Plavjanik",
+      "Sergey Gladkov",
+      "Sergiy Zuban",
+      "Vlad Marchenko"
+   ],
+   "x_generated_by_perl" : "v5.28.2",
+   "x_serialization_backend" : "JSON::PP version 2.97001",
+   "x_spdx_expression" : "Artistic-1.0-Perl OR GPL-1.0-or-later",
+   "x_static_install" : 1
 }
+

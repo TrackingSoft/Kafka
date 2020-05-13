@@ -47,6 +47,7 @@ eval { use Test::NoTabs; };
 plan skip_all => 'because Test::NoTabs required for testing' if $@;
 
 all_perl_files_ok(
+    grep {defined $_}
     $modules_dir,
     $t_dir,
     $author_dir,

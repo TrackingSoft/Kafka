@@ -25,10 +25,12 @@ our @EXPORT_OK = qw(
     decode_metadata_request
     decode_offset_request
     decode_produce_request
+    decode_saslhandshake_request
     encode_fetch_response
     encode_metadata_response
     encode_offset_response
     encode_produce_response
+    encode_saslhandshake_response
 );
 
 
@@ -122,6 +124,18 @@ my ( $_FetchResponse_body_template,                         $_FetchResponse_body
                     # 8 HighwaterMarkOffset
     14
 );
+my ($_saslhandshake_template,                               $_saslhandshake_template_length) = (
+    q{x[l]l>s>l>},
+                    # x[l]    # Size (skip)
+                    # l>      # CorrelationId
+                    # s>      # ErrorCode
+                    # l>      # ApiVersions array size
+                    # X[l]
+                    # l>/(    # Enabled Mechanisms
+                    #     s>/a   # Mechanism
+                    # )
+    10
+);
 my ( $_OffsetResponse_body_template,                        $_OffsetResponse_body_length ) = (
     q{l>s>l>},      # 4 Partition
                     # 2 ErrorCode
@@ -141,6 +155,17 @@ my ( $_MetadataResponse_PartitionMetadata_body_template,    $_MetadataResponse_P
                     # 4 Leader
                     # 4 Replicas array size
     14
+);
+my ( $_SaslHandshakeRequest_header_template,                      $_SaslHandshakeRequest_header_length ) = (
+    q{l>s>s>l>s>s>},
+                    # 4 Size (skip)
+                    # 2 ApiKey
+                    # 2 ApiVersion
+                    # 4 CorrelationId
+                    # ClientId
+                    # String size
+                    # Mechanizm
+    16 #before mechanizm
 );
 my ( $_ProduceRequest_header_template,                      $_ProduceRequest_header_length ) = (
     q{x[l]s>s>l>s>/as>l>l>},
@@ -168,6 +193,58 @@ my $_package_error;
 The following functions are available for C<Kafka::MockProtocol> module.
 
 =cut
+
+=head3 C<encode_saslhandshake_response( $saslhandshake_response )>
+
+Encodes the argument and returns a string representing
+the structure of the SaslHandshake Response.
+
+This function takes the following arguments:
+
+=over 3
+
+=item C<$saslhandshake_response>
+
+C<$saslhandshake_response> is a response structure
+
+=back
+
+=cut
+sub encode_saslhandshake_response {
+    my ( $saslhandshake_response) = @_;
+    my $len = $_saslhandshake_template_length;
+    $len += $_ for map {2+length($_)} @{$saslhandshake_response->{Mechanisms}};
+    my $tmpl = $_saslhandshake_template . join '', map {'s>/a'} @{$saslhandshake_response->{Mechanisms}};
+    return pack('l>' . $tmpl, $len, 0, $saslhandshake_response->{CorrelationId}, $saslhandshake_response->{ErrorCode}, 0, scalar(@{$saslhandshake_response->{Mechanisms}}), @{$saslhandshake_response->{Mechanisms}});
+}
+
+=head3 C<decode_saslhandshake_request( $bin_stream_ref )>
+
+Decodes the argument and returns a reference to the hash representing
+the structure of the SaslHandshake Request (examples see C<t/*_decode_encode.t>).
+
+This function takes the following arguments:
+
+=over 3
+
+=item C<$bin_stream_ref>
+
+C<$bin_stream_ref> is a reference to the encoded Request buffer. The buffer
+must be a non-empty binary string.
+
+=back
+
+=cut
+sub decode_saslhandshake_request {
+    my ( $bin_stream_ref ) = @_;
+    _is_bin_stream_correct( $bin_stream_ref )
+        or return _protocol_error( $ERROR_MISMATCH_ARGUMENT );
+
+    my $resp = {};
+    ($resp->{Len}, $resp->{ApiKey}, $resp->{ApiVersion}, $resp->{CorrelationId}, $resp->{ClientId}, $resp->{MechanismLen}) = unpack $_SaslHandshakeRequest_header_template, $$bin_stream_ref;
+    $resp->{Mechanism} = substr($$bin_stream_ref, $_SaslHandshakeRequest_header_length, $resp->{MechanismLen});
+    return $resp;
+}
 
 # PRODUCE Request --------------------------------------------------------------
 

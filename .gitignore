@@ -10,3 +10,6 @@
 /vendor
 /kafka
 /perl_modules/
+.build/
+Kafka-*
+local/

@@ -16,7 +16,7 @@ use warnings;
 
 our $DEBUG = 0;
 
-our $VERSION = '1.07';
+our $VERSION = 'v1.700.9';
 
 use Exporter qw(
     import
@@ -25,6 +25,8 @@ our @EXPORT = qw(
     %RETRY_ON_ERRORS
 );
 
+use Authen::SCRAM::Client;
+use Encode qw/encode/;
 use Data::Validate::Domain qw(
     is_hostname
 );
@@ -118,6 +120,7 @@ use Kafka::Internals qw(
     $APIKEY_APIVERSIONS
     $APIKEY_OFFSETCOMMIT
     $APIKEY_OFFSETFETCH
+    $APIKEY_SASLHANDSHAKE
     $MAX_CORRELATIONID
     $MAX_INT32
     debug_level
@@ -125,6 +128,7 @@ use Kafka::Internals qw(
     format_message
 );
 use Kafka::IO;
+use Kafka::IO::Async;
 use Kafka::Protocol qw(
     $BAD_OFFSET
     $IMPLEMENTED_APIVERSIONS
@@ -136,6 +140,7 @@ use Kafka::Protocol qw(
     decode_find_coordinator_response
     decode_offsetcommit_response
     decode_offsetfetch_response
+    decode_saslhandshake_response
     encode_fetch_request
     encode_metadata_request
     encode_offset_request
@@ -144,6 +149,7 @@ use Kafka::Protocol qw(
     encode_find_coordinator_request
     encode_offsetcommit_request
     encode_offsetfetch_request
+    encode_saslhandshake_request
 );
 
 =head1 SYNOPSIS
@@ -233,6 +239,10 @@ my %protocol = (
     "$APIKEY_OFFSETFETCH"  => {
         decode                  => \&decode_offsetfetch_response,
         encode                  => \&encode_offsetfetch_request,
+    },
+    "$APIKEY_SASLHANDSHAKE"  => {
+        decode                  => \&decode_saslhandshake_response,
+        encode                  => \&encode_saslhandshake_request,
     },
 );
 
@@ -440,12 +450,16 @@ sub new {
         port                    => $KAFKA_SERVER_PORT,
         broker_list             => [],
         Timeout                 => $REQUEST_TIMEOUT,
+        async                   => 0,
         ip_version              => undef,
         SEND_MAX_ATTEMPTS       => $SEND_MAX_ATTEMPTS,
         RETRY_BACKOFF           => $RETRY_BACKOFF,
         AutoCreateTopicsEnable  => 0,
         MaxLoggedErrors         => 100,
         dont_load_supported_api_versions => 0,
+        sasl_username           => undef,
+        sasl_password           => undef,
+        sasl_mechanizm          => undef,
     }, $class;
 
     foreach my $p ( keys %params ) {
@@ -672,6 +686,75 @@ sub _get_supported_api_versions {
     return $api_versions;
 }
 
+=head3 C<sasl_auth( $broker, Username =E<gt> $username, Password =E<gt> $password )>
+
+Auth on C<$broker>. Connection must be established in advance.
+C<$username> and C<$password> are the username and password for
+SASL PLAINTEXT/SCRAM authentication respectively.
+
+=cut
+sub sasl_auth {
+    my ($self, $broker, %p) = @_;
+    my ($username, $password, $mechanizm) = ($p{Username}, $p{Password}, $p{Mechanizm});
+    $mechanizm ||= 'PLAIN';
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'Username' )
+        unless defined( $username ) && defined( _STRING( $username ) )  && !utf8::is_utf8( $username );
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'Password' )
+        unless defined( $password ) && defined( _STRING( $password ) )  && !utf8::is_utf8( $password );
+
+    my $decoded_request = {
+        CorrelationId => Kafka::Internals->_get_CorrelationId(),
+        ClientId      => q{},
+        ApiVersion    => 0,
+        Mechanism     => $mechanizm,
+    };
+
+    my $encoded_request = $protocol{ $APIKEY_SASLHANDSHAKE }->{encode}->( $decoded_request );
+
+    return unless $self->_sendIO( $broker, $encoded_request ) &&
+        ( my $encoded_response_ref = $self->_receiveIO( $broker ) );
+
+    if ($mechanizm =~ /SCRAM-(.*)$/) {
+        my $digest = $1;
+        my $client = Authen::SCRAM::Client->new(
+            digest => $digest,
+            username => $username,
+            password => $password,
+        );
+        my $first_msg = encode("utf-8", $client->first_msg());
+        my $client_first = pack "l>a*", length($first_msg), $first_msg;
+        return unless $self->_sendIO( $broker, $client_first);
+
+        $encoded_response_ref = $self->_receiveIO( $broker );
+        return unless $encoded_response_ref;
+        my ($sasl_first_resp_len, $server_first) = unpack "l>a*", $$encoded_response_ref;
+        my $final_msg = encode("utf-8", $client->final_msg( $server_first ));
+        my $client_final = pack "l>a*", length($final_msg), $final_msg;
+        return unless $self->_sendIO( $broker, $client_final );
+        $encoded_response_ref = $self->_receiveIO( $broker );
+        return unless $encoded_response_ref;
+        my ($sasl_final_resp_len, $server_final) = unpack "l>a*", $$encoded_response_ref;
+        return $client->validate( $server_final );
+    } elsif ($mechanizm eq 'PLAIN') {
+        my $msg = $username . "\0" . $username . "\0" . $password;
+
+        my $encoded_sasl_req = pack( 'l>a'.length($msg), length($msg), $msg );
+
+        $self->_sendIO( $broker, $encoded_sasl_req );
+
+        my ($server_data, $io) = $self->_server_data_IO($broker);
+        my $encoded_sasl_resp_len_ref = $io->try_receive( 4 ); # receive resp msg size (actually is 0)
+        return 0 unless $$encoded_sasl_resp_len_ref;
+
+        my $sasl_resp_len = unpack 'l>', $$encoded_sasl_resp_len_ref;
+        return 1 unless $sasl_resp_len;
+        $io->receive( $sasl_resp_len );
+        return 1;
+    } else {
+        die "Unsupported mechanizm $mechanizm";
+    }
+}
+
 =head3 C<get_metadata( $topic )>
 
 If C<$topic> is present, it must be a non-false string of non-zero length.
@@ -710,7 +793,7 @@ sub get_metadata {
 
     $self->_update_metadata( $topic )
         # FATAL error
-        or $self->_error( $ERROR_CANNOT_GET_METADATA, format_message( "topic='%s'", $topic ) );
+        or $self->_error( $ERROR_CANNOT_GET_METADATA, $topic ? format_message( "topic='%s'", $topic ) : '' );
 
     my $clone;
     if ( defined $topic ) {
@@ -1496,8 +1579,9 @@ sub _connectIO {
     ;
     unless( $server_data->{IO} ) {
         my $error;
+        my $io_class = $self->{async} ? 'Kafka::IO::Async' : 'Kafka::IO';
         try {
-            $server_data->{IO} = Kafka::IO->new(
+            $server_data->{IO} = $io_class->new(
                 host        => $server_data->{host},
                 port        => $server_data->{port},
                 timeout     => $self->{Timeout},
@@ -1511,6 +1595,12 @@ sub _connectIO {
         if( defined $error ) {
             $self->_on_io_error( $server_data, $error );
             return;
+        }
+        if ( defined $self->{sasl_username} && defined $self->{sasl_password} ) {
+            unless ( $self->sasl_auth($server, Username => $self->{sasl_username}, Password => $self->{sasl_password}, Mechanizm => $self->{sasl_mechanizm}) ) {
+                $self->_on_io_error( $server_data, 'Auth failed' );
+                return;
+            }
         }
     }
 

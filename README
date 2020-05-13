@@ -28,6 +28,7 @@ packages that are distributed separately from Perl. We recommend that
 you have the following packages installed before you install
 Kafka:
 
+   Authen::SCRAM::Client
    Carp
    Compress::Snappy
    Const::Fast
