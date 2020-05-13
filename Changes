@@ -1,6 +1,7 @@
 Revision history for Kafka package
 
 {{$NEXT}}
+    - Review fixes
 
 v1.700.9  2020-04-27 12:07:39 MSK
     - Normalise module version

@@ -3,7 +3,7 @@ package Kafka::IO::Async;
 =head1 NAME
 
 Kafka::IO::Async - Pseudo async interface to nonblocking network communication with the Apache Kafka server with Coro.
-This module implemets the same interface that usual Kafka::IO module
+This module implements the same interface that usual Kafka::IO module
 
 =head1 VERSION
 

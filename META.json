@@ -171,36 +171,29 @@
    "release_status" : "stable",
    "resources" : {
       "bugtracker" : {
-         "web" : "https://github.com/my-mail-ru/Kafka/issues"
+         "web" : "https://github.com/TrackingSoft/Kafka/issues"
       },
-      "homepage" : "https://github.com/my-mail-ru/Kafka",
+      "homepage" : "https://github.com/TrackingSoft/Kafka",
       "repository" : {
          "type" : "git",
-         "url" : "https://github.com/my-mail-ru/Kafka.git",
-         "web" : "https://github.com/my-mail-ru/Kafka"
+         "url" : "https://github.com/TrackingSoft/Kafka.git",
+         "web" : "https://github.com/TrackingSoft/Kafka"
       }
    },
    "version" : "v1.700.9",
    "x_contributors" : [
-      "Aleksandr Matveev <a.matveev@corp.mail.ru>",
-      "Aleksandr <timon@timon.net.nz>",
-      "Alexander Kazakov <akazakov@corp.mail.ru>",
-      "Alex Solovey <alex@trackingsoft.com>",
-      "Alex Solovey <a.solovey@gmail.com>",
-      "Alex Solovey <asolovey@users.noreply.github.com>",
-      "Damien Krotkine <3834+dams@users.noreply.github.com>",
-      "Damien Krotkine <dams@zarb.org>",
-      "Damien Krotkine <dkrotkine@booking.com>",
-      "Dan Book <grinnz@grinnz.com>",
-      "David Schmidt <mail@davidschmidt.at>",
-      "filimonov <filimonov.mikhail@gmail.com>",
-      "Nikolay Shulyakovskiy <n.shulyakovskiy@corp.mail.ru>",
-      "Petr Plavjanik <petr.plavjanik@gooddata.com>",
-      "Sergey Gladkov <sgladkov@trackingsoft.com>",
-      "Sergiy Zuban <s.zuban@gmail.com>",
-      "Sergiy Zuban <s.zuban@trackingsoft.com>",
-      "Vlad <marchenko@gmail.com>",
-      "Vlad Marchenko <vlad@trackingsoft.com>"
+      "Aleksandr Matveev",
+      "Alexander Kazakov",
+      "Alex Solovey",
+      "Damien Krotkine",
+      "Dan Book",
+      "David Schmidt",
+      "Filimonov",
+      "Nikolay Shulyakovskiy",
+      "Petr Plavjanik",
+      "Sergey Gladkov",
+      "Sergiy Zuban",
+      "Vlad Marchenko"
    ],
    "x_generated_by_perl" : "v5.28.2",
    "x_serialization_backend" : "JSON::PP version 2.97001",
