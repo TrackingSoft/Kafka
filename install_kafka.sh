@@ -38,3 +38,5 @@ fi
 mkdir -p kafka
 tar xzf $SOURCE -C kafka --strip-components 1
 
+# fix java options issue: https://stackoverflow.com/questions/36970622/kafka-unrecognized-vm-option-printgcdatestamps
+find kafka -name \*.sh -exec sed -i'' 's/-XX:+PrintGCDateStamps -XX:+PrintGCTimeStamps//g' {} \;
