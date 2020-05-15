@@ -43,6 +43,7 @@
       },
       "runtime" : {
          "requires" : {
+            "AnyEvent" : "7.17",
             "Authen::SCRAM" : "0",
             "Carp" : "1.08",
             "Compress::LZ4Frame" : "0.012001",

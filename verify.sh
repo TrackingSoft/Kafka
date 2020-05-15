@@ -10,6 +10,7 @@ cpanm --notest Test::Kwalitee::Extra
 export KAFKA_BASE_DIR="$( dirname $0 )/kafka"
 
 export RELEASE_TESTS=1
-perl Makefile.PL --no_full_tests &&         \
-make test
+perl Build.PL && \
+./Build build && \
+./Build test
 

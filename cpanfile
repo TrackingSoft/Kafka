@@ -1,3 +1,4 @@
+requires 'AnyEvent'                  => '7.17';
 requires 'Authen::SCRAM'             => '0';
 requires 'Carp'                      => '1.08';
 requires 'Compress::Snappy'          => '0.23';
