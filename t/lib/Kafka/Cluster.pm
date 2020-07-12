@@ -1009,6 +1009,8 @@ sub _create_kafka_log_dir {
     return;
 }
 
+my %_stopped; # port -> epoch
+
 # Starts server. Possible arguments:
 #   $server_name    - Name of the server.
 #   $property_file  - Path to the configuration file.
@@ -1021,6 +1023,11 @@ sub _start_server {
 
     my $cwd = _clear_cwd();
     chdir _clear_tainted( $log_dir );
+
+    while ( $_stopped{$port} && time() - $_stopped{$port} < 5 ) {
+       # do not attempt restarting too soon
+       sleep 5;
+    }
 
     my $proc_daemon = Proc::Daemon->new;
     my $pid = _clear_tainted( $proc_daemon->Init( {
@@ -1040,11 +1047,11 @@ sub _start_server {
 
         my $attempts = $MAX_START_ATTEMPT;
         while ( $attempts-- ) {
-            sleep 1;    # give it some time to warm up
+            sleep 2;    # give it some time to warm up
 
             unless ( kill 0, $pid ) {
                 # not running?
-                confess "Not running: $cmd_str";
+                confess "Not running: $cmd_str\nLog dir: $log_dir";
             }
 
 
@@ -1054,7 +1061,7 @@ sub _start_server {
             # won't work (no signals are trapped there) - actual java process keeps
             # running.
 
-            my $java_pid = $proc_daemon->get_pid( qr/.*java.+$server_name.+\Q$property_file\E.*/ );
+            my( $java_pid, $java_pid_file ) = $proc_daemon->get_pid( qr/.*java.+$server_name.+\Q$property_file\E.*/ );
 
             if( not $java_pid ) {
                 # sometimes it's not possible to find pid of java process by looking
@@ -1114,7 +1121,7 @@ sub _stop_zookeeper {
     my $port = $self->zookeeper_port;
     my $pid_file = $self->_get_zookeeper_pid_file_name;
 
-    confess 'Trying to stop zookeeper server while it is not running'
+    confess "Trying to stop zookeeper server (pid file: $pid_file) while it is not running"
         unless -e $pid_file;
 
     $self->_stop_server( $pid_file, 'zookeeper', $ZOOKEEPER_HOST, $port );
@@ -1145,8 +1152,12 @@ sub _stop_server {
         unlink $pid_file;
     }
 
+    sleep 10; # give it some time to release ports and other system resources
+
     confess "Port $host:$port is not available after stopping $server_name"
         if check_port( { host => $host, port => $port } );
+
+    $_stopped{$port} = time();
 }
 
 # Creates a new topic with specified replication factor.
