@@ -5,6 +5,7 @@ MANIFEST
 META.json
 META.yml
 README
+cpanfile
 dist.ini
 lib/Kafka.pm
 lib/Kafka/Connection.pm
