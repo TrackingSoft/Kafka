@@ -9,7 +9,7 @@ Kafka - Apache Kafka low-level synchronous API, which does not use Zookeeper.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka> package version 1.07 .
+This documentation refers to C<Kafka> package version 1.08 .
 
 =cut
 
@@ -21,7 +21,7 @@ use warnings;
 
 
 
-our $VERSION = 'v1.700.9';
+our $VERSION = 'v1.08';
 
 use Exporter qw(
     import

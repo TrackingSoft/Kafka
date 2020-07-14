@@ -7,7 +7,7 @@ This module implements the same interface that usual Kafka::IO module
 
 =head1 VERSION
 
-Read documentation for C<Kafka::IO> version 1.07 .
+Read documentation for C<Kafka::IO> version 1.08 .
 
 =cut
 
@@ -21,7 +21,7 @@ use warnings;
 
 our $DEBUG = 0;
 
-our $VERSION = 'v1.700.9';
+our $VERSION = 'v1.08';
 
 use Carp;
 use Config;

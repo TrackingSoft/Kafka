@@ -4,7 +4,7 @@ Kafka - Apache Kafka low-level synchronous API, which does not use Zookeeper.
 
 # VERSION
 
-This documentation refers to `Kafka` package version 1.07 .
+This documentation refers to `Kafka` package version 1.08 .
 
 # SYNOPSIS
 

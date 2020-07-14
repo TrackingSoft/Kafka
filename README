@@ -1,4 +1,4 @@
-Kafka package version 1.07
+Kafka package version 1.08
 ==============================
 
 The Kafka package is a set of Perl modules which provides a
@@ -15,10 +15,10 @@ INSTALLATION
 
 To install this package type the following:
 
-   perl Makefile.PL
-   make
-   make test
-   make install
+   perl Build.PL
+   ./Build
+   ./Build test
+   ./Build install
 
 DEPENDENCIES
 

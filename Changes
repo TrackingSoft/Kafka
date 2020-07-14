@@ -1,21 +1,11 @@
 Revision history for Kafka package
 
-{{$NEXT}}
-    - Review fixes
-
-v1.700.9  2020-04-27 12:07:39 MSK
-    - Normalise module version
-
-v1.07.9  2020-04-27 00:45:14 MSK
-    - Remove Makefile.PL (Dist::Zilla static_install)
-
-v1.7.8  2020-04-26 23:29:08 MSK
-    Migrate to milla
-    Pull code from TrackingSoft repo
-    Fix tests
-
-v1.07.7  2020-04-26 23:01:50 MSK
+1.08
     Add support SASL authentication support
+
+    Use Dist::Zilla static_install
+
+    Migrate to milla
 
 1.07 Sun September 17 2017
 

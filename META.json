@@ -126,47 +126,47 @@
    "provides" : {
       "Kafka" : {
          "file" : "lib/Kafka.pm",
-         "version" : "v1.700.9"
+         "version" : "1.08"
       },
       "Kafka::Connection" : {
          "file" : "lib/Kafka/Connection.pm",
-         "version" : "v1.700.9"
+         "version" : "1.08"
       },
       "Kafka::Consumer" : {
          "file" : "lib/Kafka/Consumer.pm",
-         "version" : "v1.700.9"
+         "version" : "1.08"
       },
       "Kafka::Exceptions" : {
          "file" : "lib/Kafka/Exceptions.pm",
-         "version" : "v1.700.9"
+         "version" : "1.08"
       },
       "Kafka::IO" : {
          "file" : "lib/Kafka/IO.pm",
-         "version" : "v1.700.9"
+         "version" : "1.08"
       },
       "Kafka::IO::Async" : {
          "file" : "lib/Kafka/IO/Async.pm",
-         "version" : "v1.700.9"
+         "version" : "1.08"
       },
       "Kafka::Int64" : {
          "file" : "lib/Kafka/Int64.pm",
-         "version" : "v1.700.9"
+         "version" : "1.08"
       },
       "Kafka::Internals" : {
          "file" : "lib/Kafka/Internals.pm",
-         "version" : "v1.700.9"
+         "version" : "1.08"
       },
       "Kafka::Message" : {
          "file" : "lib/Kafka/Message.pm",
-         "version" : "v1.700.9"
+         "version" : "1.08"
       },
       "Kafka::Producer" : {
          "file" : "lib/Kafka/Producer.pm",
-         "version" : "v1.700.9"
+         "version" : "1.08"
       },
       "Kafka::Protocol" : {
          "file" : "lib/Kafka/Protocol.pm",
-         "version" : "v1.700.9"
+         "version" : "1.08"
       }
    },
    "release_status" : "stable",
@@ -181,7 +181,7 @@
          "web" : "https://github.com/TrackingSoft/Kafka"
       }
    },
-   "version" : "v1.700.9",
+   "version" : "1.08",
    "x_contributors" : [
       "Aleksandr Matveev",
       "Alexander Kazakov",
